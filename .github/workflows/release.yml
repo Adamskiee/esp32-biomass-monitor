@@ -47,6 +47,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            firmware/build/esp32.esp32.esp32/*.bin
+            firmware/main/build/esp32.esp32.esp32/*.bin
             hardware-release*.zip
           generate_release_notes: true

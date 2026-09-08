@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Install core and library dependencies for the firmware
 
 # Install ESP32 Core
