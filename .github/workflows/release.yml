@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,23 +29,25 @@ jobs:
       - name: Setup Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
-      - name: Install ESP32 Core and Dependencies
-        run: |
-          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-          arduino-cli core install esp32:esp32@2.0.11 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-          arduino-cli lib install "Adafruit PM25 AQI Sensor@2.0.0" "DHT sensor library@1.4.7"
-
       - name: Compile Sketches and Export
-        run: arduino-cli compile --profile esp32 --warnings all --export-binaries firmware/
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: esp32:esp32:esp32
+          sketch-paths: |
+            firmware
+          cli-compile-flags: |
+            - --profile
+            - esp32
+            - --warnings
+            - all
+            - --export-binaries
 
       - name: Package Hardware Assets
         run: |
           # Package specific release-ready files from the hardware directory
           # Note: Fails gracefully if no such files exist yet, ensuring pipeline doesn't break
-          mkdir -p release-hardware
-          find hardware/ -type f \( -name "*.pdf" -o -name "*.zip" -o -name "*.csv" \) -exec cp {} release-hardware/ \; || true
-          cd release-hardware
-          zip -r ../hardware-release.zip ./* || true
+          cd hardware
+          zip -r ../hardware-release.zip . -i "*.pdf" "*.zip" "*.csv" || true
           cd ..
 
       - name: Create GitHub Release and Upload Assets
