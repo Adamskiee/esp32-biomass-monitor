@@ -3,3 +3,8 @@ build/
 *.elf
 .vscode/
 docs/superpowers
+
+# Arduino CLI build artifacts and hardware release zips
+firmware/build/
+hardware-release.zip
+release-hardware/
