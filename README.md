@@ -4,11 +4,9 @@
 
 This project uses an Arduino CLI `sketch.yaml` file for strict dependency version pinning. 
 
-To build locally with Arduino CLI, refer to the versions pinned in `firmware/sketch.yaml` and install them:
+To build locally with Arduino CLI, first install the pinned dependencies using the provided script:
 ```bash
-arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-arduino-cli lib install "Adafruit PM25 AQI Sensor" "DHT sensor library"
+./firmware/install_deps.sh
 ```
 
-If using the Arduino IDE, please refer to the versions pinned in `firmware/sketch.yaml` and install them via the Library Manager.
+If using the Arduino IDE, please refer to the versions pinned in `firmware/install_deps.sh` and install them via the Library Manager.

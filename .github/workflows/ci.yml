@@ -25,21 +25,15 @@ jobs:
           path: |
             ~/.arduino15
             ~/.core-simulator
-          key: ${{ runner.os }}-arduino-${{ hashFiles('firmware/sketch.yaml') }}
+          key: ${{ runner.os }}-arduino-${{ hashFiles('firmware/install_deps.sh') }}
           restore-keys: |
             ${{ runner.os }}-arduino-
 
       - name: Setup Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
+      - name: Install ESP32 Core and Dependencies
+        run: ./firmware/install_deps.sh
+
       - name: Compile Sketches
-        uses: arduino/compile-sketches@v1
-        with:
-          fqbn: esp32:esp32:esp32
-          sketch-paths: |
-            firmware
-          cli-compile-flags: |
-            - --profile
-            - esp32
-            - --warnings
-            - all
+        run: arduino-cli compile --profile esp32 --warnings all firmware/main/
