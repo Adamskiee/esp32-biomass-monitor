@@ -2,16 +2,21 @@
 #include "Config.h"
 
 void initActuators() {
+  // Drive pins HIGH (RELAY_OFF) before enabling OUTPUT mode to prevent startup glitch/clicking
+  digitalWrite(PIN_RELAY_SOLENOID, RELAY_OFF);
   pinMode(PIN_RELAY_SOLENOID, OUTPUT);
-  pinMode(PIN_RELAY_FAN, OUTPUT);
-  pinMode(PIN_RELAY_LED_RED, OUTPUT);
-  pinMode(PIN_RELAY_LED_YELLOW, OUTPUT);
-  pinMode(PIN_RELAY_LED_GREEN, OUTPUT);
 
-  // Turn all OFF by default
-  setSolenoid(false);
-  setFan(false);
-  setLedStatus(false, false, false);
+  digitalWrite(PIN_RELAY_FAN, RELAY_OFF);
+  pinMode(PIN_RELAY_FAN, OUTPUT);
+
+  digitalWrite(PIN_RELAY_LED_RED, RELAY_OFF);
+  pinMode(PIN_RELAY_LED_RED, OUTPUT);
+
+  digitalWrite(PIN_RELAY_LED_YELLOW, RELAY_OFF);
+  pinMode(PIN_RELAY_LED_YELLOW, OUTPUT);
+
+  digitalWrite(PIN_RELAY_LED_GREEN, RELAY_OFF);
+  pinMode(PIN_RELAY_LED_GREEN, OUTPUT);
 }
 
 void setFan(bool state) {
