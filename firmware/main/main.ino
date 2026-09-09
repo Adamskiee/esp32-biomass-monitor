@@ -1,11 +1,16 @@
 #include "Config.h"
 #include "Actuators.h"
+#include "AnalogSensors.h"
 
 void setup() {
   Serial.begin(115200);
   initActuators();
-  setLedStatus(false, true, false); // Test yellow
+  initAnalogSensors();
 }
 
-void loop() {}
+void loop() {
+  Serial.println(readMQ135Voltage());
+  delay(1000);
+}
+
 
