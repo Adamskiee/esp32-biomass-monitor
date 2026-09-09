@@ -1,0 +1,30 @@
+name: Draw.io Export
+on:
+  push:
+    paths:
+      - '**/*.drawio'
+
+permissions:
+  contents: write
+
+jobs:
+  drawio-export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Export Draw.io files to SVG
+        uses: rlespinasse/drawio-export-action@v2
+        with:
+          format: svg
+          transparent: false
+          action-mode: all
+
+      - name: Commit Generated SVGs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: auto-export drawio diagrams [skip ci]"
+          file_pattern: '**/*.svg'
