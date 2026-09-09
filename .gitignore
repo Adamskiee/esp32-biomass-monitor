@@ -8,3 +8,4 @@ docs/superpowers
 **/build/
 hardware-release.zip
 release-hardware/
+.worktrees/
