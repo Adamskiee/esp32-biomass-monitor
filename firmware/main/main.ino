@@ -1,9 +1,11 @@
 #include "Config.h"
+#include "Actuators.h"
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("System Booting...");
+  initActuators();
+  setLedStatus(false, true, false); // Test yellow
 }
 
-void loop() {
-}
+void loop() {}
+
