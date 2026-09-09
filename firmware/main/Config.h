@@ -24,3 +24,8 @@
 #define PIN_MQ135 34
 #define PIN_MQ2 35
 #define V_DIVIDER_RATIO 0.6 // 15K / (10K + 15K)
+
+// Timing and Safety Thresholds
+#define POLL_INTERVAL_MS 2000
+#define MQ2_ALARM_VOLTAGE 2.5
+#define EXHAUST_TEMP_ALARM_C 80.0

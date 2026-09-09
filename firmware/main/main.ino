@@ -15,7 +15,7 @@ void setup() {
 }
 
 void loop() {
-  if (millis() - lastRead > 2000) {
+  if (millis() - lastRead >= POLL_INTERVAL_MS) {
     lastRead = millis();
     
     float mq135 = readMQ135Voltage();
@@ -23,11 +23,18 @@ void loop() {
     float temp = readTemperature();
     float exhaustTemp = readThermocouple();
     
-    Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %.1fC | Exhaust: %.1fC\n", 
-                  mq135, mq2, temp, exhaustTemp);
+    char tempStr[16];
+    if (isnan(temp)) {
+      snprintf(tempStr, sizeof(tempStr), "ERR");
+    } else {
+      snprintf(tempStr, sizeof(tempStr), "%.1fC", temp);
+    }
+
+    Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %s | Exhaust: %.1fC\n", 
+                  mq135, mq2, tempStr, exhaustTemp);
 
     // Safety logic: if exhaust temp is too high, gas detected, or sensor fault (fail-safe)
-    if (isnan(exhaustTemp) || isnan(mq2) || mq2 > 2.5 || exhaustTemp > 80.0) {
+    if (isnan(exhaustTemp) || mq2 < 0.1 || mq2 > MQ2_ALARM_VOLTAGE || exhaustTemp > EXHAUST_TEMP_ALARM_C) {
       setFan(true);
       setLedStatus(true, false, false); // Red LED
     } else {

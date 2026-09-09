@@ -24,6 +24,7 @@ float readThermocouple() {
 }
 
 int readPM25() {
+  // TODO: Implement real PM2.5 serial frame parsing
   // Dummy implementation for PM2.5 frame reading
   if (Serial2.available()) {
     while(Serial2.available()) Serial2.read(); // flush for now
