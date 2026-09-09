@@ -26,8 +26,8 @@ void loop() {
     Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %.1fC | Exhaust: %.1fC\n", 
                   mq135, mq2, temp, exhaustTemp);
 
-    // Safety logic: if exhaust temp is too high or gas detected
-    if (mq2 > 2.5 || exhaustTemp > 80.0) {
+    // Safety logic: if exhaust temp is too high, gas detected, or sensor fault (fail-safe)
+    if (isnan(exhaustTemp) || isnan(mq2) || mq2 > 2.5 || exhaustTemp > 80.0) {
       setFan(true);
       setLedStatus(true, false, false); // Red LED
     } else {
