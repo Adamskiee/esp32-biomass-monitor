@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: Biomass Monitor API
+  description: >
+    API for interacting with the ESP32 Biomass Monitor sensors and settings. 
+    Note that as this is served from an ESP32, connections may be plaintext over HTTP.
+  version: 1.0.0
+servers:
+  - url: /
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+  schemas:
+    SystemState:
+      type: object
+      properties:
+        temperature_c:
+          type: number
+          format: float
+          nullable: true
+        chamber_temp_c:
+          type: number
+          format: float
+          nullable: true
+        mq135_v:
+          type: number
+          format: float
+          nullable: true
+        mq2_v:
+          type: number
+          format: float
+          nullable: true
+    Settings:
+      type: object
+      properties:
+        threshold_chamber_temp_c:
+          type: number
+          format: float
+          minimum: 20.0
+          maximum: 150.0
+        threshold_mq2_v:
+          type: number
+          format: float
+          minimum: 0.1
+          maximum: 5.0
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+security:
+  - basicAuth: []
+paths:
+  /api/state:
+    options:
+      summary: CORS preflight for state
+      security: []
+      responses:
+        '200':
+          description: OK
+    get:
+      summary: Retrieves real-time sensor data
+      responses:
+        '200':
+          description: A JSON object returning sensor readings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemState'
+        '401':
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Unauthorized
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Not Found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/settings:
+    options:
+      summary: CORS preflight for settings
+      security: []
+      responses:
+        '200':
+          description: OK
+    get:
+      summary: Retrieves current configuration thresholds
+      responses:
+        '200':
+          description: A JSON object containing current configuration limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Unauthorized
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Not Found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Updates configuration thresholds
+      description: >
+        Accepts partial or full updates to thresholds.
+        Warning: The ESP32 enforces a strict payload limit of 256 bytes and rejects fragmented packets to prevent DoS attacks.
+        Frequent updates are applied instantly to memory, but persisted to flash at most once every 60 seconds.
+      requestBody:
+        description: A JSON object accepting partial or full updates to the thresholds.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+      responses:
+        '200':
+          description: Successful update
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+        '400':
+          description: Empty payload, payload exceeds 256 bytes, or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Unauthorized
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Not Found

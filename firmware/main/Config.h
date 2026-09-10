@@ -27,5 +27,3 @@
 
 // Timing and Safety Thresholds
 #define POLL_INTERVAL_MS 2000
-#define MQ2_ALARM_VOLTAGE 2.5
-#define CHAMBER_TEMP_ALARM_C 80.0

@@ -4,7 +4,13 @@ set -e
 
 # Install ESP32 Core
 arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-arduino-cli core install esp32:esp32@2.0.11 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+arduino-cli core install esp32:esp32@3.0.4 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
 
 # Install required libraries
-arduino-cli lib install "Adafruit PM25 AQI Sensor@2.0.0" "DHT sensor library@1.4.7" "MAX6675 library@1.1.2"
+arduino-cli lib install "Adafruit PM25 AQI Sensor@2.0.0" "DHT sensor library@1.4.7" "Adafruit Unified Sensor" "MAX6675 library@1.1.2" "ArduinoJson" "Async TCP" "ESP Async WebServer"
+
+# Setup Secrets.h if it does not exist
+if [ ! -f firmware/main/Secrets.h ] && [ -f firmware/main/Secrets.h.example ]; then
+    cp firmware/main/Secrets.h.example firmware/main/Secrets.h
+    echo "Created Secrets.h from example"
+fi
