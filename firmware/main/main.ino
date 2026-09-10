@@ -37,11 +37,11 @@ void loop() {
                   t_mq135, t_mq2, tempStr, t_chamber);
 
     bool do_save = false;
-    float safe_chamber_limit;
-    float safe_mq2_limit;
+    static float safe_chamber_limit = 80.0;
+    static float safe_mq2_limit = 2.5;
     
     // Grab safe copies and update API cache rapidly
-    if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10))) {
         // Update sensor cache for API
         current_mq135_v = t_mq135;
         current_mq2_v = t_mq2;
