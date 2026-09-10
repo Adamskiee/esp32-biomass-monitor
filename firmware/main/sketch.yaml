@@ -9,3 +9,6 @@ profiles:
       - DHT sensor library (1.4.7)
       - MAX6675 library (1.1.2)
       - Adafruit Unified Sensor (1.1.15)
+      - ArduinoJson (7.0.4)
+      - Async TCP (3.5.0)
+      - ESP Async WebServer (3.12.0)

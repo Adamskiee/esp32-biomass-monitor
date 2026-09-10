@@ -10,3 +10,4 @@ hardware-release.zip
 release-hardware/
 .worktrees/
 worktrees/
+firmware/main/Secrets.h
