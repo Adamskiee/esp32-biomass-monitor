@@ -12,6 +12,43 @@ components:
     basicAuth:
       type: http
       scheme: basic
+  schemas:
+    SystemState:
+      type: object
+      properties:
+        temperature_c:
+          type: number
+          format: float
+          nullable: true
+        chamber_temp_c:
+          type: number
+          format: float
+          nullable: true
+        mq2_v:
+          type: number
+          format: float
+          nullable: true
+    Settings:
+      type: object
+      properties:
+        threshold_chamber_temp_c:
+          type: number
+          format: float
+          minimum: 20.0
+          maximum: 150.0
+        threshold_mq2_v:
+          type: number
+          format: float
+          minimum: 0.1
+          maximum: 5.0
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
 security:
   - basicAuth: []
 paths: {}
