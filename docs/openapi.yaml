@@ -108,3 +108,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Updates configuration thresholds
+      description: >
+        Accepts partial or full updates to thresholds.
+        Warning: The ESP32 enforces a strict payload limit of 256 bytes and rejects fragmented packets to prevent DoS attacks.
+        Warning: Settings are persisted to flash memory. Clients *must not* continuously poll or update settings, as rapid writes will permanently degrade the microcontroller's flash storage.
+      requestBody:
+        description: A JSON object accepting partial or full updates to the thresholds.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+      responses:
+        '200':
+          description: Successful update
+        '400':
+          description: Empty payload, payload exceeds 256 bytes, or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
