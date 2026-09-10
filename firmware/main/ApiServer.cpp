@@ -110,18 +110,23 @@ void initApiServer() {
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, (const char*)data, len);
             
-            request->_tempObject = (void*)(intptr_t)(!error ? 1 : 2);
-
-            if (!error) {
+            if (error || !doc.is<JsonObject>()) {
+                request->_tempObject = (void*)(intptr_t)2;
+            } else {
+                request->_tempObject = (void*)(intptr_t)1;
                 if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5))) {
                     bool invalid_value = false;
                     bool has_chamber_temp = doc.containsKey("threshold_chamber_temp_c");
                     float new_chamber_temp = threshold_chamber_temp_c;
                     
                     if (has_chamber_temp) {
-                        float val = doc["threshold_chamber_temp_c"].as<float>();
-                        if (val >= 20.0 && val <= 150.0) {
-                            new_chamber_temp = val;
+                        if (doc["threshold_chamber_temp_c"].is<float>()) {
+                            float val = doc["threshold_chamber_temp_c"].as<float>();
+                            if (val >= 20.0 && val <= 150.0) {
+                                new_chamber_temp = val;
+                            } else {
+                                invalid_value = true;
+                            }
                         } else {
                             invalid_value = true;
                         }
@@ -131,12 +136,20 @@ void initApiServer() {
                     float new_mq2 = threshold_mq2_v;
                     
                     if (has_mq2) {
-                        float val = doc["threshold_mq2_v"].as<float>();
-                        if (val >= 0.1 && val <= 5.0) {
-                            new_mq2 = val;
+                        if (doc["threshold_mq2_v"].is<float>()) {
+                            float val = doc["threshold_mq2_v"].as<float>();
+                            if (val >= 0.1 && val <= 5.0) {
+                                new_mq2 = val;
+                            } else {
+                                invalid_value = true;
+                            }
                         } else {
                             invalid_value = true;
                         }
+                    }
+
+                    if (!has_chamber_temp && !has_mq2) {
+                        invalid_value = true;
                     }
                     
                     if (!invalid_value) {

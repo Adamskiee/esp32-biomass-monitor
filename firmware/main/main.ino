@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 #include "Config.h"
 #include "SystemState.h"
 #include "Actuators.h"
