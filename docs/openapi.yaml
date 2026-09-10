@@ -4,8 +4,7 @@ info:
   description: >
     API for interacting with the ESP32 Biomass Monitor sensors and settings. 
     Note that as this is served from an ESP32, connections may be plaintext over HTTP.
-    
-    **CORS Warning:** The API echoes the Origin header, but the C++ backend currently does not explicitly set `Access-Control-Allow-Credentials: true`, which may cause browser preflight rejections when sending Basic Auth credentials.
+    Basic Auth should only be used on an isolated/trusted VLAN, or consider upgrading the firmware to use Digest Auth to prevent credential interception.
   version: 1.0.0
 servers:
   - url: /
@@ -17,44 +16,95 @@ components:
   schemas:
     SystemState:
       type: object
+      required:
+        - uptime_ms
+        - tmp_c
+        - ch_tmp_c
+        - mq2_v
       properties:
-        temperature_c:
-          type: number
-          format: float
+        uptime_ms:
+          type: integer
+          format: int64
+          description: ESP32 uptime in milliseconds (64-bit to prevent 49-day overflow)
+        tmp_c:
+          type: integer
           nullable: true
-        chamber_temp_c:
-          type: number
-          format: float
+          description: Ambient temperature scaled by 10 (e.g., 205 = 20.5 °C). Null if the sensor faults.
+        ch_tmp_c:
+          type: integer
           nullable: true
+          description: Chamber temperature scaled by 10. Null if the sensor faults.
         mq2_v:
-          type: number
-          format: float
+          type: integer
           nullable: true
+          description: MQ2 gas sensor voltage scaled by 100 (e.g., 315 = 3.15 V). Null if the sensor faults.
     Settings:
       type: object
+      additionalProperties: false
+      required:
+        - th_tmp_c
+        - th_ch_tmp_c
+        - th_mq2_v
       properties:
-        threshold_chamber_temp_c:
-          type: number
-          format: float
-          minimum: 20.0
-          maximum: 150.0
-        threshold_mq2_v:
-          type: number
-          format: float
-          minimum: 0.1
-          maximum: 5.0
+        th_tmp_c:
+          type: integer
+          description: Threshold scaled by 10.
+          minimum: -200
+          maximum: 1000
+        th_ch_tmp_c:
+          type: integer
+          description: Threshold scaled by 10.
+          minimum: 200
+          maximum: 1500
+        th_mq2_v:
+          type: integer
+          description: Threshold scaled by 100.
+          minimum: 10
+          maximum: 500
     ErrorResponse:
       type: object
+      required:
+        - code
       properties:
-        status:
+        code:
+          type: integer
+          enum: [1, 2, 3, 4, 5]
+          description: >
+            1 = invalid_payload or cross-field validation conflict
+            2 = payload_too_large
+            3 = rate_limited_flash_protect
+            4 = auth_brute_force_lockout
+            5 = unsupported_media_type
+        msg:
           type: string
-          example: error
-        message:
+          description: Optional short message
+        details:
           type: string
+          description: Optional details for validation errors
 security:
   - basicAuth: []
 paths:
   /api/state:
+    options:
+      summary: CORS preflight for state
+      security: []
+      responses:
+        '204':
+          description: OK
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+              description: Should include Authorization, If-Match, X-Requested-With
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
     get:
       summary: Retrieves real-time sensor data
       responses:
@@ -66,6 +116,11 @@ paths:
                 $ref: '#/components/schemas/SystemState'
         '401':
           description: Unauthorized
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait after brute-force lockout (in-RAM exponential backoff)
           content:
             application/json:
               schema:
@@ -83,17 +138,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/settings:
+    options:
+      summary: CORS preflight for settings
+      security: []
+      responses:
+        '204':
+          description: OK
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+              description: Should include Authorization, If-Match, X-Requested-With
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
     get:
       summary: Retrieves current configuration thresholds
       responses:
         '200':
           description: A JSON object containing current configuration limits
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: Entity tag for the current settings state
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Settings'
         '401':
           description: Unauthorized
+          headers:
+            Retry-After:
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -110,36 +194,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-    post:
-      summary: Updates configuration thresholds
+    put:
+      summary: Replaces configuration thresholds
       description: >
-        Accepts partial or full updates to thresholds.
-        Warning: The ESP32 enforces a strict payload limit of 256 bytes and rejects fragmented packets to prevent DoS attacks.
-        Warning: Settings are persisted to flash memory. Clients *must not* continuously poll or update settings, as rapid writes will permanently degrade the microcontroller's flash storage.
+        Accepts a full replacement of thresholds to simplify C-struct deserialization.
+        Warning: Settings are persisted to flash memory. Clients *must not* continuously poll or update settings.
+        ETag precondition prevents lost updates. The ESP32 strictly diffs the payload in RAM and silently returns 204 without flashing if values are unchanged.
+      parameters:
+        - in: header
+          name: If-Match
+          required: true
+          schema:
+            type: string
+          description: ETag of the current settings to prevent redundant or conflicting writes.
+        - in: header
+          name: X-Requested-With
+          required: true
+          schema:
+            type: string
+          description: Required to prevent CSRF attacks from browsers.
       requestBody:
-        description: A JSON object accepting partial or full updates to the thresholds.
+        description: A JSON object accepting full updates to the thresholds.
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Settings'
       responses:
-        '200':
-          description: Successful update
+        '204':
+          description: Successful update, no content returned
         '400':
-          description: Empty payload, payload exceeds 256 bytes, or validation failed
+          description: Empty payload or validation failed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+          headers:
+            Retry-After:
+              schema:
+                type: integer
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '412':
+          description: Precondition Failed (ETag mismatch)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload exceeds 256 bytes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported Media Type (must be application/json)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests (rate limited to protect flash memory)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Number of seconds to wait before trying again
           content:
             application/json:
               schema:
