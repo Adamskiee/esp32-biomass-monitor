@@ -3,6 +3,7 @@
 #include "Actuators.h"
 #include "AnalogSensors.h"
 #include "DigitalSensors.h"
+#include "ApiServer.h"
 
 unsigned long lastRead = 0;
 
@@ -13,6 +14,7 @@ void setup() {
   initAnalogSensors();
   initDigitalSensors();
   setLedStatus(false, false, true); // Green = system ready
+  initApiServer();
   Serial.println("System Ready.");
 }
 
