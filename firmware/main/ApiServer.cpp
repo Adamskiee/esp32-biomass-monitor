@@ -86,8 +86,11 @@ void initApiServer() {
             if (status == 1) {
                 AsyncWebServerResponse *response = request->beginResponse(200, "application/json", "{\"status\":\"success\"}");
                 request->send(addCorsOrigin(request, response));
+            } else if (status == 3) {
+                AsyncWebServerResponse *response = request->beginResponse(503, "application/json", "{\"status\":\"error\",\"message\":\"Server busy\"}");
+                request->send(addCorsOrigin(request, response));
             } else {
-                AsyncWebServerResponse *response = request->beginResponse(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON, Mutex Timeout, or Invalid Values\"}");
+                AsyncWebServerResponse *response = request->beginResponse(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON, Payload Exceeds 256 bytes, or Invalid Values\"}");
                 request->send(addCorsOrigin(request, response));
             }
         }, 
@@ -152,7 +155,7 @@ void initApiServer() {
                     xSemaphoreGive(stateMutex);
                     request->_tempObject = (void*)(intptr_t)(invalid_value ? 2 : 1);
                 } else {
-                    request->_tempObject = (void*)(intptr_t)2; // Flag as failure if we couldn't get the lock
+                    request->_tempObject = (void*)(intptr_t)3; // Flag as failure if we couldn't get the lock
                 }
             }
         }
