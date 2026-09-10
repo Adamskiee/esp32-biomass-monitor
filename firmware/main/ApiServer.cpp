@@ -111,33 +111,43 @@ void initApiServer() {
 
             if (!error) {
                 if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5))) {
-                    bool changed = false;
                     bool invalid_value = false;
+                    bool has_chamber_temp = doc.containsKey("threshold_chamber_temp_c");
+                    float new_chamber_temp = threshold_chamber_temp_c;
                     
-                    if (doc.containsKey("threshold_chamber_temp_c")) {
+                    if (has_chamber_temp) {
                         float val = doc["threshold_chamber_temp_c"].as<float>();
                         if (val >= 20.0 && val <= 150.0) {
-                            if (val != threshold_chamber_temp_c) {
-                                threshold_chamber_temp_c = val;
-                                changed = true;
-                            }
-                        } else {
-                            invalid_value = true;
-                        }
-                    }
-                    if (doc.containsKey("threshold_mq2_v")) {
-                        float val = doc["threshold_mq2_v"].as<float>();
-                        if (val >= 0.1 && val <= 5.0) {
-                            if (val != threshold_mq2_v) {
-                                threshold_mq2_v = val;
-                                changed = true;
-                            }
+                            new_chamber_temp = val;
                         } else {
                             invalid_value = true;
                         }
                     }
                     
-                    if (changed) state_needs_save = true;
+                    bool has_mq2 = doc.containsKey("threshold_mq2_v");
+                    float new_mq2 = threshold_mq2_v;
+                    
+                    if (has_mq2) {
+                        float val = doc["threshold_mq2_v"].as<float>();
+                        if (val >= 0.1 && val <= 5.0) {
+                            new_mq2 = val;
+                        } else {
+                            invalid_value = true;
+                        }
+                    }
+                    
+                    if (!invalid_value) {
+                        bool changed = false;
+                        if (has_chamber_temp && threshold_chamber_temp_c != new_chamber_temp) {
+                            threshold_chamber_temp_c = new_chamber_temp;
+                            changed = true;
+                        }
+                        if (has_mq2 && threshold_mq2_v != new_mq2) {
+                            threshold_mq2_v = new_mq2;
+                            changed = true;
+                        }
+                        if (changed) state_needs_save = true;
+                    }
                     
                     xSemaphoreGive(stateMutex);
                     request->_tempObject = (void*)(intptr_t)(invalid_value ? 2 : 1);
