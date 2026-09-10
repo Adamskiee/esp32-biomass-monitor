@@ -51,4 +51,60 @@ components:
           type: string
 security:
   - basicAuth: []
-paths: {}
+paths:
+  /api/state:
+    get:
+      summary: Retrieves real-time sensor data
+      responses:
+        '200':
+          description: A JSON object returning sensor readings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemState'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/settings:
+    get:
+      summary: Retrieves current configuration thresholds
+      responses:
+        '200':
+          description: A JSON object containing current configuration limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
