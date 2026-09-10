@@ -1,0 +1,17 @@
+openapi: 3.0.3
+info:
+  title: Biomass Monitor API
+  description: >
+    API for interacting with the ESP32 Biomass Monitor sensors and settings. 
+    Note that as this is served from an ESP32, connections may be plaintext over HTTP.
+    
+    **CORS Warning:** The API echoes the Origin header, but the C++ backend currently does not explicitly set `Access-Control-Allow-Credentials: true`, which may cause browser preflight rejections when sending Basic Auth credentials.
+  version: 1.0.0
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+security:
+  - basicAuth: []
+paths: {}
