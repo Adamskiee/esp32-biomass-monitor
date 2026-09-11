@@ -1,5 +1,5 @@
 #include "AnalogSensors.h"
-#include "Config.h"
+#include <BiomassConfig.h>
 
 void initAnalogSensors() {
   pinMode(PIN_MQ135, INPUT);

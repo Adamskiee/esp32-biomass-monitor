@@ -1,9 +1,9 @@
 #include "DHT.h"
 
-#define DHTPIN 4
+#include <BiomassConfig.h>
 #define DHTTYPE DHT22
 
-DHT dht(DHTPIN, DHTTYPE);
+DHT dht(PIN_DHT22, DHTTYPE);
 
 void setup() {
   Serial.begin(115200);

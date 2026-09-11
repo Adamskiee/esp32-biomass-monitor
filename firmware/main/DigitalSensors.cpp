@@ -1,5 +1,5 @@
 #include "DigitalSensors.h"
-#include "Config.h"
+#include <BiomassConfig.h>
 #include <DHT.h>
 #include <max6675.h>
 
