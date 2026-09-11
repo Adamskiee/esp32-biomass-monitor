@@ -1,6 +1,5 @@
 // --- ESP32 SPECIFIC SETTINGS FOR MQ-2 & MQ-135 ---
-const int MQ2_SENSOR_PIN = 34;    // Using GPIO 34 for MQ-2
-const int MQ135_SENSOR_PIN = 35;  // Using GPIO 35 for MQ-135
+#include <BiomassConfig.h>
 const float ADC_MAX = 4095.0;     // ESP32 has a 12-bit ADC (0 to 4095)
 const float MCU_VOLTAGE = 3.3;    // ESP32 runs at 3.3V
 // -------------------------------------------------
@@ -17,7 +16,7 @@ void setup() {
 
 void loop() {
   // --- MQ-2 Reading ---
-  int mq2Raw = analogRead(MQ2_SENSOR_PIN);
+  int mq2Raw = analogRead(PIN_MQ2);
   float mq2PinVolts = mq2Raw * (MCU_VOLTAGE / ADC_MAX);
   float mq2RealVolts = mq2PinVolts * 1.5; // Reversing 10k/20k divider
 
@@ -30,7 +29,7 @@ void loop() {
   Serial.println(" V");
 
   // --- MQ-135 Reading ---
-  int mq135Raw = analogRead(MQ135_SENSOR_PIN);
+  int mq135Raw = analogRead(PIN_MQ135);
   float mq135PinVolts = mq135Raw * (MCU_VOLTAGE / ADC_MAX);
   float mq135RealVolts = mq135PinVolts * 1.5; // Reversing 10k/20k divider
 

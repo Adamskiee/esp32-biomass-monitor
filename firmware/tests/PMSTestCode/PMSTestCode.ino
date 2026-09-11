@@ -1,5 +1,5 @@
 #include "Adafruit_PM25AQI.h"
-
+#include <BiomassConfig.h>
 // We use HardwareSerial2 for the ESP32
 HardwareSerial pmsSerial(2); 
 
@@ -15,8 +15,8 @@ void setup() {
 
   // Start Serial2 for PMS5003 communication.
   // PMS5003 baud rate is exactly 9600.
-  // RX pin = 16, TX pin = 17
-  pmsSerial.begin(9600, SERIAL_8N1, 16, 17);
+  // RX/TX pins are shared in BiomassConfig.h
+  pmsSerial.begin(9600, SERIAL_8N1, PIN_PM25_RX, PIN_PM25_TX);
   
   // Initialize the sensor
   if (!aqi.begin_UART(&pmsSerial)) {

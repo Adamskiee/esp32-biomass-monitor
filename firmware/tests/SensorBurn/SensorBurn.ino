@@ -1,5 +1,4 @@
-const int mq2Pin = A0;   // The analog pin the MQ-2 is connected to
-const int mq135Pin = A1; // The analog pin the MQ-135 is connected to
+#include <BiomassConfig.h>
 
 void setup() {
   Serial.begin(9600); // Start serial communication
@@ -9,8 +8,8 @@ void setup() {
 }
 
 void loop() {
-  int mq2Value = analogRead(mq2Pin);     // Read the MQ-2 analog value
-  int mq135Value = analogRead(mq135Pin); // Read the MQ-135 analog value
+  int mq2Value = analogRead(PIN_MQ2);     // Read the MQ-2 analog value
+  int mq135Value = analogRead(PIN_MQ135); // Read the MQ-135 analog value
   
   Serial.print("MQ-2 (Smoke/Combustible): ");
   Serial.print(mq2Value);

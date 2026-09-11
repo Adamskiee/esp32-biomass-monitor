@@ -1,5 +1,5 @@
 #include "Actuators.h"
-#include "Config.h"
+#include <BiomassConfig.h>
 
 void initActuators() {
   // Drive pins HIGH (RELAY_OFF) before enabling OUTPUT mode to prevent startup glitch/clicking

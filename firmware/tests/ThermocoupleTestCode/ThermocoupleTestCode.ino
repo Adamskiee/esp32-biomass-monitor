@@ -1,9 +1,7 @@
 #include <Arduino.h>
 #include <max6675.h>
 
-const int PIN_MAX6675_SCK = 18;
-const int PIN_MAX6675_SO = 19;
-const int PIN_MAX6675_CS = 5;
+#include <BiomassConfig.h>
 
 // Constructor MUST be in this exact order: (SCK, CS, MISO)
 MAX6675 thermocouple(PIN_MAX6675_SCK, PIN_MAX6675_CS, PIN_MAX6675_SO);

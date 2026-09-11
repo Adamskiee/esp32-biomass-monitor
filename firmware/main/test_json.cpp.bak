@@ -1,0 +1,10 @@
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
+void setup() {
+    AsyncCallbackJsonWebHandler* handler = new AsyncCallbackJsonWebHandler("/api/settings", 
+        [](AsyncWebServerRequest *request, JsonVariant &json) {
+            JsonDocument doc;
+            doc.set(json);
+        });
+}

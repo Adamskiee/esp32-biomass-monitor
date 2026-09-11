@@ -1,14 +1,6 @@
 #include <Arduino.h>
 
-const int PIN_RELAY_SOLENOID = 27;
-const int PIN_RELAY_FAN = 26;
-const int PIN_RELAY_LED_RED = 25;
-const int PIN_RELAY_LED_YELLOW = 33;
-const int PIN_RELAY_LED_GREEN = 14;
-
-// Active-LOW logic
-const int RELAY_ON = LOW;
-const int RELAY_OFF = HIGH;
+#include <BiomassConfig.h>
 
 void setup() {
   Serial.begin(115200);

@@ -1,4 +1,5 @@
-#include "Config.h"
+#include <ArduinoJson.h>
+#include <BiomassConfig.h>
 #include "SystemState.h"
 #include "Actuators.h"
 #include "AnalogSensors.h"
