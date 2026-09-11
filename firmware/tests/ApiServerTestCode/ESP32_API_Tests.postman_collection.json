@@ -1,0 +1,184 @@
+{
+  "info": {
+    "name": "ESP32 API Tests",
+    "description": "Tests for the ApiServerTestCode.ino firmware",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://192.168.1.100",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "password",
+        "value": "YOUR_API_PASS",
+        "type": "string"
+      },
+      {
+        "key": "username",
+        "value": "YOUR_API_USER",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "GET /api/state",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/state",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "state"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/settings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "settings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/settings (Valid)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"threshold_chamber_temp_c\": 80.5,\n  \"threshold_mq2_v\": 3.0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "settings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/settings (Invalid Range)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"threshold_chamber_temp_c\": 10.0,\n  \"threshold_mq2_v\": 6.0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "settings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/settings (Empty Payload)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "settings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "OPTIONS /api/state (CORS Preflight)",
+      "request": {
+        "method": "OPTIONS",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "http://localhost:3000",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/state",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "state"
+          ]
+        }
+      }
+    }
+  ]
+}
