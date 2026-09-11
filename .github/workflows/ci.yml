@@ -40,4 +40,7 @@ jobs:
         run: ./firmware/install_deps.sh
 
       - name: Compile Sketches
-        run: arduino-cli compile --profile esp32 --warnings all firmware/main/
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/main/main.ino
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/tests/DHTTestCode/DHTTestCode.ino
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/tests/MQTestCode/MQTestCode.ino
