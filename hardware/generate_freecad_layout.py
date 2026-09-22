@@ -42,10 +42,17 @@ def generate_biomass_prototype():
     
     # 4. Multi-stage Filtration Frame (Blue-ish)
     create_block(doc, "FiltrationFrame", filter_l, filter_w, filter_h, chamber_l + 200, 0, 0, color=(0.2, 0.4, 0.8))
+    
+    # MQ Sensors embedded at the end of the filtration frame
+    # Protruding slightly from the top so they are visually clear in FreeCAD
+    create_block(doc, "MQSensors", 50, 100, 50, chamber_l + 200 + filter_l - 50, 150, filter_h - 25, color=(0.2, 0.8, 0.2))
+
     # Align fan with exhaust pipe center (pipe Z=300, fan height 300, so Z=150)
     create_block(doc, "ExhaustVent", 100, 300, 300, chamber_l + 200 + filter_l, 50, 150, color=(0.1, 0.1, 0.1))
     create_block(doc, "MoistureTrap", 80, 80, 150, chamber_l + 200 + filter_l + 100, 160, 225, color=(0.6, 0.6, 0.6))
-    create_block(doc, "MQSensors", 50, 100, 50, chamber_l + 200 + filter_l + 180, 150, 275, color=(0.2, 0.8, 0.2))
+    
+    # Final Exhaust Chimney directing clean air up
+    create_cylinder(doc, "OutputChimney", 40, 300, chamber_l + 200 + filter_l + 140, 200, 375, (1,0,0), 0, color=(0.3, 0.3, 0.3))
     
     # 5. Overhead Water Rack & Container (Offset Laterally)
     # Rack offset by 100mm on Y axis to prevent direct plume heat
