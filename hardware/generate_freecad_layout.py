@@ -50,9 +50,9 @@ def generate_biomass_prototype():
     # Final Exhaust Chimney directing clean air up
     create_cylinder(doc, "OutputChimney", 40, 300, chamber_l + 200 + filter_l + 140, 200, 375, (1,0,0), 0, color=(0.3, 0.3, 0.3))
     
-    # MQ Sensors mounted on the Output Chimney (Post-Moisture Trap)
-    # Allows for highly accurate final emissions monitoring in dry exhaust
-    create_block(doc, "MQSensors", 50, 100, 50, chamber_l + 200 + filter_l + 115, 150, 450, color=(0.2, 0.8, 0.2))
+    # MQ Sensors mounted on the exterior wall of the Output Chimney (Post-Moisture Trap)
+    # Allows for highly accurate final emissions monitoring in dry exhaust without obstructing airflow
+    create_block(doc, "MQSensors", 50, 100, 50, chamber_l + 200 + filter_l + 180, 150, 450, color=(0.2, 0.8, 0.2))
     
     # 5. Overhead Water Rack & Container (Offset Laterally)
     # Rack offset by 100mm on Y axis to prevent direct plume heat

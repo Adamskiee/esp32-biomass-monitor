@@ -28,26 +28,32 @@ The system operates on a continuous, non-blocking evaluation loop.
 ## 4. Safety Rules & Automation Logic
 The core responsibility of the system is evaluating sensor data against safety thresholds and triggering the appropriate actuators.
 
-### 4.1 Fault & Filtration State (Fan & LED)
-The system enters an active filtration and danger state if **ANY** of the following conditions are met:
-1.  **Sensor Fault (Thermocouple):** Chamber Temperature reads `NaN`.
-2.  **Sensor Fault (MQ2):** MQ2 voltage reads `NaN`.
-3.  **Sensor Disconnect (MQ2):** MQ2 voltage reads `< 0.1V`.
-4.  **Smoke/Gas Threshold:** MQ2 voltage exceeds `safe_mq2_limit`.
-5.  **Temperature Threshold:** Chamber Temperature exceeds `safe_chamber_limit`.
+### 4.1 Danger State (Active Filtration)
+The system enters an active filtration and danger state if the following threshold condition is met:
+1.  **Temperature Threshold:** Chamber Temperature exceeds `safe_chamber_limit`.
 
 **Actions taken when in this state:**
 *   Filtration Fan is turned **ON**.
 *   Status LED is set to **RED**.
 
-### 4.2 Safe State
-If **NONE** of the conditions in Section 4.1 are met, the system is in a safe state.
+### 4.2 Hardware Fault State
+The system enters a hardware fault state if **ANY** of the following conditions are met, ensuring fail-safe filtration:
+1.  **Sensor Fault (Thermocouple):** Chamber Temperature reads `NaN`.
+2.  **Sensor Fault (MQ2):** MQ2 voltage reads `NaN`.
+3.  **Sensor Disconnect (MQ2):** MQ2 voltage reads `< 0.1V`.
+
+**Actions taken when in this state:**
+*   Filtration Fan is turned **ON**.
+*   Status LED is set to **YELLOW**.
+
+### 4.3 Safe State
+If **NONE** of the conditions in Section 4.1 or 4.2 are met, the system is in a safe state.
 
 **Actions taken when in this state:**
 *   Filtration Fan is turned **OFF**.
 *   Status LED is set to **GREEN**.
 
-### 4.3 Overheat Alarm (Buzzer)
+### 4.4 Overheat Alarm (Buzzer)
 The audible alarm operates on an independent rule focused strictly on overheating.
 *   **Condition:** The buzzer activates ONLY if the Chamber Temperature is a valid number AND strictly exceeds the `safe_chamber_limit`.
 *   *(Note: The buzzer does not sound for MQ2 gas thresholds or sensor disconnects).*
