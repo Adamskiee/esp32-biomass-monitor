@@ -71,13 +71,27 @@ void loop() {
         Serial.println("System state saved to NVS.");
     }
     
-    // Safety logic (unchanged visually but using local limits)
-    if (isnan(t_chamber) || isnan(t_mq2) || t_mq2 < 0.1 || t_mq2 > safe_mq2_limit || t_chamber > safe_chamber_limit) {
+    // Safety logic
+    if (t_mq2 > safe_mq2_limit || t_chamber > safe_chamber_limit) {
+        // Danger State
         setFan(true);
         setLedStatus(true, false, false); // Red LED
+    } else if (isnan(t_chamber) || isnan(t_mq2) || t_mq2 < 0.1) {
+        // Hardware Fault State
+        setFan(true);
+        setLedStatus(false, true, false); // Yellow LED
     } else {
+        // Safe State
         setFan(false);
         setLedStatus(false, false, true); // Green LED
     }
+
+    // Buzzer logic: active only if chamber exceeds the temperature threshold
+    if (!isnan(t_chamber) && t_chamber > safe_chamber_limit) {
+        setBuzzer(true);
+    } else {
+        setBuzzer(false);
+    }
   }
 }
+

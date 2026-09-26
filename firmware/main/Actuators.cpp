@@ -17,6 +17,9 @@ void initActuators() {
 
   digitalWrite(PIN_RELAY_LED_GREEN, RELAY_OFF);
   pinMode(PIN_RELAY_LED_GREEN, OUTPUT);
+
+  digitalWrite(PIN_BUZZER, LOW);
+  pinMode(PIN_BUZZER, OUTPUT);
 }
 
 void setFan(bool state) {
@@ -31,4 +34,9 @@ void setLedStatus(bool red, bool yellow, bool green) {
   digitalWrite(PIN_RELAY_LED_RED, red ? RELAY_ON : RELAY_OFF);
   digitalWrite(PIN_RELAY_LED_YELLOW, yellow ? RELAY_ON : RELAY_OFF);
   digitalWrite(PIN_RELAY_LED_GREEN, green ? RELAY_ON : RELAY_OFF);
+}
+
+void setBuzzer(bool state) {
+  // Assuming an active buzzer. If it's a passive buzzer, use tone(PIN_BUZZER, 2000) for ON and noTone(PIN_BUZZER) for OFF.
+  digitalWrite(PIN_BUZZER, state ? HIGH : LOW);
 }

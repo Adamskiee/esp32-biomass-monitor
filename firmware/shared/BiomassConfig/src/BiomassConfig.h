@@ -10,6 +10,9 @@
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
 
+// Other Actuators
+#define PIN_BUZZER 4
+
 // Digital Sensors
 #define PIN_DHT22 32
 #define PIN_MAX6675_SCK 18
