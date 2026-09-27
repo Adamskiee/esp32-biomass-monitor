@@ -1,22 +1,48 @@
 # Biomass IoT Project
 
-## Dependencies
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
+## Project Overview & Business Context
+The Biomass Monitor & Filtration System is an ESP32-based environmental monitor designed to mitigate emissions from the open burning of biodegradable waste (leaves, grass, branches). Open burning poses significant health and environmental risks. This system intelligently monitors smoke, combustible gases, and chamber temperatures, automatically triggering active filtration systems when safety thresholds are exceeded. 
+
+By deploying these devices, we ensure environmental compliance at scale, reduce harmful particulate matter release, and provide real-time telemetry to stakeholders via our mobile companion app.
+
+## Quick Start
+
+### Hardware Requirements
+- ESP32 Development Board
+- MQ135 Air Quality Sensor
+- MQ2 Smoke/Gas Sensor
+- K-Type Thermocouple (for chamber temp)
+- Relay-controlled Filtration Fan
+
+### Firmware Flashing
 This project uses an Arduino CLI `sketch.yaml` file for strict dependency version pinning. 
 
-To build locally with Arduino CLI or the Arduino IDE, you **must** first run the provided script to install dependencies and symlink the shared configuration library (`BiomassConfig`) into your local sketchbook.
+1. **Install Dependencies:**
+   - **Linux/macOS:** Run `./firmware/install_deps.sh`
+   - **Windows:** Run `.\firmware\install_deps.bat`
+   
+   *Note: This is mandatory to symlink the `BiomassConfig` library.*
 
-**On Linux/macOS:**
-```bash
-./firmware/install_deps.sh
-```
+2. **Build and Flash:**
+   Use the Arduino IDE or CLI to build and flash the main sketch located in `firmware/src`.
 
-**On Windows:**
-Double-click `firmware\install_deps.bat` or run it from the command prompt:
-```cmd
-.\firmware\install_deps.bat
-```
+### Mobile App
+The mobile app enables dashboard integration and remote threshold configuration. 
+Please refer to the [Mobile Application Guide](docs/mobile-app.md) for build and deployment instructions.
 
-**⚠️ Important Notes:**
-- **Arduino IDE Users:** Running `install_deps.sh` is mandatory even if you manually install the third-party libraries, as it symlinks the internal `BiomassConfig` library required by both the main firmware and the test sketches.
-- **Multiple Clones/Branches:** The `install_deps.sh` script creates a global symlink in your `~/Arduino/libraries/` folder pointing to this specific directory. If you clone this repository multiple times or rename the directory, you must re-run `install_deps.sh` in the active repository so the IDE compiles against the correct configuration.
+## Directory Structure
+- `/firmware` - ESP32 C++ firmware, hardware control loops, and configuration.
+- `/hardware` - Schematics, Bill of Materials (BOM), and PCB designs.
+- `/mobileapp` - Flutter-based mobile dashboard for remote monitoring.
+- `/docs` - System architecture, API references, operations, and developer guides.
+
+## Documentation
+For complete details on the system, please refer to our documentation:
+- [System Architecture](docs/architecture.md) (Hardware/Software logic, Edge/Cloud, Security, OTA)
+- [Operations Guide](docs/operations-guide.md) (Field Commissioning, Maintenance, Troubleshooting)
+- [Mobile Application](docs/mobile-app.md)
+- [Developer Onboarding & Contributing](CONTRIBUTING.md)
+- [API Reference](docs/api.md)
