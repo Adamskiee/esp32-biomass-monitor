@@ -4,9 +4,11 @@ on:
   push:
     paths:
       - 'mobileapp/**'
+      - '.github/workflows/mobile-ci.yml'
   pull_request:
     paths:
       - 'mobileapp/**'
+      - '.github/workflows/mobile-ci.yml'
 
 jobs:
   analyze-and-test:
