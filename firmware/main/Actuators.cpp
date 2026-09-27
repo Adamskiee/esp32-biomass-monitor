@@ -1,10 +1,21 @@
 #include "Actuators.h"
 #include <BiomassConfig.h>
 
-void initActuators() {
-  // Drive pins HIGH (RELAY_OFF) before enabling OUTPUT mode to prevent startup glitch/clicking
+bool current_solenoid_state = false;
+uint32_t last_solenoid_toggle = 0;
+static bool solenoid_has_toggled = false;
+
+void initSolenoid() {
   digitalWrite(PIN_RELAY_SOLENOID, RELAY_OFF);
   pinMode(PIN_RELAY_SOLENOID, OUTPUT);
+  current_solenoid_state = false;
+  solenoid_has_toggled = false;
+  last_solenoid_toggle = 0;
+}
+
+void initActuators() {
+  // Drive pins HIGH (RELAY_OFF) before enabling OUTPUT mode to prevent startup glitch/clicking
+  initSolenoid();
 
   digitalWrite(PIN_RELAY_FAN, RELAY_OFF);
   pinMode(PIN_RELAY_FAN, OUTPUT);
@@ -26,8 +37,15 @@ void setFan(bool state) {
   digitalWrite(PIN_RELAY_FAN, state ? RELAY_ON : RELAY_OFF);
 }
 
-void setSolenoid(bool state) {
-  digitalWrite(PIN_RELAY_SOLENOID, state ? RELAY_ON : RELAY_OFF);
+void setSolenoid(bool state, bool force_bypass_debounce) {
+  if (state != current_solenoid_state) {
+    if (force_bypass_debounce || !solenoid_has_toggled || (millis() - last_solenoid_toggle > 500)) {
+      digitalWrite(PIN_RELAY_SOLENOID, state ? RELAY_ON : RELAY_OFF);
+      current_solenoid_state = state;
+      last_solenoid_toggle = millis();
+      solenoid_has_toggled = true;
+    }
+  }
 }
 
 void setLedStatus(bool red, bool yellow, bool green) {
