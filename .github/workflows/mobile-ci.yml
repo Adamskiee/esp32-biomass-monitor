@@ -1,0 +1,54 @@
+name: Mobile App CI
+
+on:
+  push:
+    paths:
+      - 'mobileapp/**'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    paths:
+      - 'mobileapp/**'
+      - '.github/workflows/mobile-ci.yml'
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.1'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: ./mobileapp
+        run: flutter pub get
+
+      - name: Static Analysis
+        working-directory: ./mobileapp
+        run: flutter analyze
+
+      - name: Run Tests
+        working-directory: ./mobileapp
+        run: flutter test
+
+  smoke-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.1'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: ./mobileapp
+        run: flutter pub get
+
+      - name: Build Android Debug APK
+        working-directory: ./mobileapp
+        run: flutter build apk --debug

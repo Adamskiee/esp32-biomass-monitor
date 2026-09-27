@@ -14,7 +14,7 @@ void setup() {
 
 void loop() {
   float tempC = thermocouple.readCelsius();
-  
+
   Serial.print("Temperature: ");
   if (isnan(tempC)) {
     Serial.println("Error reading thermocouple!");
@@ -22,7 +22,7 @@ void loop() {
     Serial.print(tempC);
     Serial.println(" *C");
   }
-  
+
   // 2s delay matching main firmware polling interval
-  delay(2000); 
+  delay(2000);
 }

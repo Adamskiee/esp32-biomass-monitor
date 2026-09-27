@@ -1,0 +1,75 @@
+name: Firmware CI
+
+on:
+  push:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/firmware-ci.yml'
+  pull_request:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/firmware-ci.yml'
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Arduino CLI and ESP32 Core
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+          key: ${{ runner.os }}-arduino-esp32
+
+      - name: Install Arduino CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo BINDIR=/usr/local/bin sh -s 0.35.3
+
+      - name: Install ESP32 Core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.14
+
+      - name: Install Dependencies
+        run: |
+          cd firmware
+          chmod +x install_deps.sh
+          ./install_deps.sh
+
+      - name: Setup Dummy Secrets
+        run: |
+          cp firmware/main/Secrets.h.example firmware/main/Secrets.h
+          # Copy to all test directories to isolate build dependencies
+          if [ -d firmware/tests ]; then find firmware/tests -mindepth 1 -maxdepth 1 -type d -exec cp firmware/main/Secrets.h.example {}/Secrets.h \;; fi
+
+      - name: Compile Main Firmware
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32 firmware/main/main.ino
+
+      - name: Compile Tests
+        run: |
+          for dir in firmware/tests/*/; do
+            if [ -d "${dir}" ] && [ -f "${dir}$(basename ${dir%/}).ino" ]; then
+              echo "Compiling ${dir}..."
+              arduino-cli compile --fqbn esp32:esp32:esp32 "${dir}"
+            fi
+          done
+
+  linting-and-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format and cppcheck
+        run: sudo apt-get update && sudo apt-get install -y clang-format-14 cppcheck
+
+      - name: Run Clang-Format
+        run: |
+          find firmware \( -iname '*.h' -o -iname '*.cpp' -o -iname '*.ino' \) -print0 | xargs -0 -r clang-format-14 --dry-run --Werror
+
+      - name: Run CppCheck
+        run: |
+          # Strictly check .cpp and .h files, exclude .ino
+          find firmware \( -iname '*.cpp' -o -iname '*.h' \) -print0 | xargs -0 -r cppcheck --enable=warning,style,performance,portability --library=firmware/cppcheck.cfg --error-exitcode=1 -I firmware/main
