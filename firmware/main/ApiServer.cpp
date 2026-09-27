@@ -2,8 +2,10 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <AsyncJson.h>
 #include <ArduinoJson.h>
 #include "SystemState.h"
+#include "Actuators.h"
 #include "Secrets.h"
 
 AsyncWebServer server(80);
@@ -18,7 +20,7 @@ void initApiServer() {
         Serial.println(WiFi.localIP());
     }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
     
-    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-ESP32-Biomass");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Credentials", "true");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
@@ -34,25 +36,64 @@ void initApiServer() {
         request->send(addCorsOrigin(request, response));
     };
     
-    server.on("/api/state", HTTP_GET, [addCorsOrigin, send401](AsyncWebServerRequest *request){
-        if(!request->authenticate(API_USER, API_PASS)) return send401(request);
-        
-        JsonDocument doc;
-        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5))) {
-            if (isnan(current_temp_c)) doc["temperature_c"] = nullptr; else doc["temperature_c"] = current_temp_c;
-            if (isnan(current_chamber_c)) doc["chamber_temp_c"] = nullptr; else doc["chamber_temp_c"] = current_chamber_c;
-            if (isnan(current_mq135_v)) doc["mq135_v"] = nullptr; else doc["mq135_v"] = current_mq135_v;
-            if (isnan(current_mq2_v)) doc["mq2_v"] = nullptr; else doc["mq2_v"] = current_mq2_v;
-            xSemaphoreGive(stateMutex);
-            
-            AsyncResponseStream *response = request->beginResponseStream("application/json");
-            serializeJson(doc, *response);
-            request->send(addCorsOrigin(request, response));
-        } else {
-            AsyncWebServerResponse *response = request->beginResponse(503, "application/json", "{\"status\":\"error\",\"message\":\"Server busy\"}");
-            request->send(addCorsOrigin(request, response));
-        }
+    server.on("/api/state", HTTP_GET, [addCorsOrigin](AsyncWebServerRequest *request){
+        xSemaphoreTake(stateMutex, portMAX_DELAY);
+        String json = "{";
+        json += "\"chamber_temp\":" + (isnan(current_chamber_c) ? String("null") : String(current_chamber_c)) + ",";
+        json += "\"mq2_v\":" + (isnan(current_mq2_v) ? String("null") : String(current_mq2_v)) + ",";
+        json += "\"safe_chamber_limit\":" + String(threshold_chamber_temp_c) + ",";
+        json += "\"safe_mq2_limit\":" + String(threshold_mq2_v) + ",";
+        json += "\"fan_on\":true,";
+        json += "\"sprinkler_on\":" + String(current_solenoid_state ? "true" : "false") + ",";
+        json += "\"manual_sprinkler\":" + String(manual_sprinkler ? "true" : "false") + ",";
+        json += "\"active_triggers\":" + active_triggers_json;
+        json += "}";
+        xSemaphoreGive(stateMutex);
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/json", json);
+        request->send(addCorsOrigin(request, response));
     });
+
+    AsyncCallbackJsonWebHandler* controlHandler = new AsyncCallbackJsonWebHandler("/api/control", [addCorsOrigin](AsyncWebServerRequest *request, JsonVariant &json) {
+        if (!request->hasHeader("X-ESP32-Biomass")) {
+            AsyncWebServerResponse *response = request->beginResponse(403);
+            request->send(addCorsOrigin(request, response));
+            return;
+        }
+        JsonObject jsonObj = json.as<JsonObject>();
+        if (jsonObj.containsKey("sprinkler")) {
+            xSemaphoreTake(stateMutex, portMAX_DELAY);
+            manual_sprinkler = jsonObj["sprinkler"];
+            catastrophic_latch = false;
+            setSolenoid(manual_sprinkler, true); // Force bypass debounce on API command
+            xSemaphoreGive(stateMutex);
+        }
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
+        request->send(addCorsOrigin(request, response));
+    });
+    server.addHandler(controlHandler);
+
+    AsyncCallbackJsonWebHandler* thresholdHandler = new AsyncCallbackJsonWebHandler("/api/thresholds", [addCorsOrigin](AsyncWebServerRequest *request, JsonVariant &json) {
+        if (!request->hasHeader("X-ESP32-Biomass")) {
+            AsyncWebServerResponse *response = request->beginResponse(403);
+            request->send(addCorsOrigin(request, response));
+            return;
+        }
+        JsonObject jsonObj = json.as<JsonObject>();
+        xSemaphoreTake(stateMutex, portMAX_DELAY);
+        if (jsonObj.containsKey("safe_chamber_limit")) {
+            float val = jsonObj["safe_chamber_limit"];
+            if (val >= 0 && val <= 1000) threshold_chamber_temp_c = val;
+        }
+        if (jsonObj.containsKey("safe_mq2_limit")) {
+            float val = jsonObj["safe_mq2_limit"];
+            if (val >= 0 && val <= 5.0) threshold_mq2_v = val;
+        }
+        state_needs_save = true;
+        xSemaphoreGive(stateMutex);
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
+        request->send(addCorsOrigin(request, response));
+    });
+    server.addHandler(thresholdHandler);
 
     server.on("/api/settings", HTTP_GET, [addCorsOrigin, send401](AsyncWebServerRequest *request){
         if(!request->authenticate(API_USER, API_PASS)) return send401(request);
