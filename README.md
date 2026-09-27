@@ -3,6 +3,8 @@
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+![Hero Diagram Placeholder](docs/assets/hero-diagram.png "System Block Diagram")
+
 ## Project Overview & Business Context
 The Biomass Monitor & Filtration System is an ESP32-based environmental monitor designed to mitigate emissions from the open burning of biodegradable waste (leaves, grass, branches). Open burning poses significant health and environmental risks. This system intelligently monitors smoke, combustible gases, and chamber temperatures, automatically triggering active filtration systems when safety thresholds are exceeded. 
 
@@ -15,7 +17,7 @@ By deploying these devices, we ensure environmental compliance at scale, reduce 
 - MQ135 Air Quality Sensor
 - MQ2 Smoke/Gas Sensor
 - K-Type Thermocouple (for chamber temp)
-- Relay-controlled Filtration Fan
+- PWM/MOSFET-controlled Filtration Fan
 
 ### Firmware Flashing
 This project uses an Arduino CLI `sketch.yaml` file for strict dependency version pinning. 
