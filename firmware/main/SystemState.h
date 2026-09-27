@@ -1,8 +1,19 @@
 #pragma once
+#ifdef ARDUINO
 #include <Arduino.h>
 #include <Preferences.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#else
+#include <string>
+#include <cmath>
+#include <cstdint>
+typedef std::string String;
+typedef void* SemaphoreHandle_t;
+#define portMAX_DELAY 0xFFFF
+inline void xSemaphoreTake(SemaphoreHandle_t, uint32_t) {}
+inline void xSemaphoreGive(SemaphoreHandle_t) {}
+#endif
 
 // Thresholds
 extern float threshold_chamber_temp_c;
@@ -15,6 +26,11 @@ extern float current_mq2_v;
 
 extern bool state_needs_save;
 extern SemaphoreHandle_t stateMutex;
+
+extern bool manual_sprinkler;
+extern bool catastrophic_latch;
+extern String active_triggers_json;
+void evaluateSafetyLoop();
 
 void initSystemState();
 void saveSystemState(float chamber_limit, float mq2_limit);
