@@ -50,7 +50,7 @@ The system enters a hardware fault state if **ANY** of the following conditions 
 If **NONE** of the conditions in Section 4.1 or 4.2 are met, the system is in a safe state.
 
 **Actions taken when in this state:**
-*   Filtration Fan is turned **OFF**.
+*   Filtration Fan is turned **ON** (providing continuous baseline ventilation).
 *   Status LED is set to **GREEN**.
 
 ### 4.4 Overheat Alarm (Buzzer)
