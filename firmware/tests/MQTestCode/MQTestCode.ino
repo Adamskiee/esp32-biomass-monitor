@@ -1,7 +1,7 @@
 // --- ESP32 SPECIFIC SETTINGS FOR MQ-2 & MQ-135 ---
 #include <BiomassConfig.h>
-const float ADC_MAX = 4095.0;     // ESP32 has a 12-bit ADC (0 to 4095)
-const float MCU_VOLTAGE = 3.3;    // ESP32 runs at 3.3V
+const float ADC_MAX = 4095.0;  // ESP32 has a 12-bit ADC (0 to 4095)
+const float MCU_VOLTAGE = 3.3; // ESP32 runs at 3.3V
 // -------------------------------------------------
 
 void setup() {

@@ -25,7 +25,7 @@ void loop() {
     Serial.print(humidity);
     Serial.println(" %");
   }
-  
+
   // Wait 2 seconds before reading again
   delay(2000);
 }

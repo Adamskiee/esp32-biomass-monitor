@@ -6,7 +6,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Actuators Test Started");
 
-  // Write HIGH *before* pinMode to prevent relay chattering/glitching on startup
+  // Write HIGH *before* pinMode to prevent relay chattering/glitching on
+  // startup
   digitalWrite(PIN_RELAY_SOLENOID, RELAY_OFF);
   digitalWrite(PIN_RELAY_FAN, RELAY_OFF);
   digitalWrite(PIN_RELAY_LED_RED, RELAY_OFF);
@@ -50,6 +51,6 @@ void loop() {
   delay(1000);
   digitalWrite(PIN_RELAY_LED_GREEN, RELAY_OFF);
   delay(1000);
-  
+
   Serial.println("Cycle Complete. Restarting...\n");
 }
