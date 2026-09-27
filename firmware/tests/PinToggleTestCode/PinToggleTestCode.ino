@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 // Include the project config to keep pins in sync
-#include "../../main/Config.h"
+#include <BiomassConfig.h>
 
 // Note on Hardware Safety: Software fixes in setup() cannot prevent relays
 // from floating during the ESP32's bootloader phase. Ensure physical pull-up
