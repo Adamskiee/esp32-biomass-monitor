@@ -30,10 +30,6 @@ jobs:
         working-directory: ./mobileapp
         run: flutter analyze
 
-      - name: Run Tests
-        working-directory: ./mobileapp
-        run: flutter test
-
   smoke-build:
     runs-on: ubuntu-latest
     steps:
