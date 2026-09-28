@@ -15,6 +15,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'database_helper.dart';
+import 'dashboard.dart';
+export 'dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1547,6 +1549,19 @@ class ControlTab extends StatelessWidget {
               const SizedBox(height: 40),
 
               if (state.isAdmin) ...[
+                Text("Emergency Control & Local Alerts", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  tileColor: theme.cardColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: theme.dividerColor)),
+                  leading: const Icon(Icons.dashboard_outlined, color: AppTheme.neonGreen, size: 28),
+                  title: Text("Biomass Monitor Safety Dashboard", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+                  subtitle: const Text("Direct ESP32 Sprinkler Control & Danger Alerts", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  trailing: const Icon(CupertinoIcons.chevron_right, color: Colors.grey, size: 18),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DashboardScreen())),
+                ),
+                const SizedBox(height: 24),
                 Text("Remote Relays", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
                 const SizedBox(height: 16),
                 FluidTileGrid(
@@ -1944,6 +1959,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: settings.isDarkMode ? AppTheme.getDarkTheme() : AppTheme.getLightTheme(),
       home: Consumer<AppStateProvider>(builder: (context, state, _) => state.isAuthenticated ? const MainWrapper() : const LoginScreen()),
+      routes: {
+        '/dashboard': (context) => const DashboardScreen(),
+      },
     );
   }
 }
