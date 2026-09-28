@@ -116,7 +116,7 @@ void initApiServer() {
           return request->send(addCorsOrigin(request, response));
         }
 
-        int status = (int)(intptr_t)request->_tempObject;
+        int status = static_cast<int>(reinterpret_cast<intptr_t>(request->_tempObject));
         if (status == 1) {
           AsyncWebServerResponse *response = request->beginResponse(
               200, "application/json", "{\"status\":\"success\"}");
@@ -152,9 +152,9 @@ void initApiServer() {
 
         JsonDocument doc;
         DeserializationError error =
-            deserializeJson(doc, (const char *)data, len);
+            deserializeJson(doc, reinterpret_cast<const char *>(data), len);
 
-        request->_tempObject = (void *)(intptr_t)(!error ? 1 : 2);
+        request->_tempObject = reinterpret_cast<void *>(static_cast<intptr_t>(!error ? 1 : 2));
 
         if (!error) {
           if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5))) {
@@ -199,9 +199,9 @@ void initApiServer() {
             }
 
             xSemaphoreGive(stateMutex);
-            request->_tempObject = (void *)(intptr_t)(invalid_value ? 2 : 1);
+            request->_tempObject = reinterpret_cast<void *>(static_cast<intptr_t>(invalid_value ? 2 : 1));
           } else {
-            request->_tempObject = (void *)(intptr_t)3; // Flag as failure if we
+            request->_tempObject = reinterpret_cast<void *>(static_cast<intptr_t>(3)); // Flag as failure if we
                                                         // couldn't get the lock
           }
         }
