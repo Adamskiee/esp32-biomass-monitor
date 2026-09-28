@@ -1428,11 +1428,11 @@ class ControlTab extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Node Name", labelStyle: TextStyle(color: Colors.grey)), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+            TextField(controller: nameCtrl, decoration: InputDecoration(labelText: "Node Name", labelStyle: const TextStyle(color: Colors.grey)), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
             const SizedBox(height: 12),
-            TextField(controller: ipCtrl, decoration: const InputDecoration(labelText: "IP Address", labelStyle: TextStyle(color: Colors.grey)), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+            TextField(controller: ipCtrl, decoration: InputDecoration(labelText: "IP Address", labelStyle: const TextStyle(color: Colors.grey)), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
             const SizedBox(height: 12),
-            TextField(controller: macCtrl, decoration: const InputDecoration(labelText: "MAC Address", labelStyle: TextStyle(color: Colors.grey)), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+            TextField(controller: macCtrl, decoration: InputDecoration(labelText: "MAC Address", labelStyle: const TextStyle(color: Colors.grey)), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
           ],
         ),
         actions: [

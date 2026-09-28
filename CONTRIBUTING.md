@@ -15,6 +15,25 @@ We use `arduino-cli` for compilation.
 2. Navigate to `mobileapp/` and run `flutter pub get`.
 3. Start coding!
 
+## Code Style & Linting
+
+### Firmware
+CI enforces formatting and static analysis. Before submitting, run:
+```bash
+# Format all firmware code (requires clang-format-14)
+find firmware \( -iname '*.h' -o -iname '*.cpp' -o -iname '*.ino' \) -print0 | xargs -0 -r clang-format-14 -i
+
+# Run static analysis (requires cppcheck)
+find firmware \( -iname '*.cpp' -o -iname '*.h' \) -print0 | xargs -0 -r cppcheck --enable=warning,style,performance,portability --library=firmware/cppcheck.cfg --error-exitcode=1 -I firmware/main
+```
+
+### Mobile App
+```bash
+cd mobileapp
+flutter analyze
+flutter test
+```
+
 ## Submitting a Pull Request
 1. Branch off `main` for your work.
 2. Ensure you have tested your code locally.
