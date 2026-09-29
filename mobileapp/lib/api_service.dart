@@ -2,17 +2,27 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://esp32.local/api';
-  static http.Client client = http.Client();
-  static const Map<String, String> headers = {
+  ApiService({
+    required String baseUrl,
+    required this.authorizationHeader,
+    http.Client? client,
+  }) : baseUrl = baseUrl.endsWith('/')
+           ? baseUrl.substring(0, baseUrl.length - 1)
+           : baseUrl,
+       _client = client ?? http.Client();
+
+  final String baseUrl;
+  final String authorizationHeader;
+  final http.Client _client;
+
+  Map<String, String> get headers => {
+    'Authorization': authorizationHeader,
     'Content-Type': 'application/json',
-    'X-ESP32-Biomass': 'true',
     'Connection': 'close',
   };
 
-  static Future<Map<String, dynamic>> fetchState({http.Client? client}) async {
-    final httpClient = client ?? ApiService.client;
-    final response = await httpClient
+  Future<Map<String, dynamic>> fetchState() async {
+    final response = await _client
         .get(Uri.parse('$baseUrl/state'), headers: headers)
         .timeout(const Duration(milliseconds: 2000));
     if (response.statusCode == 200) {
@@ -21,9 +31,8 @@ class ApiService {
     throw Exception('Failed to load state: ${response.statusCode}');
   }
 
-  static Future<void> setSprinkler(bool state, {http.Client? client}) async {
-    final httpClient = client ?? ApiService.client;
-    final response = await httpClient
+  Future<void> setSprinkler(bool state) async {
+    final response = await _client
         .post(
           Uri.parse('$baseUrl/control'),
           headers: headers,
@@ -35,19 +44,14 @@ class ApiService {
     }
   }
 
-  static Future<void> setThresholds(
-    double chamberLimit,
-    double mq2Limit, {
-    http.Client? client,
-  }) async {
-    final httpClient = client ?? ApiService.client;
-    final response = await httpClient
+  Future<void> setThresholds(double chamberLimit, double mq2Limit) async {
+    final response = await _client
         .post(
           Uri.parse('$baseUrl/thresholds'),
           headers: headers,
           body: jsonEncode({
-            'safe_chamber_limit': chamberLimit,
-            'safe_mq2_limit': mq2Limit,
+            'threshold_chamber_temp_c': chamberLimit,
+            'threshold_mq2_v': mq2Limit,
           }),
         )
         .timeout(const Duration(milliseconds: 2000));

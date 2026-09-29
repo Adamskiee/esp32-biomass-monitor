@@ -15,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'database_helper.dart';
+import 'api_service.dart';
 import 'dashboard.dart';
 export 'dashboard.dart';
 
@@ -1559,7 +1560,12 @@ class ControlTab extends StatelessWidget {
                   title: Text("Biomass Monitor Safety Dashboard", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
                   subtitle: const Text("Direct ESP32 Sprinkler Control & Danger Alerts", style: TextStyle(color: Colors.grey, fontSize: 12)),
                   trailing: const Icon(CupertinoIcons.chevron_right, color: Colors.grey, size: 18),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DashboardScreen())),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DashboardScreen(
+                    apiService: ApiService(
+                      baseUrl: 'http://${state.activeNode.ipAddress}/api',
+                      authorizationHeader: state._basicAuthHeader,
+                    ),
+                  ))),
                 ),
                 const SizedBox(height: 24),
                 Text("Remote Relays", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
@@ -1960,7 +1966,15 @@ class MyApp extends StatelessWidget {
       theme: settings.isDarkMode ? AppTheme.getDarkTheme() : AppTheme.getLightTheme(),
       home: Consumer<AppStateProvider>(builder: (context, state, _) => state.isAuthenticated ? const MainWrapper() : const LoginScreen()),
       routes: {
-        '/dashboard': (context) => const DashboardScreen(),
+        '/dashboard': (context) {
+          final state = context.read<AppStateProvider>();
+          return DashboardScreen(
+            apiService: ApiService(
+              baseUrl: 'http://${state.activeNode.ipAddress}/api',
+              authorizationHeader: state._basicAuthHeader,
+            ),
+          );
+        },
       },
     );
   }

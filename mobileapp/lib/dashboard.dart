@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import 'api_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, required this.apiService, this.onAlert});
+
+  final ApiService apiService;
+  final VoidCallback? onAlert;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -62,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _isPosting = true;
       final toSend = _queuedSprinklerState!;
       try {
-        await ApiService.setSprinkler(toSend);
+        await widget.apiService.setSprinkler(toSend);
         if (_queuedSprinklerState == toSend) {
           _queuedSprinklerState = null;
         }
@@ -76,7 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _isFetching = true;
     try {
-      final state = await ApiService.fetchState();
+      final state = await widget.apiService.fetchState();
       if (!mounted) return;
       final triggers = List<String>.from(state['active_triggers'] ?? []);
       _handleAlerts(triggers);
@@ -86,8 +89,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         _previousTriggers = triggers;
         if (!_thresholdsInitialized) {
           _tempLimit =
-              (state['safe_chamber_limit'] as num?)?.toDouble() ?? 60.0;
-          _mq2Limit = (state['safe_mq2_limit'] as num?)?.toDouble() ?? 1.5;
+              (state['threshold_chamber_temp_c'] as num?)?.toDouble() ?? 60.0;
+          _mq2Limit = (state['threshold_mq2_v'] as num?)?.toDouble() ?? 1.5;
           _thresholdsInitialized = true;
         }
       });
@@ -106,9 +109,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!mounted) return;
     if (currentTriggers.isNotEmpty) {
       final hasNew = currentTriggers.any((t) => !_previousTriggers.contains(t));
-      if (hasNew) {
-        _isMuted = false; // Unmute on truly new trigger
-        SystemSound.play(SystemSoundType.alert);
+      if (hasNew && !_isMuted) {
+        if (widget.onAlert != null) {
+          widget.onAlert!();
+        } else {
+          SystemSound.play(SystemSoundType.alert);
+        }
       }
       if (hasNew || currentTriggers.length != _previousTriggers.length) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -119,6 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         );
       }
     } else if (currentTriggers.isEmpty && _previousTriggers.isNotEmpty) {
+      _isMuted = false;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
     }
   }
@@ -128,7 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _isSavingThresholds = true;
     });
     try {
-      await ApiService.setThresholds(_tempLimit, _mq2Limit);
+      await widget.apiService.setThresholds(_tempLimit, _mq2Limit);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thresholds updated successfully')),
@@ -180,9 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         );
       }
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -193,13 +198,12 @@ class _DashboardScreenState extends State<DashboardScreen>
             IconButton(
               icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
               onPressed: () => setState(() => _isMuted = !_isMuted),
-            )
+            ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Live Data Section
           const Text(
             'Live Sensor Data',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -214,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     leading: const Icon(Icons.thermostat, color: Colors.orange),
                     title: const Text('Chamber Temperature'),
                     trailing: Text(
-                      '${_state['chamber_temp'] ?? '--'} °C',
+                      '${_state['chamber_temp_c'] ?? '--'} °C',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -277,7 +281,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 24),
 
-          // Controls Section
           const Text(
             'Manual Controls',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -294,7 +297,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 24),
 
-          // Configuration Section
           const Text(
             'Safety Thresholds',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

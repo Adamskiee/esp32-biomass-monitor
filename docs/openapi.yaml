@@ -1,10 +1,8 @@
 openapi: 3.0.3
 info:
   title: Biomass Monitor API
-  description: >
-    API for interacting with the ESP32 Biomass Monitor sensors and settings. 
-    Note that as this is served from an ESP32, connections may be plaintext over HTTP.
-  version: 1.0.0
+  description: Authenticated local API for ESP32 telemetry and safety control.
+  version: 1.1.0
 servers:
   - url: /
 components:
@@ -32,8 +30,31 @@ components:
           type: number
           format: float
           nullable: true
-    Settings:
+        threshold_chamber_temp_c:
+          type: number
+          format: float
+        threshold_mq2_v:
+          type: number
+          format: float
+        fan_on:
+          type: boolean
+        sprinkler_on:
+          type: boolean
+        manual_sprinkler:
+          type: boolean
+        active_triggers:
+          type: array
+          items:
+            type: string
+            enum:
+              - high_chamber_temp
+              - high_mq2_gas
+              - temp_sensor_fault
+              - mq2_sensor_fault
+              - catastrophic_latch
+    Thresholds:
       type: object
+      minProperties: 1
       properties:
         threshold_chamber_temp_c:
           type: number
@@ -45,6 +66,22 @@ components:
           format: float
           minimum: 0.1
           maximum: 5.0
+    SprinklerCommand:
+      type: object
+      required:
+        - sprinkler
+      properties:
+        sprinkler:
+          type: boolean
+    SuccessResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
     ErrorResponse:
       type: object
       properties:
@@ -64,111 +101,146 @@ paths:
         '200':
           description: OK
     get:
-      summary: Retrieves real-time sensor data
+      summary: Retrieve sensor readings and current safety state
       responses:
         '200':
-          description: A JSON object returning sensor readings
+          description: Current cached readings and actuator state
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemState'
         '401':
           description: Unauthorized
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: Unauthorized
-        '404':
-          description: Not Found
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: Not Found
         '503':
-          description: Service Unavailable
+          description: State mutex unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/control:
+    options:
+      summary: CORS preflight for control
+      security: []
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Request manual sprinkler state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SprinklerCommand'
+      responses:
+        '200':
+          description: Manual state accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '409':
+          description: Automatic safety control is active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: State mutex unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/thresholds:
+    options:
+      summary: CORS preflight for thresholds
+      security: []
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Update one or both safety thresholds transactionally
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thresholds'
+      responses:
+        '200':
+          description: Thresholds accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Missing, malformed, or out-of-range threshold
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '503':
+          description: State mutex unavailable
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/settings:
     options:
-      summary: CORS preflight for settings
+      summary: CORS preflight for compatibility settings route
       security: []
       responses:
         '200':
           description: OK
     get:
-      summary: Retrieves current configuration thresholds
+      summary: Retrieve current threshold settings
       responses:
         '200':
-          description: A JSON object containing current configuration limits
+          description: Current threshold settings
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Settings'
+                $ref: '#/components/schemas/Thresholds'
         '401':
           description: Unauthorized
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: Unauthorized
-        '404':
-          description: Not Found
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: Not Found
         '503':
-          description: Service Unavailable
+          description: State mutex unavailable
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     post:
-      summary: Updates configuration thresholds
-      description: >
-        Accepts partial or full updates to thresholds.
-        Warning: The ESP32 enforces a strict payload limit of 256 bytes and rejects fragmented packets to prevent DoS attacks.
-        Frequent updates are applied instantly to memory, but persisted to flash at most once every 60 seconds.
+      summary: Update thresholds through the compatibility route
       requestBody:
-        description: A JSON object accepting partial or full updates to the thresholds.
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Settings'
+              $ref: '#/components/schemas/Thresholds'
       responses:
         '200':
-          description: Successful update
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: success
+          description: Thresholds accepted
         '400':
-          description: Empty payload, payload exceeds 256 bytes, or validation failed
+          description: Invalid request body
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+        '503':
+          description: State mutex unavailable
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: Unauthorized
-        '404':
-          description: Not Found
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: Not Found
+                $ref: '#/components/schemas/ErrorResponse'

@@ -39,6 +39,9 @@ jobs:
       - name: Install ESP32 Core and Dependencies
         run: ./firmware/install_deps.sh
 
+      - name: Run Native Safety Tests
+        run: ./firmware/tests/run_native_tests.sh
+
       - name: Compile Sketches
         run: |
           arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/main/main.ino

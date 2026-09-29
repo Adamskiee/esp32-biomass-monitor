@@ -5,11 +5,11 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #else
-#include <string>
 #include <cmath>
 #include <cstdint>
+#include <string>
 typedef std::string String;
-typedef void* SemaphoreHandle_t;
+typedef void *SemaphoreHandle_t;
 #define portMAX_DELAY 0xFFFF
 inline void xSemaphoreTake(SemaphoreHandle_t, uint32_t) {}
 inline void xSemaphoreGive(SemaphoreHandle_t) {}
@@ -30,6 +30,25 @@ extern SemaphoreHandle_t stateMutex;
 extern bool manual_sprinkler;
 extern bool catastrophic_latch;
 extern String active_triggers_json;
+
+enum class ThresholdUpdateResult {
+  Accepted,
+  Invalid,
+  Busy,
+};
+
+enum class ManualSprinklerResult {
+  Accepted,
+  SafetyOverride,
+  Busy,
+};
+
+ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
+                                           float chamber_limit,
+                                           bool has_mq2_limit, float mq2_limit);
+ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
+void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
+                           float mq2_v);
 void evaluateSafetyLoop();
 
 void initSystemState();

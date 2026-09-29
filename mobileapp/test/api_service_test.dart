@@ -1,144 +1,139 @@
 import 'dart:convert';
+
+import 'package:biomass_iot_app/api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:biomass_iot_app/api_service.dart';
+
+const authorizationHeader = 'Basic YWRtaW46c2VjcmV0';
+
+ApiService createService(http.Client client) {
+  return ApiService(
+    baseUrl: 'http://192.168.1.51/api',
+    authorizationHeader: authorizationHeader,
+    client: client,
+  );
+}
 
 void main() {
-  group('ApiService configuration', () {
-    test('baseUrl matches ESP32 API path', () {
-      expect(ApiService.baseUrl, 'http://esp32.local/api');
-    });
-
-    test('headers contain required security and connection headers', () {
-      expect(ApiService.headers, {
-        'Content-Type': 'application/json',
-        'X-ESP32-Biomass': 'true',
-        'Connection': 'close',
-      });
-    });
-  });
-
-  group('ApiService.fetchState', () {
-    test('fetches state successfully with 200 response', () async {
-      final mockClient = MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(request.url, Uri.parse('http://esp32.local/api/state'));
-        expect(request.headers['X-ESP32-Biomass'], 'true');
-        expect(request.headers['Connection'], 'close');
-        return http.Response(
-          jsonEncode({
-            'chamber_temp': 45.2,
-            'mq2_v': 1.1,
-            'safe_chamber_limit': 60.0,
-            'safe_mq2_limit': 1.5,
-            'fan_on': true,
-            'sprinkler_on': false,
-            'manual_sprinkler': false,
-            'active_triggers': ['mq2_danger'],
-          }),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      });
-
-      final state = await ApiService.fetchState(client: mockClient);
-      expect(state['chamber_temp'], 45.2);
-      expect(state['active_triggers'], ['mq2_danger']);
-    });
-
-    test('throws Exception when fetchState returns non-200', () async {
-      final mockClient = MockClient((request) async {
-        return http.Response('Server Error', 500);
-      });
-
-      expect(() => ApiService.fetchState(client: mockClient), throwsException);
-    });
-  });
-
-  group('ApiService.setSprinkler', () {
-    test('posts sprinkler state true to /control', () async {
-      late http.Request recordedRequest;
-      final mockClient = MockClient((request) async {
+  test('uses the selected node address and Basic Auth credentials', () async {
+    late http.Request recordedRequest;
+    final service = createService(
+      MockClient((request) async {
         recordedRequest = request;
-        return http.Response(jsonEncode({'status': 'ok'}), 200);
-      });
+        return http.Response('{}', 200);
+      }),
+    );
 
-      await ApiService.setSprinkler(true, client: mockClient);
+    await service.fetchState();
+
+    expect(recordedRequest.url, Uri.parse('http://192.168.1.51/api/state'));
+    expect(recordedRequest.headers['Authorization'], authorizationHeader);
+    expect(recordedRequest.headers['Connection'], 'close');
+  });
+
+  group('fetchState', () {
+    test('returns the complete state response', () async {
+      final service = createService(
+        MockClient((request) async {
+          expect(request.method, 'GET');
+          return http.Response(
+            jsonEncode({
+              'temperature_c': 28.0,
+              'chamber_temp_c': 45.2,
+              'mq135_v': 1.4,
+              'mq2_v': 1.1,
+              'threshold_chamber_temp_c': 60.0,
+              'threshold_mq2_v': 1.5,
+              'fan_on': true,
+              'sprinkler_on': false,
+              'manual_sprinkler': false,
+              'active_triggers': ['high_mq2_gas'],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final state = await service.fetchState();
+
+      expect(state['chamber_temp_c'], 45.2);
+      expect(state['active_triggers'], ['high_mq2_gas']);
+    });
+
+    test('throws when the ESP32 returns an error', () async {
+      final service = createService(
+        MockClient((request) async {
+          return http.Response('Server Error', 500);
+        }),
+      );
+
+      expect(service.fetchState, throwsException);
+    });
+  });
+
+  group('setSprinkler', () {
+    test('posts the requested sprinkler state', () async {
+      late http.Request recordedRequest;
+      final service = createService(
+        MockClient((request) async {
+          recordedRequest = request;
+          return http.Response(jsonEncode({'status': 'ok'}), 200);
+        }),
+      );
+
+      await service.setSprinkler(true);
+
       expect(recordedRequest.method, 'POST');
-      expect(recordedRequest.url, Uri.parse('http://esp32.local/api/control'));
-      expect(recordedRequest.headers['X-ESP32-Biomass'], 'true');
+      expect(recordedRequest.url, Uri.parse('http://192.168.1.51/api/control'));
+      expect(recordedRequest.headers['Authorization'], authorizationHeader);
       expect(jsonDecode(recordedRequest.body), {'sprinkler': true});
     });
 
-    test('posts sprinkler state false to /control', () async {
-      late http.Request recordedRequest;
-      final mockClient = MockClient((request) async {
-        recordedRequest = request;
-        return http.Response(jsonEncode({'status': 'ok'}), 200);
-      });
-
-      await ApiService.setSprinkler(false, client: mockClient);
-      expect(jsonDecode(recordedRequest.body), {'sprinkler': false});
-    });
-
-    test('throws Exception when setSprinkler returns non-200', () async {
-      final mockClient = MockClient((request) async {
-        return http.Response('Forbidden', 403);
-      });
-
-      expect(
-        () => ApiService.setSprinkler(true, client: mockClient),
-        throwsException,
+    test('throws when safety control rejects the request', () async {
+      final service = createService(
+        MockClient((request) async {
+          return http.Response('Automatic safety control is active', 409);
+        }),
       );
+
+      expect(() => service.setSprinkler(false), throwsException);
     });
   });
 
-  group('ApiService.setThresholds', () {
-    test('posts thresholds to /thresholds', () async {
+  group('setThresholds', () {
+    test('posts documented threshold fields', () async {
       late http.Request recordedRequest;
-      final mockClient = MockClient((request) async {
-        recordedRequest = request;
-        return http.Response(jsonEncode({'status': 'ok'}), 200);
-      });
+      final service = createService(
+        MockClient((request) async {
+          recordedRequest = request;
+          return http.Response(jsonEncode({'status': 'ok'}), 200);
+        }),
+      );
 
-      await ApiService.setThresholds(55.0, 2.0, client: mockClient);
+      await service.setThresholds(55.0, 2.0);
+
       expect(recordedRequest.method, 'POST');
       expect(
         recordedRequest.url,
-        Uri.parse('http://esp32.local/api/thresholds'),
+        Uri.parse('http://192.168.1.51/api/thresholds'),
       );
-      expect(recordedRequest.headers['X-ESP32-Biomass'], 'true');
+      expect(recordedRequest.headers['Authorization'], authorizationHeader);
       expect(jsonDecode(recordedRequest.body), {
-        'safe_chamber_limit': 55.0,
-        'safe_mq2_limit': 2.0,
+        'threshold_chamber_temp_c': 55.0,
+        'threshold_mq2_v': 2.0,
       });
     });
 
-    test('throws Exception when setThresholds returns non-200', () async {
-      final mockClient = MockClient((request) async {
-        return http.Response('Forbidden', 403);
-      });
-
-      expect(
-        () => ApiService.setThresholds(55.0, 2.0, client: mockClient),
-        throwsException,
+    test('throws when threshold validation fails', () async {
+      final service = createService(
+        MockClient((request) async {
+          return http.Response('Invalid threshold', 400);
+        }),
       );
-    });
-  });
 
-  group('ApiService default client usage', () {
-    test('uses ApiService.client when no client passed', () async {
-      final originalClient = ApiService.client;
-      try {
-        ApiService.client = MockClient((request) async {
-          return http.Response(jsonEncode({'test': 123}), 200);
-        });
-        final result = await ApiService.fetchState();
-        expect(result['test'], 123);
-      } finally {
-        ApiService.client = originalClient;
-      }
+      expect(() => service.setThresholds(1000.0, 2.0), throwsException);
     });
   });
 }
