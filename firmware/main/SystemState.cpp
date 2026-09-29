@@ -18,6 +18,9 @@ bool manual_sprinkler = false;
 bool catastrophic_latch = false;
 String active_triggers_json = "[]";
 
+static bool temp_latch_danger = false;
+static bool mq2_latch_danger = false;
+
 #ifdef ARDUINO
 SemaphoreHandle_t stateMutex = nullptr;
 Preferences preferences;
@@ -56,20 +59,23 @@ void evaluateSafetyLoop() {
     // Hysteresis states
     bool in_temp_danger = !is_temp_fault && (current_chamber_c >= threshold_chamber_temp_c);
     bool in_mq2_danger = !is_mq2_fault && (current_mq2_v >= threshold_mq2_v);
-    static bool temp_latch_danger = false;
-    static bool mq2_latch_danger = false;
 
     if (in_temp_danger) {
         temp_latch_danger = true;
     } else if (!is_temp_fault && current_chamber_c <= threshold_chamber_temp_c * 0.95f) {
         temp_latch_danger = false;
     }
-
+    bool prev_mq2_latch = mq2_latch_danger;
     if (in_mq2_danger) {
         mq2_latch_danger = true;
     } else if (!is_mq2_fault && current_mq2_v <= threshold_mq2_v * 0.95f) {
         mq2_latch_danger = false;
     }
+    
+    if (mq2_latch_danger && !prev_mq2_latch) {
+        manual_sprinkler = false;
+    }
+
 
     // Check catastrophic fire latch condition:
     // Only latch if the system was actively in temperature danger when the sensor faulted.

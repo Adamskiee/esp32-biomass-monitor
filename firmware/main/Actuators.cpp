@@ -2,7 +2,7 @@
 #include <BiomassConfig.h>
 
 bool current_solenoid_state = false;
-uint32_t last_solenoid_toggle = 0;
+static uint32_t last_solenoid_toggle = 0;
 static bool solenoid_has_toggled = false;
 
 void initSolenoid() {

@@ -70,6 +70,7 @@ void initApiServer() {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
         request->send(addCorsOrigin(request, response));
     });
+    controlHandler->setMethod(HTTP_POST);
     server.addHandler(controlHandler);
 
     AsyncCallbackJsonWebHandler* thresholdHandler = new AsyncCallbackJsonWebHandler("/api/thresholds", [addCorsOrigin](AsyncWebServerRequest *request, JsonVariant &json) {
@@ -80,19 +81,27 @@ void initApiServer() {
         }
         JsonObject jsonObj = json.as<JsonObject>();
         xSemaphoreTake(stateMutex, portMAX_DELAY);
+        bool changed = false;
         if (jsonObj.containsKey("safe_chamber_limit")) {
             float val = jsonObj["safe_chamber_limit"];
-            if (val >= 0 && val <= 1000) threshold_chamber_temp_c = val;
+            if (val >= 0 && val <= 1000 && threshold_chamber_temp_c != val) {
+                threshold_chamber_temp_c = val;
+                changed = true;
+            }
         }
         if (jsonObj.containsKey("safe_mq2_limit")) {
             float val = jsonObj["safe_mq2_limit"];
-            if (val >= 0 && val <= 5.0) threshold_mq2_v = val;
+            if (val >= 0 && val <= 5.0 && threshold_mq2_v != val) {
+                threshold_mq2_v = val;
+                changed = true;
+            }
         }
-        state_needs_save = true;
+        if (changed) state_needs_save = true;
         xSemaphoreGive(stateMutex);
         AsyncWebServerResponse *response = request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
         request->send(addCorsOrigin(request, response));
     });
+    thresholdHandler->setMethod(HTTP_POST);
     server.addHandler(thresholdHandler);
 
     server.on("/api/settings", HTTP_GET, [addCorsOrigin, send401](AsyncWebServerRequest *request){
