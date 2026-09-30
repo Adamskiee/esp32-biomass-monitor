@@ -15,8 +15,10 @@ shows reported state and cannot override automatic sprinkler safety.
   sprinkler. It releases after the temperature falls below 95% of the threshold.
 - If the thermocouple fails during a temperature alarm, a catastrophic latch
   holds the sprinkler on until the ESP32 restarts.
-- An MQ2 reading at or above its threshold raises a gas trigger but does not
-  automatically open the sprinkler. An invalid MQ2 reading raises a fault.
+- An MQ2 reading at or above 2.5 V raises a gas trigger but does not
+  automatically open the sprinkler or change the green LED. Only `NaN`
+  readings and readings above 4.8 V raise an MQ2 fault. A 0 V reading is
+  valid.
 - The fan runs from startup. The status LED starts yellow until the first
   sensor evaluation, then shows danger, fault, or safe state. The buzzer sounds
   for a valid chamber reading
@@ -30,13 +32,14 @@ implemented.
 
 ## How are settings and network access handled?
 
-The two adjustable limits are chamber temperature (20 to 150 °C) and MQ2
-voltage (0.1 to 5.0 V). Updates apply immediately and are saved to nonvolatile
-storage at most once per 60 seconds to limit flash wear. The firmware connects
-to the Wi-Fi credentials compiled into `Secrets.h` and serves a local HTTP API
-with Basic authentication. It has no cloud sync, offline telemetry buffer,
-access point provisioning, secure boot setup, or over-the-air update flow in
-this repository.
+The adjustable chamber-temperature limit ranges from 20 to 150 °C. The API
+continues to accept and store its legacy MQ2 threshold field for compatibility,
+but gas safety uses the fixed 2.5 V threshold. Accepted settings changes are
+saved to nonvolatile storage at most once per 60 seconds to limit flash wear.
+The firmware connects to the Wi-Fi credentials compiled into `Secrets.h` and
+serves a local HTTP API with Basic authentication. It has no cloud sync,
+offline telemetry buffer, access point provisioning, secure boot setup, or
+over-the-air update flow in this repository.
 
 See [the API reference](api.md) for request and response examples and
 [the operations guide](operations-guide.md) for commissioning.

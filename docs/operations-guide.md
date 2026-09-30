@@ -21,11 +21,14 @@ password.
 
 - A green LED indicates the current readings are safe. The fan runs from
   startup, including in this state. The LED starts yellow until the first poll.
-- A red LED indicates chamber temperature or MQ2 voltage above its limit.
-  Check `active_triggers` and the measured values in the app.
-- A yellow LED indicates an invalid thermocouple or MQ2 reading. Check sensor
-  wiring and power. A thermocouple failure during a temperature alarm latches
-  the sprinkler on until restart.
+- A red LED indicates chamber temperature at or above its configured limit.
+  It also means the sprinkler has opened automatically. An MQ2 gas alert does
+  not change the green LED or open the sprinkler. Check `active_triggers` and
+  the measured values in the app.
+- A yellow LED indicates an invalid thermocouple or MQ2 reading. MQ2 readings
+  are invalid only when they are `NaN` or above 4.8 V. A 0 V MQ2 reading is
+  valid. Check sensor wiring and power. A thermocouple failure during a
+  temperature alarm latches the sprinkler on until restart.
 - The buzzer indicates a valid chamber reading above the configured limit.
 - A rejected manual sprinkler command can mean automatic temperature safety
   is active. The app refreshes the reported output state after rejection.

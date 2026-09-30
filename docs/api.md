@@ -64,8 +64,9 @@ Returns cached readings and current safety outputs:
 }
 ```
 
-Sensor reads represented internally as `NaN` are returned as `null`. An MQ2
-disconnect below 0.1 V remains visible as its numeric reading and adds the
+Sensor reads represented internally as `NaN` are returned as `null`. MQ2
+readings from 0.0 V through 2.4 V are safe. Readings at or above 2.5 V add the
+`high_mq2_gas` trigger, while only `NaN` values and values above 4.8 V add the
 `mq2_sensor_fault` trigger. `active_triggers` can contain:
 
 - `high_chamber_temp`
@@ -98,7 +99,8 @@ restarts.
 
 ### `POST /api/thresholds`
 
-Updates one or both safety thresholds:
+Updates the chamber-temperature threshold and, for API compatibility, the
+stored MQ2 threshold value:
 
 ```json
 {
@@ -108,7 +110,8 @@ Updates one or both safety thresholds:
 ```
 
 - `threshold_chamber_temp_c`: JSON number from 20.0 through 150.0.
-- `threshold_mq2_v`: JSON number from 0.1 through 5.0.
+- `threshold_mq2_v`: JSON number from 0.1 through 5.0. This legacy field is
+  stored and returned, but does not change the fixed 2.5 V MQ2 gas threshold.
 - At least one field is required.
 - The JSON body must not exceed 256 bytes.
 - Validation is transactional. If either field is invalid, neither changes.
