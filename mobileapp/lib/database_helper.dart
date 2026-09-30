@@ -98,7 +98,7 @@ class DatabaseHelper {
       orderBy: 'timestamp DESC',
       limit: limit,
     );
-    
+
     return List.generate(maps.length, (i) {
       return SensorData(
         temperatureC: maps[i]['temperature_c'] as double?,
@@ -113,10 +113,12 @@ class DatabaseHelper {
   Future<List<SensorData>> getAggregatedSensorData(int hours) async {
     if (kIsWeb) return [];
     Database db = await database;
-    
+
     // Calculate the cutoff time
-    String cutoff = DateTime.now().subtract(Duration(hours: hours)).toIso8601String();
-    
+    String cutoff = DateTime.now()
+        .subtract(Duration(hours: hours))
+        .toIso8601String();
+
     // Fetch all records within the timeframe
     List<Map<String, dynamic>> maps = await db.query(
       'sensor_data',
@@ -124,7 +126,7 @@ class DatabaseHelper {
       whereArgs: [cutoff],
       orderBy: 'timestamp ASC',
     );
-    
+
     if (maps.isEmpty) return [];
 
     // Target around 60 data points for the chart
@@ -136,26 +138,40 @@ class DatabaseHelper {
     for (int i = 0; i < maps.length; i += step) {
       int end = (i + step < maps.length) ? i + step : maps.length;
       var chunk = maps.sublist(i, end);
-      
+
       double sumTempC = 0, sumChamberC = 0, sumMq135 = 0, sumMq2 = 0;
       int countTempC = 0, countChamberC = 0, countMq135 = 0, countMq2 = 0;
-      
+
       for (var row in chunk) {
-        if (row['temperature_c'] != null) { sumTempC += row['temperature_c'] as double; countTempC++; }
-        if (row['chamber_temp_c'] != null) { sumChamberC += row['chamber_temp_c'] as double; countChamberC++; }
-        if (row['mq135_v'] != null) { sumMq135 += row['mq135_v'] as double; countMq135++; }
-        if (row['mq2_v'] != null) { sumMq2 += row['mq2_v'] as double; countMq2++; }
+        if (row['temperature_c'] != null) {
+          sumTempC += row['temperature_c'] as double;
+          countTempC++;
+        }
+        if (row['chamber_temp_c'] != null) {
+          sumChamberC += row['chamber_temp_c'] as double;
+          countChamberC++;
+        }
+        if (row['mq135_v'] != null) {
+          sumMq135 += row['mq135_v'] as double;
+          countMq135++;
+        }
+        if (row['mq2_v'] != null) {
+          sumMq2 += row['mq2_v'] as double;
+          countMq2++;
+        }
       }
-      
-      aggregated.add(SensorData(
-        temperatureC: countTempC > 0 ? sumTempC / countTempC : null,
-        chamberTempC: countChamberC > 0 ? sumChamberC / countChamberC : null,
-        mq135V: countMq135 > 0 ? sumMq135 / countMq135 : null,
-        mq2V: countMq2 > 0 ? sumMq2 / countMq2 : null,
-        timestamp: DateTime.parse(chunk.last['timestamp'] as String),
-      ));
+
+      aggregated.add(
+        SensorData(
+          temperatureC: countTempC > 0 ? sumTempC / countTempC : null,
+          chamberTempC: countChamberC > 0 ? sumChamberC / countChamberC : null,
+          mq135V: countMq135 > 0 ? sumMq135 / countMq135 : null,
+          mq2V: countMq2 > 0 ? sumMq2 / countMq2 : null,
+          timestamp: DateTime.parse(chunk.last['timestamp'] as String),
+        ),
+      );
     }
-    
+
     return aggregated;
   }
 
@@ -163,32 +179,36 @@ class DatabaseHelper {
   Future<int> insertAlert(AlertItem alert) async {
     if (kIsWeb) return 0;
     Database db = await database;
-    return await db.insert(
-      'alerts',
-      {
-        'id': alert.id,
-        'title': alert.title,
-        'description': alert.description,
-        'severity': alert.severity,
-        'time': alert.time,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    return await db.insert('alerts', {
+      'id': alert.id,
+      'title': alert.title,
+      'description': alert.description,
+      'severity': alert.severity,
+      'time': alert.timestamp?.toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<AlertItem>> getAlerts() async {
     if (kIsWeb) return [];
     Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query('alerts', orderBy: 'time DESC');
-    return List.generate(maps.length, (i) {
-      return AlertItem(
-        id: maps[i]['id'] as String,
-        title: maps[i]['title'] as String,
-        description: maps[i]['description'] as String,
-        severity: maps[i]['severity'] as String,
-        time: maps[i]['time'] as String,
-      );
-    });
+    final maps = await db.query('alerts');
+    final alerts = maps
+        .map(
+          (map) => AlertItem(
+            id: map['id'] as String,
+            title: map['title'] as String,
+            description: map['description'] as String,
+            severity: map['severity'] as String,
+            timestamp: DateTime.tryParse(map['time'] as String? ?? ''),
+          ),
+        )
+        .toList();
+    alerts.sort(
+      (first, second) => (second.timestamp ?? DateTime(0)).compareTo(
+        first.timestamp ?? DateTime(0),
+      ),
+    );
+    return alerts;
   }
 
   // --- Audit Logs CRUD ---
@@ -205,7 +225,10 @@ class DatabaseHelper {
   Future<List<AuditLog>> getAuditLogs() async {
     if (kIsWeb) return [];
     Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query('audit_logs', orderBy: 'id DESC');
+    List<Map<String, dynamic>> maps = await db.query(
+      'audit_logs',
+      orderBy: 'id DESC',
+    );
     return List.generate(maps.length, (i) {
       return AuditLog(
         maps[i]['action'] as String,
