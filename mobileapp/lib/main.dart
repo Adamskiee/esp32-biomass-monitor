@@ -264,7 +264,7 @@ class AppStateProvider extends ChangeNotifier {
   List<AuditLog> get auditLogs => _auditLogs;
 
   Map<String, String> getSessionAnalytics() {
-    if (_history.isEmpty)
+    if (_history.isEmpty) {
       return {
         "minT": "0.0",
         "maxT": "0.0",
@@ -272,6 +272,7 @@ class AppStateProvider extends ChangeNotifier {
         "maxMq2": "0.0",
         "avgMq2": "0.0",
       };
+    }
 
     var validTemps = _history
         .where((e) => e.chamberTempC != null)
@@ -2902,10 +2903,11 @@ class _AlertsTabState extends State<AlertsTab> {
     final theme = Theme.of(context);
     final isCompact = MediaQuery.of(context).size.width < 600;
     List<AlertItem> filteredAlerts = state.alerts;
-    if (_filter != 'All')
+    if (_filter != 'All') {
       filteredAlerts = state.alerts
           .where((a) => a.severity.toLowerCase() == _filter.toLowerCase())
           .toList();
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
