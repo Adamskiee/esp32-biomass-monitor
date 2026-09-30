@@ -22,6 +22,9 @@ String active_triggers_json = "[]";
 static bool temp_latch_danger = false;
 static bool mq2_latch_danger = false;
 
+constexpr float MQ2_GAS_DANGER_V = 2.5f;
+constexpr float MQ2_RAIL_SHORT_V = 4.8f;
+
 #ifdef ARDUINO
 SemaphoreHandle_t stateMutex = nullptr;
 Preferences preferences;
@@ -131,11 +134,13 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
 
 void evaluateSafetyLoop() {
   bool is_temp_fault = isnan(current_chamber_c);
-  bool is_mq2_fault = isnan(current_mq2_v) || current_mq2_v < 0.1f;
+  bool is_mq2_fault =
+      isnan(current_mq2_v) || current_mq2_v > MQ2_RAIL_SHORT_V;
 
   bool in_temp_danger =
       !is_temp_fault && (current_chamber_c >= threshold_chamber_temp_c);
-  bool in_mq2_danger = !is_mq2_fault && (current_mq2_v >= threshold_mq2_v);
+  bool in_mq2_danger =
+      !is_mq2_fault && (current_mq2_v >= MQ2_GAS_DANGER_V);
 
   if (in_temp_danger) {
     temp_latch_danger = true;
@@ -145,7 +150,8 @@ void evaluateSafetyLoop() {
   }
   if (in_mq2_danger) {
     mq2_latch_danger = true;
-  } else if (!is_mq2_fault && current_mq2_v <= threshold_mq2_v * 0.95f) {
+  } else if (!is_mq2_fault &&
+             current_mq2_v <= MQ2_GAS_DANGER_V * 0.95f) {
     mq2_latch_danger = false;
   }
 

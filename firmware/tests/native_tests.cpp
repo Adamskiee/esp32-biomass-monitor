@@ -165,10 +165,47 @@ void testMq2DangerPreservesManualSprinkler() {
   EXPECT_TRUE(name, manual_sprinkler);
 }
 
-void testMq2DisconnectIsReportedAsFault() {
-  const char *name = "MQ2 disconnect is reported as fault";
+void testMq2ZeroVoltsIsNormal() {
+  const char *name = "MQ2 zero volts is normal";
   resetSafetyState();
-  current_mq2_v = 0.05f;
+  current_mq2_v = 0.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testMq2SafeRangeDoesNotTriggerGasDanger() {
+  const char *name = "MQ2 safe range does not trigger gas danger";
+  resetSafetyState();
+  current_mq2_v = 2.4f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testMq2DangerStartsAtFixedThreshold() {
+  const char *name = "MQ2 danger starts at fixed threshold";
+  resetSafetyState();
+  threshold_mq2_v = 3.0f;
+  current_mq2_v = 2.5f;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+}
+
+void testMq2RailShortIsReportedAsFault() {
+  const char *name = "MQ2 rail short is reported as fault";
+  resetSafetyState();
+  current_mq2_v = 4.8f;
+  evaluateSafetyLoop();
+  EXPECT_FALSE(name, active_triggers_json.find("mq2_sensor_fault") !=
+                         std::string::npos);
+  current_mq2_v = 4.81f;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
+}
+
+void testMq2NanIsReportedAsFault() {
+  const char *name = "MQ2 NaN is reported as fault";
+  resetSafetyState();
+  current_mq2_v = NAN;
   evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
 }
@@ -314,8 +351,13 @@ int main() {
       testMq2DangerDoesNotActivateSolenoid);
   run("MQ2 danger preserves manual sprinkler",
       testMq2DangerPreservesManualSprinkler);
-  run("MQ2 disconnect is reported as fault",
-      testMq2DisconnectIsReportedAsFault);
+  run("MQ2 zero volts is normal", testMq2ZeroVoltsIsNormal);
+  run("MQ2 safe range does not trigger gas danger",
+      testMq2SafeRangeDoesNotTriggerGasDanger);
+  run("MQ2 danger starts at fixed threshold",
+      testMq2DangerStartsAtFixedThreshold);
+  run("MQ2 rail short is reported as fault", testMq2RailShortIsReportedAsFault);
+  run("MQ2 NaN is reported as fault", testMq2NanIsReportedAsFault);
   run("temperature fault allows manual sprinkler",
       testTemperatureFaultAllowsManualSprinkler);
   run("catastrophic fire latch", testCatastrophicFireLatch);
