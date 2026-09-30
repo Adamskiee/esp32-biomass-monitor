@@ -123,14 +123,51 @@ class SensorData {
 }
 
 class AlertItem {
-  final String id, title, description, severity, time;
+  final String id, title, description, severity;
+  final DateTime? timestamp;
+
   AlertItem({
     required this.id,
     required this.title,
     required this.description,
     required this.severity,
-    required this.time,
+    required this.timestamp,
   });
+}
+
+String formatAlertTimestamp(DateTime? timestamp, {DateTime? now}) {
+  if (timestamp == null) return 'Timestamp unavailable';
+
+  final elapsed = (now ?? DateTime.now()).difference(timestamp);
+  if (elapsed.inMinutes < 1) return 'Just now';
+  if (elapsed.inHours < 1) {
+    final minutes = elapsed.inMinutes;
+    return '$minutes ${minutes == 1 ? 'minute' : 'minutes'} ago';
+  }
+  if (elapsed.inHours < 24) {
+    final hours = elapsed.inHours;
+    return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
+  }
+  if (elapsed.inDays < 7) {
+    final days = elapsed.inDays;
+    return '$days ${days == 1 ? 'day' : 'days'} ago';
+  }
+
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[timestamp.month - 1]} ${timestamp.day}, ${timestamp.year}';
 }
 
 class AuditLog {
@@ -411,13 +448,14 @@ class AppStateProvider extends ChangeNotifier {
           _currentData.mq2V != null &&
           !_alerts.any((a) => a.title.contains("Gas Hazard"))) {
         HapticFeedback.heavyImpact();
+        final timestamp = DateTime.now();
         final alert = AlertItem(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: timestamp.millisecondsSinceEpoch.toString(),
           title: 'CRITICAL: High Gas Detected',
           description:
               'ESP32 reported a high MQ-2 reading (${_currentData.mq2V!.toStringAsFixed(2)} V).',
           severity: 'critical',
-          time: 'Just now',
+          timestamp: timestamp,
         );
         _alerts.insert(0, alert);
         DatabaseHelper().insertAlert(alert);
@@ -1666,7 +1704,7 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             ),
                             subtitle: Text(
-                              a.time,
+                              formatAlertTimestamp(a.timestamp),
                               style: const TextStyle(
                                 color: Colors.grey,
                                 fontSize: 12,
@@ -3048,7 +3086,9 @@ class _AlertsTabState extends State<AlertsTab> {
                                                 ),
                                               ),
                                               Text(
-                                                alert.time,
+                                                formatAlertTimestamp(
+                                                  alert.timestamp,
+                                                ),
                                                 style: const TextStyle(
                                                   color: Colors.grey,
                                                   fontSize: 12,
