@@ -9,11 +9,17 @@ class ApiService {
   }) : baseUrl = baseUrl.endsWith('/')
            ? baseUrl.substring(0, baseUrl.length - 1)
            : baseUrl,
-       _client = client ?? http.Client();
+       _client = client ?? http.Client(),
+       _ownsClient = client == null;
 
   final String baseUrl;
   final String authorizationHeader;
   final http.Client _client;
+  final bool _ownsClient;
+
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   Map<String, String> get headers => {
     'Authorization': authorizationHeader,

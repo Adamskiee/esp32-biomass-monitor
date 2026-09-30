@@ -11,6 +11,8 @@ namespace {
 
 uint32_t test_millis = 1000;
 int failure_count = 0;
+int test_count = 0;
+uint8_t pin_levels[40] = {};
 
 void fail(const char *test_name, const char *expression, int line) {
   std::cerr << "FAIL " << test_name << " at line " << line << ": " << expression
@@ -87,6 +89,25 @@ void testTemperatureDangerActivatesSolenoid() {
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
 
+void testLedFollowsLatchedTemperatureDanger() {
+  const char *name = "LED follows latched temperature danger";
+  resetSafetyState();
+  current_chamber_c = 80.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_BUZZER] == LOW);
+
+  current_chamber_c = 78.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_ON);
+
+  current_chamber_c = 75.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+}
+
 void testProcessingSensorReadingsEvaluatesSafety() {
   const char *name = "processing sensor readings evaluates safety";
   resetSafetyState();
@@ -131,6 +152,17 @@ void testMq2DangerDoesNotActivateSolenoid() {
   current_mq2_v = 2.3f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testMq2DangerPreservesManualSprinkler() {
+  const char *name = "MQ2 danger preserves manual sprinkler";
+  resetSafetyState();
+  EXPECT_TRUE(name, applyManualSprinklerCommand(true) ==
+                        ManualSprinklerResult::Accepted);
+  current_mq2_v = 3.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, manual_sprinkler);
 }
 
 void testMq2DisconnectIsReportedAsFault() {
@@ -237,7 +269,18 @@ void testValidThresholdUpdateChangesRequestedFields() {
   EXPECT_TRUE(name, state_needs_save);
 }
 
+void testLowerThresholdImmediatelyReevaluatesSafety() {
+  const char *name = "lower threshold immediately reevaluates safety";
+  resetSafetyState();
+  current_chamber_c = 70.0f;
+  const auto result = applyThresholdUpdate(true, 60.0f, false, 0.0f);
+  EXPECT_TRUE(name, result == ThresholdUpdateResult::Accepted);
+  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
+}
+
 void run(const char *name, const std::function<void()> &test) {
+  ++test_count;
   const int failures_before = failure_count;
   test();
   if (failure_count == failures_before) {
@@ -251,7 +294,7 @@ uint32_t millis() { return test_millis; }
 
 void pinMode(uint8_t, uint8_t) {}
 
-void digitalWrite(uint8_t, uint8_t) {}
+void digitalWrite(uint8_t pin, uint8_t level) { pin_levels[pin] = level; }
 
 int main() {
   run("solenoid debounce", testSolenoidDebounce);
@@ -260,6 +303,8 @@ int main() {
   run("fan state tracks output", testFanStateTracksOutput);
   run("temperature danger activates solenoid",
       testTemperatureDangerActivatesSolenoid);
+  run("LED follows latched temperature danger",
+      testLedFollowsLatchedTemperatureDanger);
   run("processing sensor readings evaluates safety",
       testProcessingSensorReadingsEvaluatesSafety);
   run("temperature danger bypasses debounce",
@@ -267,6 +312,8 @@ int main() {
   run("temperature hysteresis", testTemperatureHysteresis);
   run("MQ2 danger does not activate solenoid",
       testMq2DangerDoesNotActivateSolenoid);
+  run("MQ2 danger preserves manual sprinkler",
+      testMq2DangerPreservesManualSprinkler);
   run("MQ2 disconnect is reported as fault",
       testMq2DisconnectIsReportedAsFault);
   run("temperature fault allows manual sprinkler",
@@ -281,12 +328,14 @@ int main() {
       testInvalidThresholdUpdateIsTransactional);
   run("valid threshold update changes requested fields",
       testValidThresholdUpdateChangesRequestedFields);
+  run("lower threshold immediately reevaluates safety",
+      testLowerThresholdImmediatelyReevaluatesSafety);
 
   if (failure_count != 0) {
     std::cerr << failure_count << " native firmware test assertion(s) failed\n";
     return 1;
   }
 
-  std::cout << "All 17 native firmware tests passed\n";
+  std::cout << "All " << test_count << " native firmware tests passed\n";
   return 0;
 }

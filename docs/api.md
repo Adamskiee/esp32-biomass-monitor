@@ -8,7 +8,7 @@ API commands cannot disable a safety-forced sprinkler.
 
 ### Authentication
 
-Every API request except `OPTIONS` requires HTTP Basic authentication:
+Every documented API request requires HTTP Basic authentication:
 
 ```text
 Authorization: Basic <base64(user:password)>
@@ -34,11 +34,11 @@ The ESP32 serves plain HTTP. Basic authentication does not encrypt credentials,
 so expose the API only on a trusted local network. HTTPS applications also
 cannot call it directly because browsers block mixed content.
 
-### CORS and polling
+### Browser access and polling
 
-`OPTIONS` preflight requests do not require authentication. Responses echo the
-request `Origin` and allow `GET`, `POST`, `OPTIONS`, `Authorization`, and
-`Content-Type`.
+The API does not enable cross-origin browser requests. Use the Flutter app or
+another local HTTP client. This avoids granting arbitrary websites access to
+credentialed device controls.
 
 Poll sequentially every one to two seconds. Concurrent requests can receive
 `503 Server Busy` while the state mutex is unavailable.
@@ -128,9 +128,8 @@ Returns the two current threshold values using the same names as
 ### `POST /api/settings`
 
 Supports existing clients that update thresholds through the original route.
-The body must be at most 256 bytes and arrive in one TCP fragment. New clients
-should use `/api/thresholds`, which accepts buffered JSON requests and provides
-specific validation errors.
+It uses the same buffered JSON parsing, 256-byte limit, and validation as
+`/api/thresholds`. New clients should use `/api/thresholds`.
 
 ## Error responses
 

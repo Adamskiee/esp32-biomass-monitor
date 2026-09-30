@@ -14,7 +14,8 @@ void setup() {
   initActuators();
   initAnalogSensors();
   initDigitalSensors();
-  setLedStatus(false, false, true); // Green = system ready
+  setFan(true);
+  setLedStatus(false, true, false);
   initApiServer();
   Serial.println("System Ready.");
 }
@@ -48,7 +49,6 @@ void loop() {
     // Grab safe copies for persistence without holding the mutex during flash
     // writes
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10))) {
-      // Check NVS save flag and rate limit
       static unsigned long last_save = 0;
       if (state_needs_save &&
           (last_save == 0 || millis() - last_save > 60000)) {
@@ -57,38 +57,14 @@ void loop() {
         last_save = millis();     // Optimistically update
       }
 
-      // Read limits
       safe_chamber_limit = threshold_chamber_temp_c;
       safe_mq2_limit = threshold_mq2_v;
       xSemaphoreGive(stateMutex);
     }
 
-    // Save safely outside the mutex using local copies
     if (do_save) {
       saveSystemState(safe_chamber_limit, safe_mq2_limit);
       Serial.println("System state saved to NVS.");
-    }
-
-    // Safety logic
-    if (t_mq2 > safe_mq2_limit || t_chamber > safe_chamber_limit) {
-      // Danger State
-      setFan(true);
-      setLedStatus(true, false, false); // Red LED
-    } else if (isnan(t_chamber) || isnan(t_mq2) || t_mq2 < 0.1) {
-      // Hardware Fault State
-      setFan(true);
-      setLedStatus(false, true, false); // Yellow LED
-    } else {
-      // Safe State
-      setFan(false);
-      setLedStatus(false, false, true); // Green LED
-    }
-
-    // Buzzer logic: active only if chamber exceeds the temperature threshold
-    if (!isnan(t_chamber) && t_chamber > safe_chamber_limit) {
-      setBuzzer(true);
-    } else {
-      setBuzzer(false);
     }
   }
 }

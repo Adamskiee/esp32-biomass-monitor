@@ -59,8 +59,4 @@ void setLedStatus(bool red, bool yellow, bool green) {
   digitalWrite(PIN_RELAY_LED_GREEN, green ? RELAY_ON : RELAY_OFF);
 }
 
-void setBuzzer(bool state) {
-  // Assuming an active buzzer. If it's a passive buzzer, use tone(PIN_BUZZER,
-  // 2000) for ON and noTone(PIN_BUZZER) for OFF.
-  digitalWrite(PIN_BUZZER, state ? HIGH : LOW);
-}
+void setBuzzer(bool state) { digitalWrite(PIN_BUZZER, state ? HIGH : LOW); }

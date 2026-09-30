@@ -281,6 +281,44 @@ void main() {
   });
 
   group('DashboardScreen Debounced Manual Sprinkler Control', () {
+    testWidgets('rejected command clears pending state and resumes polling', (
+      tester,
+    ) async {
+      var fetches = 0;
+      var posts = 0;
+      client = MockClient((request) async {
+        if (request.method == 'POST') {
+          posts++;
+          return http.Response('Automatic safety control is active', 409);
+        }
+        fetches++;
+        return http.Response(
+          jsonEncode({
+            'chamber_temp_c': 90.0,
+            'mq2_v': 0.5,
+            'sprinkler_on': true,
+            'active_triggers': ['high_chamber_temp'],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+      await tester.tap(find.byType(Switch));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(posts, 1);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(fetches, 2);
+      expect(posts, 1);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('queues sprinkler state and sends via ApiService on poll', (
       tester,
     ) async {
@@ -318,7 +356,8 @@ void main() {
       await tester.tap(switchFinder);
       await tester.pump();
       switchWidget = tester.widget(switchFinder);
-      expect(switchWidget.value, isTrue);
+      expect(switchWidget.value, isFalse);
+      expect(switchWidget.onChanged, isNull);
       await tester.pump(const Duration(seconds: 2));
       expect(postReceived, isTrue);
       expect(postedSprinklerState, isTrue);
@@ -330,10 +369,11 @@ void main() {
     });
 
     testWidgets(
-      'prevents race condition when toggling switch during in-flight post',
+      'disables switch during an in-flight post until firmware state refreshes',
       (tester) async {
         final postCompleter = Completer<http.Response>();
         List<bool> postedCommands = [];
+        var reportedSprinklerState = false;
 
         client = MockClient((request) async {
           if (request.method == 'GET') {
@@ -341,7 +381,7 @@ void main() {
               jsonEncode({
                 'chamber_temp_c': 50.0,
                 'mq2_v': 0.5,
-                'sprinkler_on': false,
+                'sprinkler_on': reportedSprinklerState,
                 'active_triggers': [],
               }),
               200,
@@ -366,12 +406,13 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(seconds: 2));
         expect(postedCommands, [true]);
-        await tester.tap(switchFinder);
-        await tester.pump();
+        expect(tester.widget<Switch>(switchFinder).onChanged, isNull);
+        reportedSprinklerState = true;
         postCompleter.complete(http.Response('{"status":"ok"}', 200));
         await tester.pump();
         await tester.pump(const Duration(seconds: 2));
-        expect(postedCommands, [true, false]);
+        expect(postedCommands, [true]);
+        expect(tester.widget<Switch>(switchFinder).value, isTrue);
 
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -424,6 +465,93 @@ void main() {
   });
 
   group('DashboardScreen Lifecycle and Threshold Controls', () {
+    testWidgets('locks threshold sliders while saving', (tester) async {
+      final pendingSave = Completer<http.Response>();
+      client = MockClient((request) async {
+        if (request.method == 'POST') return pendingSave.future;
+        return http.Response(
+          jsonEncode({
+            'chamber_temp_c': 50.0,
+            'mq2_v': 0.5,
+            'sprinkler_on': false,
+            'active_triggers': [],
+            'threshold_chamber_temp_c': 60.0,
+            'threshold_mq2_v': 1.5,
+          }),
+          200,
+        );
+      });
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pump();
+      tester.widget<Slider>(find.byType(Slider).first).onChanged!(65.0);
+      await tester.pump();
+      await tester.scrollUntilVisible(find.text('Apply Thresholds'), 100);
+      await tester.tap(find.text('Apply Thresholds'));
+      await tester.pump();
+      expect(
+        tester.widget<Slider>(find.byType(Slider).first).onChanged,
+        isNull,
+      );
+
+      pendingSave.complete(http.Response('{"status":"ok"}', 200));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('shows offline warning after a successful poll goes stale', (
+      tester,
+    ) async {
+      var online = true;
+      client = MockClient((request) async {
+        if (!online) return http.Response('Unavailable', 503);
+        return http.Response(
+          jsonEncode({
+            'chamber_temp_c': 50.0,
+            'mq2_v': 0.5,
+            'sprinkler_on': false,
+            'active_triggers': [],
+          }),
+          200,
+        );
+      });
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+      online = false;
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(find.text('ESP32 disconnected'), findsOneWidget);
+      expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('refreshes untouched thresholds from firmware', (tester) async {
+      var chamberLimit = 70.0;
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 50.0,
+            'mq2_v': 0.5,
+            'sprinkler_on': false,
+            'active_triggers': [],
+            'threshold_chamber_temp_c': chamberLimit,
+            'threshold_mq2_v': 1.5,
+          }),
+          200,
+        ),
+      );
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+      await tester.scrollUntilVisible(find.text('70.0 °C'), 100);
+      chamberLimit = 90.0;
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(find.text('90.0 °C'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('pauses timer on background and resumes on foreground', (
       tester,
     ) async {
@@ -496,6 +624,8 @@ void main() {
       await tester.pump();
       await tester.drag(find.byType(ListView), const Offset(0, -300));
       await tester.pump();
+      tester.widget<Slider>(find.byType(Slider).first).onChanged!(65.0);
+      await tester.pump();
 
       final applyButton = find.widgetWithText(
         ElevatedButton,
@@ -505,7 +635,7 @@ void main() {
       await tester.tap(applyButton);
       await tester.pump();
 
-      expect(savedTemp, 60.0);
+      expect(savedTemp, 65.0);
       expect(savedMq2, 1.5);
       expect(find.text('Thresholds updated successfully'), findsOneWidget);
 

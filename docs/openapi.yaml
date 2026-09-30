@@ -94,12 +94,6 @@ security:
   - basicAuth: []
 paths:
   /api/state:
-    options:
-      summary: CORS preflight for state
-      security: []
-      responses:
-        '200':
-          description: OK
     get:
       summary: Retrieve sensor readings and current safety state
       responses:
@@ -118,12 +112,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/control:
-    options:
-      summary: CORS preflight for control
-      security: []
-      responses:
-        '200':
-          description: OK
     post:
       summary: Request manual sprinkler state
       requestBody:
@@ -160,12 +148,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/thresholds:
-    options:
-      summary: CORS preflight for thresholds
-      security: []
-      responses:
-        '200':
-          description: OK
     post:
       summary: Update one or both safety thresholds transactionally
       requestBody:
@@ -196,12 +178,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/settings:
-    options:
-      summary: CORS preflight for compatibility settings route
-      security: []
-      responses:
-        '200':
-          description: OK
     get:
       summary: Retrieve current threshold settings
       responses:

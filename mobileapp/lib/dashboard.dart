@@ -22,11 +22,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool? _queuedSprinklerState;
   bool _isPosting = false;
   bool _isFetching = false;
+  bool _isOffline = false;
   String? _errorMessage;
 
   double _tempLimit = 60.0;
   double _mq2Limit = 1.5;
-  bool _thresholdsInitialized = false;
+  bool _thresholdsDirty = false;
   bool _isSavingThresholds = false;
 
   @override
@@ -70,7 +71,16 @@ class _DashboardScreenState extends State<DashboardScreen>
           _queuedSprinklerState = null;
         }
       } catch (e) {
-        // Ignore transient network errors during debounced post
+        if (mounted) {
+          setState(() {
+            if (_queuedSprinklerState == toSend) {
+              _queuedSprinklerState = null;
+            }
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to set sprinkler: $e')),
+          );
+        }
       } finally {
         _isPosting = false;
       }
@@ -86,17 +96,18 @@ class _DashboardScreenState extends State<DashboardScreen>
       setState(() {
         _state = state;
         _errorMessage = null;
+        _isOffline = false;
         _previousTriggers = triggers;
-        if (!_thresholdsInitialized) {
+        if (!_thresholdsDirty) {
           _tempLimit =
               (state['threshold_chamber_temp_c'] as num?)?.toDouble() ?? 60.0;
           _mq2Limit = (state['threshold_mq2_v'] as num?)?.toDouble() ?? 1.5;
-          _thresholdsInitialized = true;
         }
       });
     } catch (e) {
-      if (mounted && _state.isEmpty) {
+      if (mounted) {
         setState(() {
+          _isOffline = true;
           _errorMessage = 'Failed to connect to ESP32: $e';
         });
       }
@@ -137,6 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       await widget.apiService.setThresholds(_tempLimit, _mq2Limit);
       if (!mounted) return;
+      setState(() => _thresholdsDirty = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thresholds updated successfully')),
       );
@@ -158,6 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopPolling();
+    widget.apiService.close();
     super.dispose();
   }
 
@@ -204,6 +217,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_isOffline)
+            Card(
+              color: Colors.orange.shade100,
+              child: const ListTile(
+                leading: Icon(Icons.wifi_off),
+                title: Text('ESP32 disconnected'),
+                subtitle: Text(
+                  'Last readings are stale. Controls are unavailable.',
+                ),
+              ),
+            ),
           const Text(
             'Live Sensor Data',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -290,9 +314,15 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: SwitchListTile(
               secondary: const Icon(Icons.water_drop_outlined),
               title: const Text('Manual Sprinkler'),
-              subtitle: const Text('Override solenoid valve'),
-              value: _queuedSprinklerState ?? _state['sprinkler_on'] ?? false,
-              onChanged: (val) => setState(() => _queuedSprinklerState = val),
+              subtitle: Text(
+                _queuedSprinklerState == null
+                    ? 'Reported by ESP32'
+                    : 'Command pending; waiting for ESP32',
+              ),
+              value: _state['sprinkler_on'] == true,
+              onChanged: _isOffline || _queuedSprinklerState != null
+                  ? null
+                  : (val) => setState(() => _queuedSprinklerState = val),
             ),
           ),
           const SizedBox(height: 24),
@@ -319,12 +349,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ],
                   ),
                   Slider(
-                    value: _tempLimit.clamp(20.0, 100.0),
+                    value: _tempLimit.clamp(20.0, 150.0),
                     min: 20.0,
-                    max: 100.0,
-                    divisions: 80,
+                    max: 150.0,
+                    divisions: 130,
                     label: '${_tempLimit.toStringAsFixed(1)} °C',
-                    onChanged: (val) => setState(() => _tempLimit = val),
+                    onChanged: _isOffline || _isSavingThresholds
+                        ? null
+                        : (val) => setState(() {
+                            _tempLimit = val;
+                            _thresholdsDirty = true;
+                          }),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -338,12 +373,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ],
                   ),
                   Slider(
-                    value: _mq2Limit.clamp(0.1, 3.5),
+                    value: _mq2Limit.clamp(0.1, 5.0),
                     min: 0.1,
-                    max: 3.5,
-                    divisions: 34,
+                    max: 5.0,
+                    divisions: 49,
                     label: '${_mq2Limit.toStringAsFixed(2)} V',
-                    onChanged: (val) => setState(() => _mq2Limit = val),
+                    onChanged: _isOffline || _isSavingThresholds
+                        ? null
+                        : (val) => setState(() {
+                            _mq2Limit = val;
+                            _thresholdsDirty = true;
+                          }),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -357,7 +397,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                             )
                           : const Icon(Icons.save),
                       label: const Text('Apply Thresholds'),
-                      onPressed: _isSavingThresholds ? null : _saveThresholds,
+                      onPressed:
+                          _isOffline || _isSavingThresholds || !_thresholdsDirty
+                          ? null
+                          : _saveThresholds,
                     ),
                   ),
                 ],

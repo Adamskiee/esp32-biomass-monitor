@@ -9,8 +9,8 @@
 
 The Biomass Monitor and Filtration System is an ESP32-based environmental
 monitor for controlled disposal of biodegradable waste. It monitors smoke,
-combustible gases, and chamber temperature, then controls filtration, alarms,
-and a water sprinkler when safety thresholds are exceeded.
+combustible gases, and chamber temperature. The fan runs continuously while
+firmware safety rules control alarms and a water sprinkler.
 
 The companion Flutter app provides live telemetry, authenticated manual
 sprinkler control, threshold configuration, and active danger alerts.
@@ -28,7 +28,7 @@ sprinkler control, threshold configuration, and active danger alerts.
 ## How do I build and upload the firmware?
 
 The normal firmware workflow uses Arduino IDE. The setup scripts install the
-pinned dependencies and link the shared `BiomassConfig` library into the
+required dependencies and link the shared `BiomassConfig` library into the
 Arduino sketchbook.
 
 1. Install dependencies:

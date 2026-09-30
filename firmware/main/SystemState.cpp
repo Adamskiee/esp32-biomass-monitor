@@ -8,10 +8,10 @@ using std::isnan;
 float threshold_chamber_temp_c = 80.0;
 float threshold_mq2_v = 2.5;
 
-float current_temp_c = 0.0;
-float current_chamber_c = 0.0;
-float current_mq135_v = 0.0;
-float current_mq2_v = 0.0;
+float current_temp_c = NAN;
+float current_chamber_c = NAN;
+float current_mq135_v = NAN;
+float current_mq2_v = NAN;
 
 bool state_needs_save = false;
 
@@ -79,6 +79,7 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
   }
   if (changed) {
     state_needs_save = true;
+    evaluateSafetyLoop();
   }
 
 #ifdef ARDUINO
@@ -121,18 +122,14 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
   current_mq135_v = mq135_v;
   current_mq2_v = mq2_v;
 
+  evaluateSafetyLoop();
+
   if (stateMutex != nullptr) {
     xSemaphoreGive(stateMutex);
   }
-
-  evaluateSafetyLoop();
 }
 
 void evaluateSafetyLoop() {
-  if (stateMutex != nullptr) {
-    xSemaphoreTake(stateMutex, portMAX_DELAY);
-  }
-
   bool is_temp_fault = isnan(current_chamber_c);
   bool is_mq2_fault = isnan(current_mq2_v) || current_mq2_v < 0.1f;
 
@@ -146,15 +143,10 @@ void evaluateSafetyLoop() {
              current_chamber_c <= threshold_chamber_temp_c * 0.95f) {
     temp_latch_danger = false;
   }
-  bool prev_mq2_latch = mq2_latch_danger;
   if (in_mq2_danger) {
     mq2_latch_danger = true;
   } else if (!is_mq2_fault && current_mq2_v <= threshold_mq2_v * 0.95f) {
     mq2_latch_danger = false;
-  }
-
-  if (mq2_latch_danger && !prev_mq2_latch) {
-    manual_sprinkler = false;
   }
 
   // Check catastrophic fire latch condition:
@@ -200,7 +192,13 @@ void evaluateSafetyLoop() {
     setSolenoid(manual_sprinkler, false);
   }
 
-  if (stateMutex != nullptr) {
-    xSemaphoreGive(stateMutex);
+  setFan(true);
+  if (is_temp_fault || is_mq2_fault) {
+    setLedStatus(false, true, false);
+  } else if (temp_latch_danger || mq2_latch_danger) {
+    setLedStatus(true, false, false);
+  } else {
+    setLedStatus(false, false, true);
   }
+  setBuzzer(!is_temp_fault && current_chamber_c > threshold_chamber_temp_c);
 }

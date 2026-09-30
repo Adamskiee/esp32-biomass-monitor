@@ -3,10 +3,13 @@
 Welcome to the Biomass IoT Project! We appreciate your contributions to the firmware, hardware designs, and mobile app.
 
 ## 1. Development Workflow
-To ensure consistency across environments, we enforce strict dependency versioning.
+The setup scripts install the Arduino dependencies and link the shared library.
 
 ### Local Setup (Firmware)
-You **must** run the provided setup script before opening the project in the Arduino IDE or compiling via CLI. This script symlinks the internal `BiomassConfig` library and installs the exact versions of external dependencies required by `sketch.yaml`.
+Run the provided setup script before opening the project in Arduino IDE or
+compiling via CLI. It links the internal `BiomassConfig` library and installs
+the required external libraries. Some library versions are not pinned, so
+verify the sketch compiles after installing or updating dependencies.
 
 - **Linux/macOS:** `./firmware/install_deps.sh`
 - **Windows:** `.\firmware\install_deps.bat`
