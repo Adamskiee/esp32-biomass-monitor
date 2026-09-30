@@ -49,7 +49,7 @@ remote manual commands cannot clear this latch.
 ### 4.2 Gas Alert State
 The system reports an active gas alert when MQ2 voltage reaches 2.5 V. The
 alert clears when voltage falls to or below 2.375 V. Gas alerts do not
-automatically open the water sprinkler.
+automatically open the water sprinkler or change the green status LED.
 
 ### 4.3 Hardware Fault State
 The system enters a hardware fault state if **ANY** of the following conditions are met, ensuring fail-safe filtration:

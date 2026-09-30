@@ -154,6 +154,15 @@ void testMq2DangerDoesNotActivateSolenoid() {
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
+void testMq2DangerKeepsLedGreen() {
+  const char *name = "MQ2 danger keeps LED green";
+  resetSafetyState();
+  current_mq2_v = 3.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_OFF);
+}
+
 void testMq2DangerPreservesManualSprinkler() {
   const char *name = "MQ2 danger preserves manual sprinkler";
   resetSafetyState();
@@ -349,6 +358,7 @@ int main() {
   run("temperature hysteresis", testTemperatureHysteresis);
   run("MQ2 danger does not activate solenoid",
       testMq2DangerDoesNotActivateSolenoid);
+  run("MQ2 danger keeps LED green", testMq2DangerKeepsLedGreen);
   run("MQ2 danger preserves manual sprinkler",
       testMq2DangerPreservesManualSprinkler);
   run("MQ2 zero volts is normal", testMq2ZeroVoltsIsNormal);

@@ -16,8 +16,9 @@ shows reported state and cannot override automatic sprinkler safety.
 - If the thermocouple fails during a temperature alarm, a catastrophic latch
   holds the sprinkler on until the ESP32 restarts.
 - An MQ2 reading at or above 2.5 V raises a gas trigger but does not
-  automatically open the sprinkler. Only `NaN` readings and readings above
-  4.8 V raise an MQ2 fault. A 0 V reading is valid.
+  automatically open the sprinkler or change the green LED. Only `NaN`
+  readings and readings above 4.8 V raise an MQ2 fault. A 0 V reading is
+  valid.
 - The fan runs from startup. The status LED starts yellow until the first
   sensor evaluation, then shows danger, fault, or safe state. The buzzer sounds
   for a valid chamber reading

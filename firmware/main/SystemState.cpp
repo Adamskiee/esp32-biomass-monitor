@@ -201,7 +201,7 @@ void evaluateSafetyLoop() {
   setFan(true);
   if (is_temp_fault || is_mq2_fault) {
     setLedStatus(false, true, false);
-  } else if (temp_latch_danger || mq2_latch_danger) {
+  } else if (temp_latch_danger) {
     setLedStatus(true, false, false);
   } else {
     setLedStatus(false, false, true);
