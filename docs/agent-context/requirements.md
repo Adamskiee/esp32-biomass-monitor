@@ -17,6 +17,7 @@ The system is built around an ESP32 microcontroller utilizing FreeRTOS.
 *   **Filtration Fan:** Active ventilation and smoke filtration.
 *   **Status LED (RGB):** Visual system state indicator.
 *   **Buzzer:** Audible overheat alarm.
+*   **Water Sprinkler Solenoid:** Opens automatically during a chamber-temperature danger and supports authenticated manual control while no automatic safety override is active.
 
 ## 3. Core Control Loop & State Management
 The system operates on a continuous, non-blocking evaluation loop.
@@ -35,8 +36,22 @@ The system enters an active filtration and danger state if the following thresho
 **Actions taken when in this state:**
 *   Filtration Fan is turned **ON**.
 *   Status LED is set to **RED**.
+*   Water Sprinkler Solenoid is turned **ON** immediately, bypassing command debounce.
 
-### 4.2 Hardware Fault State
+The temperature danger uses 5% hysteresis. After entering danger, it remains
+active until the chamber temperature falls to or below 95% of
+`safe_chamber_limit`.
+
+If the thermocouple fails while temperature danger is active, the system sets
+a catastrophic fire latch. The sprinkler remains on until the ESP32 restarts;
+remote manual commands cannot clear this latch.
+
+### 4.2 Gas Alert State
+The system reports an active gas alert when MQ2 voltage reaches
+`safe_mq2_limit`. The alert clears when voltage falls to or below 95% of that
+limit. Gas alerts do not automatically open the water sprinkler.
+
+### 4.3 Hardware Fault State
 The system enters a hardware fault state if **ANY** of the following conditions are met, ensuring fail-safe filtration:
 1.  **Sensor Fault (Thermocouple):** Chamber Temperature reads `NaN`.
 2.  **Sensor Fault (MQ2):** MQ2 voltage reads `NaN`.
@@ -46,14 +61,14 @@ The system enters a hardware fault state if **ANY** of the following conditions 
 *   Filtration Fan is turned **ON**.
 *   Status LED is set to **YELLOW**.
 
-### 4.3 Safe State
-If **NONE** of the conditions in Section 4.1 or 4.2 are met, the system is in a safe state.
+### 4.4 Safe State
+If **NONE** of the conditions in Sections 4.1 through 4.3 are met, the system is in a safe state.
 
 **Actions taken when in this state:**
 *   Filtration Fan is turned **ON** (providing continuous baseline ventilation).
 *   Status LED is set to **GREEN**.
 
-### 4.4 Overheat Alarm (Buzzer)
+### 4.5 Overheat Alarm (Buzzer)
 The audible alarm operates on an independent rule focused strictly on overheating.
 *   **Condition:** The buzzer activates ONLY if the Chamber Temperature is a valid number AND strictly exceeds the `safe_chamber_limit`.
 *   *(Note: The buzzer does not sound for MQ2 gas thresholds or sensor disconnects).*

@@ -5,46 +5,86 @@
 
 ![Hero Diagram Placeholder](docs/assets/hero-diagram.png "System Block Diagram")
 
-## Project Overview & Business Context
-The Biomass Monitor & Filtration System is an ESP32-based environmental monitor designed to mitigate emissions from the open burning of biodegradable waste (leaves, grass, branches). Open burning poses significant health and environmental risks. This system intelligently monitors smoke, combustible gases, and chamber temperatures, automatically triggering active filtration systems when safety thresholds are exceeded. 
+## What problem does this system solve?
 
-By deploying these devices, we ensure environmental compliance at scale, reduce harmful particulate matter release, and provide real-time telemetry to stakeholders via our mobile companion app.
+The Biomass Monitor and Filtration System is an ESP32-based environmental
+monitor for controlled disposal of biodegradable waste. It monitors smoke,
+combustible gases, and chamber temperature. The fan runs continuously while
+firmware safety rules control alarms and a water sprinkler.
 
-## Quick Start
+The companion Flutter app provides live telemetry, authenticated manual
+sprinkler control, threshold configuration, and active danger alerts.
 
-### Hardware Requirements
-- ESP32 Development Board
-- MQ135 Air Quality Sensor
-- MQ2 Smoke/Gas Sensor
-- K-Type Thermocouple (for chamber temp)
-- PWM/MOSFET-controlled Filtration Fan
+## What hardware is required?
 
-### Firmware Flashing
-This project uses an Arduino CLI `sketch.yaml` file for strict dependency version pinning. 
+- ESP32 development board
+- MQ135 air-quality sensor
+- MQ2 smoke and gas sensor
+- K-type thermocouple
+- Filtration fan and driver
+- Water sprinkler solenoid and relay
+- Status LEDs and buzzer
 
-1. **Install Dependencies:**
-   - **Linux/macOS:** Run `./firmware/install_deps.sh`
-   - **Windows:** Run `.\firmware\install_deps.bat`
-   
-   *Note: This is mandatory to symlink the `BiomassConfig` library.*
+## How do I build and upload the firmware?
 
-2. **Build and Flash:**
-   Use the Arduino IDE or CLI to build and flash the main sketch located in `firmware/src`.
+The normal firmware workflow uses Arduino IDE. The setup scripts install the
+required dependencies and link the shared `BiomassConfig` library into the
+Arduino sketchbook.
 
-### Mobile App
-The mobile app enables dashboard integration and remote threshold configuration. 
-Please refer to the [Mobile Application Guide](docs/mobile-app.md) for build and deployment instructions.
+1. Install dependencies:
 
-## Directory Structure
-- `/firmware` - ESP32 C++ firmware, hardware control loops, and configuration.
-- `/hardware` - Schematics, Bill of Materials (BOM), and PCB designs.
-- `/mobileapp` - Flutter-based mobile dashboard for remote monitoring.
-- `/docs` - System architecture, API references, operations, and developer guides.
+   - Linux or macOS: `./firmware/install_deps.sh`
+   - Windows: `firmware\install_deps.bat`
 
-## Documentation
-For complete details on the system, please refer to our documentation:
-- [System Architecture](docs/architecture.md) (Hardware/Software logic, Edge/Cloud, Security, OTA)
-- [Operations Guide](docs/operations-guide.md) (Field Commissioning, Maintenance, Troubleshooting)
+2. Open `firmware/main/main.ino` in Arduino IDE.
+3. Select the ESP32 board and serial port.
+4. Compile and upload the sketch.
+5. Open Serial Monitor at 115200 baud to find the device IP and confirm sensor
+   readings.
+
+The mobile app connects to the IP of the selected node. The firmware does not
+advertise an `esp32.local` mDNS hostname.
+
+## How do I verify a change?
+
+Arduino CLI provides the same production compile check used by continuous
+integration:
+
+```bash
+arduino-cli compile \
+  --fqbn esp32:esp32:esp32 \
+  --warnings all \
+  --library firmware/shared/BiomassConfig \
+  firmware/main/main.ino
+```
+
+Run the native safety tests on Linux or macOS when `g++` is available:
+
+```bash
+./firmware/tests/run_native_tests.sh
+```
+
+The native tests exercise control logic without replacing Arduino IDE or
+compiling hardware-dependent networking code for the host computer.
+
+Run the Flutter checks from `mobileapp/`:
+
+```bash
+flutter analyze
+flutter test
+```
+
+## Where is each component?
+
+- `firmware/`: ESP32 firmware, hardware tests, and shared configuration
+- `hardware/`: schematics, bill of materials, and physical design files
+- `mobileapp/`: Flutter monitoring and control app
+- `docs/`: architecture, API, operations, and developer documentation
+
+## Where can I learn more?
+
+- [System Architecture](docs/architecture.md)
+- [Operations Guide](docs/operations-guide.md)
 - [Mobile Application](docs/mobile-app.md)
-- [Developer Onboarding & Contributing](CONTRIBUTING.md)
+- [Developer Onboarding and Contributing](CONTRIBUTING.md)
 - [API Reference](docs/api.md)

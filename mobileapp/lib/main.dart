@@ -15,6 +15,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'database_helper.dart';
+import 'api_service.dart';
+import 'dashboard.dart';
+export 'dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -120,23 +123,26 @@ class IoTNode {
 // ==========================================
 class AppStateProvider extends ChangeNotifier {
   final SharedPreferences _prefs;
+  final http.Client _client;
+  final bool _ownsClient;
   
   bool _isAuthenticated = false, _isAdmin = false, _isHardwareConnected = false;
-  final int _batteryLevel = 92;
-  int _rssi = -42, _currentTab = 0;
+  int _currentTab = 0;
   String _currentUser = "";
   String _password = "";
   
   List<IoTNode> _availableNodes = [];
   late IoTNode _activeNode;
   
-  SensorData _currentData = SensorData(temperatureC: 28.5, chamberTempC: 30.0, mq135V: 1.2, mq2V: 1.5, timestamp: DateTime.now());
+  SensorData _currentData = SensorData(timestamp: DateTime.now());
   final List<SensorData> _history = [];
   final List<AlertItem> _alerts = [];
   final List<AuditLog> _auditLogs = [AuditLog("System Initialized", "SYSTEM", "08:00 AM")];
   Timer? _pollingTimer;
 
-  AppStateProvider(this._prefs) { 
+  AppStateProvider(this._prefs, {http.Client? client})
+      : _client = client ?? http.Client(),
+        _ownsClient = client == null {
     _loadNodes();
     _activeNode = _availableNodes[0]; 
     _loadHistory(); 
@@ -149,8 +155,7 @@ class AppStateProvider extends ChangeNotifier {
       _availableNodes = dec.map((n) => IoTNode.fromJson(n)).toList();
     } else {
       _availableNodes = [
-        IoTNode("1", "JPLPC Malvar Node 1", "192.168.4.1", "24:0A:C4:00:01:10"),
-        IoTNode("2", "JPLPC Malvar Node 2", "192.168.1.51", "24:0A:C4:00:01:11"),
+        IoTNode("1", "ESP32", "", ""),
       ];
       _saveNodes();
     }
@@ -174,18 +179,18 @@ class AppStateProvider extends ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
   bool get isAdmin => _isAdmin;
   bool get isHardwareConnected => _isHardwareConnected;
+  bool get canResumeWithBiometrics =>
+      _currentUser.isNotEmpty && _password.isNotEmpty;
   int get currentTab => _currentTab;
   IoTNode get activeNode => _activeNode;
   List<IoTNode> get availableNodes => _availableNodes;
-  int get batteryLevel => _batteryLevel;
-  int get rssi => _rssi;
   SensorData get currentData => _currentData;
   List<SensorData> get history => _history;
   List<AlertItem> get alerts => _alerts;
   List<AuditLog> get auditLogs => _auditLogs;
 
   Map<String, String> getSessionAnalytics() {
-    if (_history.isEmpty) return {"minT": "0.0", "maxT": "0.0", "avgT": "0.0", "maxCO": "0.0", "avgCO": "0.0"};
+    if (_history.isEmpty) return {"minT": "0.0", "maxT": "0.0", "avgT": "0.0", "maxMq2": "0.0", "avgMq2": "0.0"};
     
     var validTemps = _history.where((e) => e.chamberTempC != null).map((e) => e.chamberTempC!);
     double minT = validTemps.isEmpty ? 0.0 : validTemps.reduce(min);
@@ -193,65 +198,72 @@ class AppStateProvider extends ChangeNotifier {
     double avgT = validTemps.isEmpty ? 0.0 : validTemps.reduce((a, b) => a + b) / validTemps.length;
     
     var validMq2 = _history.where((e) => e.mq2V != null).map((e) => e.mq2V!);
-    double maxCO = validMq2.isEmpty ? 0.0 : validMq2.reduce(max);
-    double avgCO = validMq2.isEmpty ? 0.0 : validMq2.reduce((a, b) => a + b) / validMq2.length;
+    double maxMq2 = validMq2.isEmpty ? 0.0 : validMq2.reduce(max);
+    double avgMq2 = validMq2.isEmpty ? 0.0 : validMq2.reduce((a, b) => a + b) / validMq2.length;
 
     return {
       "minT": minT.toStringAsFixed(1),
       "maxT": maxT.toStringAsFixed(1),
       "avgT": avgT.toStringAsFixed(1),
-      "maxCO": maxCO.toStringAsFixed(2),
-      "avgCO": avgCO.toStringAsFixed(2),
+      "maxMq2": maxMq2.toStringAsFixed(2),
+      "avgMq2": avgMq2.toStringAsFixed(2),
     };
   }
 
   Future<void> _loadHistory() async {
-    final dbHelper = DatabaseHelper();
-    
-    // Load Sensor Data
-    List<SensorData> dbData = await dbHelper.getSensorData(limit: 60);
-    _history.clear();
-    _history.addAll(dbData.reversed);
-    
-    // Load Alerts
-    List<AlertItem> dbAlerts = await dbHelper.getAlerts();
-    if (dbAlerts.isNotEmpty) {
-      _alerts.clear();
-      _alerts.addAll(dbAlerts);
+    try {
+      final dbHelper = DatabaseHelper();
+      final dbData = await dbHelper.getSensorData(limit: 60);
+      _history.clear();
+      _history.addAll(dbData.reversed);
+
+      final dbAlerts = await dbHelper.getAlerts();
+      if (dbAlerts.isNotEmpty) {
+        _alerts.clear();
+        _alerts.addAll(dbAlerts);
+      }
+
+      final dbLogs = await dbHelper.getAuditLogs();
+      if (dbLogs.isNotEmpty) {
+        _auditLogs.clear();
+        _auditLogs.addAll(dbLogs);
+      }
+
+      notifyListeners();
+    } catch (error) {
+      debugPrint('Local history unavailable: $error');
     }
-    
-    // Load Audit Logs
-    List<AuditLog> dbLogs = await dbHelper.getAuditLogs();
-    if (dbLogs.isNotEmpty) {
-      _auditLogs.clear();
-      _auditLogs.addAll(dbLogs);
-    }
-    
-    notifyListeners();
   }
 
   String get _basicAuthHeader => 'Basic ${base64Encode(utf8.encode("$_currentUser:$_password"))}';
 
-  void login(String username, String password) {
-    if ((username.trim() == 'admin' && password == 'admin') || (username.trim() == 'user' && password == 'user')) {
-      _isAdmin = (username.trim() == 'admin'); 
-      _currentUser = username.trim().toLowerCase(); // ESP32 expects lower case for basic auth
-      _password = password;
-      _isAuthenticated = true; 
-      _currentTab = 0;
-      startLiveTelemetryStream(); 
-      notifyListeners();
+  Future<bool> login(String username, String password) async {
+    final user = username.trim();
+    if (user.isEmpty || password.isEmpty) return false;
+    try {
+      final authorization =
+          'Basic ${base64Encode(utf8.encode("$user:$password"))}';
+      final response = await _client.get(
+        Uri.parse('http://${_activeNode.ipAddress}/api/state'),
+        headers: {'Authorization': authorization},
+      ).timeout(const Duration(seconds: 3));
+      if (response.statusCode != 200) return false;
+    } catch (_) {
+      return false;
     }
-  }
-
-  void biometricLoginSuccess(bool isAdminUser) {
-    _isAdmin = isAdminUser;
-    _currentUser = isAdminUser ? "admin" : "user";
-    _password = isAdminUser ? "admin" : "user"; // hardcoded for fallback
+    _isAdmin = true;
+    _currentUser = user;
+    _password = password;
     _isAuthenticated = true;
     _currentTab = 0;
     startLiveTelemetryStream();
     notifyListeners();
+    return true;
+  }
+
+  Future<bool> biometricLoginSuccess() async {
+    if (_currentUser.isEmpty || _password.isEmpty) return false;
+    return login(_currentUser, _password);
   }
 
   void logout() { 
@@ -271,6 +283,12 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setLoginNodeIp(String ipAddress) {
+    _activeNode.ipAddress = ipAddress;
+    _saveNodes();
+    notifyListeners();
+  }
+
   Future<void> _addAuditLog(String actionName) async {
     final log = AuditLog(actionName, _currentUser, "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}");
     _auditLogs.insert(0, log);
@@ -287,37 +305,37 @@ class AppStateProvider extends ChangeNotifier {
     int interval = _prefs.getInt('pollingInterval') ?? 2;
 
     _pollingTimer = Timer.periodic(Duration(seconds: interval), (_) async {
+      var gasDanger = false;
       try {
-        final response = await http.get(
+        final response = await _client.get(
           Uri.parse('http://${_activeNode.ipAddress}/api/state'),
           headers: { 'Authorization': _basicAuthHeader },
         ).timeout(const Duration(seconds: 2));
         if (response.statusCode == 200) {
-          _currentData = SensorData.fromJson(json.decode(response.body));
+          final reportedState = json.decode(response.body) as Map<String, dynamic>;
+          _currentData = SensorData.fromJson(reportedState);
+          gasDanger = (reportedState['active_triggers'] as List<dynamic>? ?? [])
+              .contains('high_mq2_gas');
           _isHardwareConnected = true;
-          _rssi = -40 - Random().nextInt(15);
-        } else { _isHardwareConnected = false; }
+        } else {
+          _isHardwareConnected = false;
+        }
       } catch (e) {
         _isHardwareConnected = false;
-        // Fallback UI Simulation
-        final r = Random();
-        _currentData = SensorData(
-          temperatureC: ((_currentData.temperatureC ?? 25.0) + (r.nextDouble() * 0.8 - 0.4)).clamp(20.0, 55.0),
-          chamberTempC: ((_currentData.chamberTempC ?? 120.0) + (r.nextDouble() * 2.0 - 1.0)).clamp(20.0, 150.0),
-          mq135V: ((_currentData.mq135V ?? 2.1) + r.nextDouble() * 0.1 - 0.05).clamp(0.1, 5.0),
-          mq2V: ((_currentData.mq2V ?? 1.5) + r.nextDouble() * 0.2 - 0.1).clamp(0.1, 5.0),
-          timestamp: DateTime.now(),
-        );
-        _rssi = -60 - Random().nextInt(10);
+      }
+      if (!_isHardwareConnected) {
+        _currentData = SensorData(timestamp: DateTime.now());
+        notifyListeners();
+        return;
       }
       
       _history.add(_currentData);
       if (_history.length > 60) _history.removeAt(0);
       DatabaseHelper().insertSensorData(_currentData);
 
-      if (_currentData.mq2V != null && _currentData.mq2V! > 2.5 && !_alerts.any((a) => a.title.contains("Gas Hazard"))) {
+      if (gasDanger && _currentData.mq2V != null && !_alerts.any((a) => a.title.contains("Gas Hazard"))) {
         HapticFeedback.heavyImpact();
-        final alert = AlertItem(id: DateTime.now().millisecondsSinceEpoch.toString(), title: 'CRITICAL: High Gas Detected', description: 'MQ-2 voltage crossed safe limits (${_currentData.mq2V!.toStringAsFixed(2)} V).', severity: 'critical', time: 'Just now');
+        final alert = AlertItem(id: DateTime.now().millisecondsSinceEpoch.toString(), title: 'CRITICAL: High Gas Detected', description: 'ESP32 reported a high MQ-2 reading (${_currentData.mq2V!.toStringAsFixed(2)} V).', severity: 'critical', time: 'Just now');
         _alerts.insert(0, alert);
         DatabaseHelper().insertAlert(alert);
       }
@@ -325,53 +343,12 @@ class AppStateProvider extends ChangeNotifier {
     });
   }
 
-  Future<bool> sendHardwareCommand(String endpoint, bool state) async {
-    String actionName = "${state ? 'Activated' : 'Deactivated'} $endpoint";
-    _addAuditLog(actionName);
-
-    try {
-      final res = await http.post(
-        Uri.parse('http://${_activeNode.ipAddress}/api/control/$endpoint'),
-        headers: { 'Content-Type': 'application/json', 'Authorization': _basicAuthHeader },
-        body: json.encode({'state': state})
-      ).timeout(const Duration(seconds: 3));
-      return res.statusCode == 200;
-    } catch (e) { return false; }
-  }
-
-  // --- ESP32 API: Settings ---
-  Future<Map<String, dynamic>?> fetchEsp32Settings() async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://${_activeNode.ipAddress}/api/settings'),
-        headers: { 'Authorization': _basicAuthHeader },
-      ).timeout(const Duration(seconds: 3));
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-    } catch (e) { /* Ignore */ }
-    return null;
-  }
-
-  Future<bool> updateEsp32Settings(double chamberTempC, double mq2V) async {
-    try {
-      final payload = json.encode({
-        "threshold_chamber_temp_c": chamberTempC,
-        "threshold_mq2_v": mq2V
-      });
-      if (payload.length > 256) return false; // ESP32 limitation
-      
-      final res = await http.post(
-        Uri.parse('http://${_activeNode.ipAddress}/api/settings'),
-        headers: { 'Content-Type': 'application/json', 'Authorization': _basicAuthHeader },
-        body: payload,
-      ).timeout(const Duration(seconds: 3));
-      return res.statusCode == 200;
-    } catch (e) { return false; }
-  }
-
   @override
-  void dispose() { _pollingTimer?.cancel(); super.dispose(); }
+  void dispose() {
+    _pollingTimer?.cancel();
+    if (_ownsClient) _client.close();
+    super.dispose();
+  }
 }
 
 class SettingsProvider extends ChangeNotifier {
@@ -381,29 +358,22 @@ class SettingsProvider extends ChangeNotifier {
     _isDarkMode = _prefs.getBool('isDarkMode') ?? true;
     _pushNotifications = _prefs.getBool('pushNotifications') ?? true;
     _biometricLogin = _prefs.getBool('biometricLogin') ?? false;
-    _tempThreshold = _prefs.getDouble('tempThreshold') ?? 45.0;
-    _coThreshold = _prefs.getDouble('coThreshold') ?? 1.5;
     _pollingInterval = _prefs.getInt('pollingInterval') ?? 2;
   }
 
   late bool _isDarkMode, _pushNotifications, _biometricLogin;
-  late double _tempThreshold, _coThreshold;
   late int _pollingInterval;
   double _mqCalibOffset = 0.0;
 
   bool get isDarkMode => _isDarkMode;
   bool get pushNotifications => _pushNotifications;
   bool get biometricLogin => _biometricLogin;
-  double get tempThreshold => _tempThreshold;
-  double get coThreshold => _coThreshold;
   double get mqCalibOffset => _mqCalibOffset;
   int get pollingInterval => _pollingInterval;
 
   void toggleTheme() { _isDarkMode = !_isDarkMode; _prefs.setBool('isDarkMode', _isDarkMode); notifyListeners(); }
   void togglePush(bool val) { _pushNotifications = val; _prefs.setBool('pushNotifications', val); notifyListeners(); }
   void toggleBiometric(bool val) { _biometricLogin = val; _prefs.setBool('biometricLogin', val); notifyListeners(); }
-  void setTempThreshold(double val) { _tempThreshold = val; _prefs.setDouble('tempThreshold', val); notifyListeners(); }
-  void setCoThreshold(double val) { _coThreshold = val; _prefs.setDouble('coThreshold', val); notifyListeners(); }
   void setMqOffset(double val) { _mqCalibOffset = val; notifyListeners(); }
   
   void setPollingInterval(int val) { 
@@ -536,8 +506,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+  final _ipCtrl = TextEditingController();
   final _userCtrl = TextEditingController(text: 'admin');
-  final _passCtrl = TextEditingController(text: 'admin');
+  final _passCtrl = TextEditingController();
   final LocalAuthentication auth = LocalAuthentication();
   bool _isLoading = false;
   String _errorMsg = '';
@@ -546,6 +517,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    _ipCtrl.text = context.read<AppStateProvider>().activeNode.ipAddress;
     _animCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 15))..repeat(reverse: true);
     _checkBiometrics();
   }
@@ -553,6 +525,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void dispose() {
     _animCtrl.dispose();
+    _ipCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -560,25 +533,34 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   Future<void> _checkBiometrics() async {
     final settings = context.read<SettingsProvider>();
-    if (settings.biometricLogin) {
+    if (settings.biometricLogin &&
+        context.read<AppStateProvider>().canResumeWithBiometrics) {
       try {
         final bool didAuthenticate = await auth.authenticate(localizedReason: 'Authenticate to access Biomass Terminal');
-        if (didAuthenticate && mounted) context.read<AppStateProvider>().biometricLoginSuccess(true);
+        if (didAuthenticate && mounted) {
+          await context.read<AppStateProvider>().biometricLoginSuccess();
+        }
       } catch (e) { /* Fallback to manual login */ }
     }
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     setState(() { _isLoading = true; _errorMsg = ''; });
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-      final u = _userCtrl.text.trim();
-      final p = _passCtrl.text;
-      if ((u == 'admin' && p == 'admin') || (u == 'user' && p == 'user')) {
-        context.read<AppStateProvider>().login(u, p);
-      } else {
-        setState(() { _isLoading = false; _errorMsg = 'Invalid credentials.'; });
-      }
+    final state = context.read<AppStateProvider>();
+    final ipAddress = _ipCtrl.text.trim();
+    if (ipAddress.isEmpty) {
+      setState(() { _isLoading = false; _errorMsg = 'Enter the ESP32 IP address.'; });
+      return;
+    }
+    state.setLoginNodeIp(ipAddress);
+    final accepted = await state.login(
+      _userCtrl.text,
+      _passCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (!accepted) _errorMsg = 'Device unavailable or credentials invalid.';
     });
   }
 
@@ -652,6 +634,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         const SizedBox(height: 8),
                         const Text("Telemetry & Command Protocol", style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 0.5)),
                         const SizedBox(height: 48),
+                        TextField(controller: _ipCtrl, keyboardType: TextInputType.url, style: TextStyle(color: theme.textTheme.bodyLarge?.color), decoration: _inputDec("ESP32 IP address", CupertinoIcons.wifi, theme)),
+                        const SizedBox(height: 20),
                         TextField(controller: _userCtrl, style: TextStyle(color: theme.textTheme.bodyLarge?.color), decoration: _inputDec("Operator ID", CupertinoIcons.person_solid, theme)),
                         const SizedBox(height: 20),
                         TextField(controller: _passCtrl, obscureText: true, style: TextStyle(color: theme.textTheme.bodyLarge?.color), decoration: _inputDec("Passcode", CupertinoIcons.lock_fill, theme), onSubmitted: (_) => _handleLogin()),
@@ -670,7 +654,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             child: _isLoading ? const CircularProgressIndicator(color: Colors.black) : const Text("INITIATE CONNECTION", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                           ),
                         ),
-                        if (settings.biometricLogin) ...[
+                        if (settings.biometricLogin &&
+                            context.watch<AppStateProvider>().canResumeWithBiometrics) ...[
                           const SizedBox(height: 24),
                           TextButton.icon(
                             icon: const Icon(CupertinoIcons.lock_shield_fill, color: AppTheme.neonBlue),
@@ -932,25 +917,6 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  void _showDiagnosticDialog(BuildContext context, String moduleName, bool isHealthy) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(isHealthy ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.exclamationmark_triangle_fill, color: isHealthy ? AppTheme.neonGreen : AppTheme.neonOrange),
-            const SizedBox(width: 12),
-            Expanded(child: Text("$moduleName Diagnostics", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          ],
-        ),
-        content: Text(isHealthy ? "This module is operating within standard parameters. No maintenance required." : "Warning: This module is detecting irregularities or requires maintenance inspection.", style: const TextStyle(color: Colors.grey)),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close", style: TextStyle(color: AppTheme.neonBlue)))],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppStateProvider>();
@@ -970,7 +936,15 @@ class _HomeTabState extends State<HomeTab> {
             child: ListView(
               padding: EdgeInsets.only(left: isCompact ? 16 : 24, right: isCompact ? 16 : 24, top: isCompact ? 16 : 24, bottom: 160), 
               children: [
-                FluidTileGrid(
+                if (!state.isHardwareConnected)
+                  const Card(
+                    child: ListTile(
+                      leading: Icon(CupertinoIcons.wifi_slash),
+                      title: Text('ESP32 disconnected'),
+                      subtitle: Text('Live sensor readings are unavailable.'),
+                    ),
+                  )
+                else FluidTileGrid(
                   minTileWidth: isCompact ? 150 : 260,
                   spacing: isCompact ? 12 : 16,
                   children: [
@@ -978,19 +952,6 @@ class _HomeTabState extends State<HomeTab> {
                     _metricCard("Chamber Temp", data.chamberTempC ?? 0.0, " °C", CupertinoIcons.flame_fill, data.chamberTempC != null && data.chamberTempC! > 100 ? AppTheme.neonRed : AppTheme.neonOrange, theme, isCompact: isCompact, maxVal: 150.0),
                     _metricCard("MQ135 Gas", data.mq135V ?? 0.0, " V", CupertinoIcons.cloud_fill, AppTheme.neonBlue, theme, decimals: 2, isCompact: isCompact, maxVal: 5.0),
                     _metricCard("MQ2 Smoke", data.mq2V ?? 0.0, " V", CupertinoIcons.smoke_fill, AppTheme.neonPurple, theme, decimals: 2, isCompact: isCompact, maxVal: 5.0),
-                  ],
-                ),
-                const SizedBox(height: 32),
-
-                Text("System Status", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12, runSpacing: 12,
-                  children: [
-                    _statusChip(context, "Combustion Chamber", true),
-                    _statusChip(context, "DC Blower Fan", true),
-                    _statusChip(context, "Filtration Module", true),
-                    _statusChip(context, "Sprinkler System", false, warning: true),
                   ],
                 ),
                 const SizedBox(height: 32),
@@ -1014,7 +975,7 @@ class _HomeTabState extends State<HomeTab> {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(_chartTimeframe == 0 ? "Temperature & CO over the last 60 seconds. Tap chart for details." : "Historical average trends.", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(_chartTimeframe == 0 ? "Temperature and MQ2 voltage from recent readings. Tap chart for details." : "Historical average trends.", style: const TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 24),
                       LayoutBuilder(
                         builder: (context, constraints) {
@@ -1105,31 +1066,6 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _statusChip(BuildContext context, String label, bool active, {bool warning = false}) {
-    Color color = warning ? AppTheme.neonOrange : (active ? AppTheme.neonGreen : Colors.grey);
-    return InkWell(
-      onTap: () => _showDiagnosticDialog(context, label, !warning),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1), 
-          borderRadius: BorderRadius.circular(12), 
-          border: Border.all(color: color.withValues(alpha: 0.4)),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.15), blurRadius: 12, spreadRadius: 1)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(warning ? CupertinoIcons.exclamationmark_triangle_fill : (active ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.xmark_circle_fill), color: color, size: 18), 
-            const SizedBox(width: 8), 
-            Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold))
-          ],
-        ),
-      ),
-    );
-  }
-
   LineChartData _buildChartData(List<SensorData> history, ThemeData theme) {
     List<FlSpot> tempSpots = [], coSpots = [];
     for (int i = 0; i < history.length; i++) {
@@ -1144,7 +1080,7 @@ class _HomeTabState extends State<HomeTab> {
             return touchedSpots.map((spot) {
               final isTemp = spot.barIndex == 0;
               final val = isTemp ? spot.y.toStringAsFixed(1) : (spot.y / 10).toStringAsFixed(2);
-              return LineTooltipItem('${isTemp ? "Temp" : "CO"}: $val${isTemp ? "°C" : "V"}', TextStyle(color: isTemp ? AppTheme.neonOrange : AppTheme.neonRed, fontWeight: FontWeight.bold));
+              return LineTooltipItem('${isTemp ? "Temp" : "MQ2"}: $val${isTemp ? "°C" : "V"}', TextStyle(color: isTemp ? AppTheme.neonOrange : AppTheme.neonRed, fontWeight: FontWeight.bold));
             }).toList();
           },
         ),
@@ -1196,7 +1132,7 @@ class _MonitorTabState extends State<MonitorTab> {
             const SizedBox(height: 24),
             ListTile(title: Text("Date Range", style: TextStyle(color: theme.textTheme.bodyLarge?.color)), trailing: const Text("Current Session", style: TextStyle(color: AppTheme.neonGreen)), tileColor: theme.scaffoldBackgroundColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             const SizedBox(height: 12),
-            ListTile(title: Text("Include Sensors", style: TextStyle(color: theme.textTheme.bodyLarge?.color)), trailing: const Text("All (CO, VOC, Temp)", style: TextStyle(color: AppTheme.neonGreen)), tileColor: theme.scaffoldBackgroundColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            ListTile(title: Text("Include Sensors", style: TextStyle(color: theme.textTheme.bodyLarge?.color)), trailing: const Text("Temperature, chamber, MQ135, MQ2", style: TextStyle(color: AppTheme.neonGreen)), tileColor: theme.scaffoldBackgroundColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity, height: 50,
@@ -1218,7 +1154,7 @@ class _MonitorTabState extends State<MonitorTab> {
   void _generateAndShareCSV(List<SensorData> history) {
     if (history.isEmpty) return;
     StringBuffer csv = StringBuffer();
-    csv.writeln("Timestamp,Temperature(C),Humidity(%),CO(ppm),VOC(ppm),PM2.5(ug/m3)");
+    csv.writeln("Timestamp,Temperature(C),ChamberTemperature(C),MQ135(V),MQ2(V)");
     for (var d in history) {
       csv.writeln("${d.timestamp.toIso8601String()},${d.temperatureC?.toStringAsFixed(2) ?? ''},${d.chamberTempC?.toStringAsFixed(2) ?? ''},${d.mq135V?.toStringAsFixed(2) ?? ''},${d.mq2V?.toStringAsFixed(2) ?? ''}");
     }
@@ -1250,7 +1186,14 @@ class _MonitorTabState extends State<MonitorTab> {
                   ),
                 ),
               ),
-              Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 300), child: _segIndex == 0 ? _buildSensorsView(state, theme) : _buildAirQualityView(state.currentData, theme))),
+              Expanded(child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _segIndex == 0
+                    ? _buildSensorsView(state, theme)
+                    : state.isHardwareConnected
+                        ? _buildAirQualityView(state.currentData, theme)
+                        : const Center(child: Text('ESP32 disconnected. Air quality is unavailable.')),
+              )),
             ],
           ),
         ),
@@ -1271,9 +1214,9 @@ class _MonitorTabState extends State<MonitorTab> {
           minTileWidth: 200,
           children: [
             _statCard("Peak Temp", "${stats['maxT']} °C", AppTheme.neonOrange, theme),
-            _statCard("Peak CO", "${stats['maxCO']} ppm", AppTheme.neonRed, theme),
+            _statCard("Peak MQ2", "${stats['maxMq2']} V", AppTheme.neonRed, theme),
             _statCard("Avg Temp", "${stats['avgT']} °C", AppTheme.neonOrange, theme),
-            _statCard("Avg CO", "${stats['avgCO']} ppm", AppTheme.neonRed, theme),
+            _statCard("Avg MQ2", "${stats['avgMq2']} V", AppTheme.neonRed, theme),
           ],
         ),
         const SizedBox(height: 32),
@@ -1316,65 +1259,12 @@ class _MonitorTabState extends State<MonitorTab> {
   }
 
   Widget _buildAirQualityView(SensorData data, ThemeData theme) {
-    int aqi = (((data.mq135V ?? 0) / 5.0) * 100).toInt();
-    bool hazardous = aqi > 100;
     final isCompact = MediaQuery.of(context).size.width < 600;
-    Color aqiColor = hazardous ? AppTheme.neonRed : AppTheme.neonGreen;
     
     return ListView(
       key: const ValueKey(1), padding: EdgeInsets.only(left: isCompact ? 16 : 24, right: isCompact ? 16 : 24, bottom: 100),
       children: [
-        if (hazardous)
-          Container(
-            padding: const EdgeInsets.all(16), margin: const EdgeInsets.only(bottom: 24),
-            decoration: BoxDecoration(color: AppTheme.neonRed.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.neonRed.withValues(alpha: 0.5))),
-            child: const Row(children: [Icon(CupertinoIcons.exclamationmark_triangle_fill, color: AppTheme.neonRed, size: 28), SizedBox(width: 16), Expanded(child: Text("Hazardous threshold crossed. System purge recommended immediately.", style: TextStyle(color: AppTheme.neonRed, fontWeight: FontWeight.bold)))]),
-          ),
-        Center(
-          child: TweenAnimationBuilder<double>(
-            duration: const Duration(seconds: 2),
-            curve: Curves.easeOutCubic,
-            tween: Tween<double>(begin: 0, end: (aqi / 200).clamp(0.0, 1.0)),
-            builder: (context, val, child) => Container(
-              width: 260, height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.cardColor.withValues(alpha: 0.5),
-                boxShadow: [
-                  BoxShadow(color: aqiColor.withValues(alpha: 0.2 + (val * 0.2)), blurRadius: 60, spreadRadius: -10),
-                ],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 260, height: 260,
-                    child: CircularProgressIndicator(
-                      value: val,
-                      backgroundColor: theme.dividerColor.withValues(alpha: 0.3),
-                      color: aqiColor,
-                      strokeWidth: 12,
-                      strokeCap: StrokeCap.round,
-                    ),
-                  ),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text((val * 200).toInt().toString(), style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 80, fontWeight: FontWeight.w900, letterSpacing: -3)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(color: aqiColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-                        child: Text("AQI US", style: TextStyle(color: aqiColor, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 56),
-        Text("Pollutant Dispersion Levels", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
+        Text("Reported Gas Sensor Voltages", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
         const SizedBox(height: 24),
         _pollutantBar("MQ135 Gas Voltage", (data.mq135V ?? 0) / 5.0, AppTheme.neonOrange, "${(data.mq135V ?? 0).toStringAsFixed(2)} V", theme),
         const SizedBox(height: 24),
@@ -1520,25 +1410,6 @@ class ControlTab extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         _infoRow(CupertinoIcons.wifi, "IP Address", state.activeNode.ipAddress, AppTheme.neonBlue, theme),
-                        const Divider(height: 24),
-                        _infoRow(CupertinoIcons.link, "MAC Address", state.activeNode.macAddress, AppTheme.neonBlue, theme),
-                        const Divider(height: 24),
-                        _infoRow(CupertinoIcons.waveform_path_ecg, "Signal (RSSI)", "${state.rssi} dBm", state.rssi > -60 ? AppTheme.neonGreen : AppTheme.neonOrange, theme),
-                      ],
-                    ),
-                  ),
-                  GlowingCard(
-                    glowColor: AppTheme.neonGreen, padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Power Systems", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        _infoRow(CupertinoIcons.bolt_fill, "Main Power", "AC Connected", AppTheme.neonGreen, theme),
-                        const Divider(height: 24),
-                        _infoRow(CupertinoIcons.battery_100, "Battery Backup", "${state.batteryLevel}% (Charging)", AppTheme.neonGreen, theme),
-                        const Divider(height: 24),
-                        _infoRow(CupertinoIcons.shield_fill, "Heat Protection", "Active", AppTheme.neonOrange, theme),
                       ],
                     ),
                   ),
@@ -1547,14 +1418,22 @@ class ControlTab extends StatelessWidget {
               const SizedBox(height: 40),
 
               if (state.isAdmin) ...[
-                Text("Remote Relays", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
+                Text("Emergency Control & Local Alerts", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
                 const SizedBox(height: 16),
-                FluidTileGrid(
-                  minTileWidth: 200,
-                  children: [
-                    _relayCard("Purge Fan", Icons.air, AppTheme.neonBlue, true, () => state.sendHardwareCommand('fan', true), theme),
-                    _relayCard("Sprinkler", Icons.water_drop, AppTheme.neonRed, false, () => state.sendHardwareCommand('sprinkler', true), theme),
-                  ],
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  tileColor: theme.cardColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: theme.dividerColor)),
+                  leading: const Icon(Icons.dashboard_outlined, color: AppTheme.neonGreen, size: 28),
+                  title: Text("Biomass Monitor Safety Dashboard", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+                  subtitle: const Text("Direct ESP32 Sprinkler Control & Danger Alerts", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  trailing: const Icon(CupertinoIcons.chevron_right, color: Colors.grey, size: 18),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DashboardScreen(
+                    apiService: ApiService(
+                      baseUrl: 'http://${state.activeNode.ipAddress}/api',
+                      authorizationHeader: state._basicAuthHeader,
+                    ),
+                  ))),
                 ),
                 const SizedBox(height: 40),
                 
@@ -1620,33 +1499,6 @@ class ControlTab extends StatelessWidget {
     );
   }
 
-  Widget _relayCard(String title, IconData icon, Color color, bool isActive, VoidCallback onTap, ThemeData theme) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.1) : theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isActive ? color.withValues(alpha: 0.5) : theme.dividerColor, width: isActive ? 2 : 1),
-          boxShadow: isActive ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 15)] : [],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.2), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: Text(title, style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16, fontWeight: FontWeight.bold))),
-            CupertinoSwitch(value: isActive, activeTrackColor: color, onChanged: (val) => onTap()),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ==========================================
@@ -1856,26 +1708,6 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              Text("Safety Thresholds", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 16),
-              GlowingCard(
-                glowColor: AppTheme.cardBorder, padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    _sliderRow("Temp Warning (°C)", settings.tempThreshold, 30.0, 70.0, AppTheme.neonOrange, theme, 
-                      (val) => settings.setTempThreshold(val),
-                      (val) => context.read<AppStateProvider>().updateEsp32Settings(val, settings.coThreshold)
-                    ),
-                    const Divider(height: 32),
-                    _sliderRow("MQ2 Alert (Volts)", settings.coThreshold, 0.1, 5.0, AppTheme.neonRed, theme, 
-                      (val) => settings.setCoThreshold(val),
-                      (val) => context.read<AppStateProvider>().updateEsp32Settings(settings.tempThreshold, val)
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
               if (isAdmin) ...[
                  Text("Admin Security & Access", style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 18)),
                  const SizedBox(height: 16),
@@ -1911,17 +1743,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _sliderRow(String label, double val, double min, double max, Color color, ThemeData theme, Function(double) onChanged, [Function(double)? onChangeEnd]) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(label, style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15, fontWeight: FontWeight.bold))), Text(val.toStringAsFixed(1), style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold))]),
-        const SizedBox(height: 12),
-        CupertinoSlider(value: val.clamp(min, max), min: min, max: max, activeColor: color, onChanged: onChanged, onChangeEnd: onChangeEnd),
-      ],
-    );
-  }
-
   Widget _switchRow(String label, bool val, ThemeData theme, Function(bool) onChanged) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1944,6 +1765,17 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: settings.isDarkMode ? AppTheme.getDarkTheme() : AppTheme.getLightTheme(),
       home: Consumer<AppStateProvider>(builder: (context, state, _) => state.isAuthenticated ? const MainWrapper() : const LoginScreen()),
+      routes: {
+        '/dashboard': (context) {
+          final state = context.read<AppStateProvider>();
+          return DashboardScreen(
+            apiService: ApiService(
+              baseUrl: 'http://${state.activeNode.ipAddress}/api',
+              authorizationHeader: state._basicAuthHeader,
+            ),
+          );
+        },
+      },
     );
   }
 }
