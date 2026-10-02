@@ -21,6 +21,8 @@ void setup() {
 }
 
 void loop() {
+  updateActuatorTransitions();
+
   if (millis() - lastRead >= POLL_INTERVAL_MS) {
     lastRead = millis();
 

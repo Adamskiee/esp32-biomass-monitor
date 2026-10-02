@@ -19,11 +19,13 @@ void digitalWrite(uint8_t pin, uint8_t val);
 #endif
 
 extern bool current_solenoid_state;
+extern bool current_pump_state;
 extern bool current_fan_state;
 
 void initActuators();
 void initSolenoid();
 void setFan(bool state);
-void setSolenoid(bool state, bool force_bypass_debounce = false);
+void requestSprinkler(bool enabled);
+void updateSprinklerActuators();
 void setLedStatus(bool red, bool yellow, bool green);
 void setBuzzer(bool state);
