@@ -13,6 +13,8 @@ components:
   schemas:
     SystemState:
       type: object
+      required:
+        - pump_on
       properties:
         temperature_c:
           type: number
@@ -40,6 +42,10 @@ components:
           type: boolean
         sprinkler_on:
           type: boolean
+          description: Commanded solenoid relay output. It can be true while the pump waits during startup.
+        pump_on:
+          type: boolean
+          description: Commanded pump relay output. This reports the relay command, not verified water flow.
         manual_sprinkler:
           type: boolean
         active_triggers:
