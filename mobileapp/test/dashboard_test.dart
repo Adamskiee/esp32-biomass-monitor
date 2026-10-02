@@ -33,6 +33,13 @@ void main() {
     );
   }
 
+  Finder pumpStatusTile() {
+    return find.ancestor(
+      of: find.text('Pump Status'),
+      matching: find.byType(ListTile),
+    );
+  }
+
   group('DashboardScreen Loading, Error and Display', () {
     testWidgets('shows active pump state', (tester) async {
       client = MockClient(
@@ -53,9 +60,17 @@ void main() {
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
 
-      expect(find.text('Pump Status'), findsOneWidget);
-      expect(find.text('ACTIVE'), findsWidgets);
-      expect(find.byType(Switch), findsOneWidget);
+      final tile = pumpStatusTile();
+      expect(tile, findsOneWidget);
+      expect(
+        find.descendant(of: tile, matching: find.text('ACTIVE')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tile, matching: find.byType(Switch)),
+        findsNothing,
+      );
+      expect(tester.widget<ListTile>(tile).onTap, isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -78,9 +93,17 @@ void main() {
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
 
-      expect(find.text('Pump Status'), findsOneWidget);
-      expect(find.text('IDLE'), findsWidgets);
-      expect(find.byType(Switch), findsOneWidget);
+      final tile = pumpStatusTile();
+      expect(tile, findsOneWidget);
+      expect(
+        find.descendant(of: tile, matching: find.text('IDLE')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tile, matching: find.byType(Switch)),
+        findsNothing,
+      );
+      expect(tester.widget<ListTile>(tile).onTap, isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -102,9 +125,81 @@ void main() {
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
 
-      expect(find.text('Pump Status'), findsOneWidget);
-      expect(find.text('UNAVAILABLE'), findsOneWidget);
-      expect(find.byType(Switch), findsOneWidget);
+      final tile = pumpStatusTile();
+      expect(tile, findsOneWidget);
+      expect(
+        find.descendant(of: tile, matching: find.text('UNAVAILABLE')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tile, matching: find.byType(Switch)),
+        findsNothing,
+      );
+      expect(tester.widget<ListTile>(tile).onTap, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('shows unavailable when pump state is malformed', (
+      tester,
+    ) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'fan_on': false,
+            'sprinkler_on': true,
+            'pump_on': 'on',
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: pumpStatusTile(),
+          matching: find.text('UNAVAILABLE'),
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('updates pump status after polling', (tester) async {
+      var pumpOn = false;
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'fan_on': false,
+            'sprinkler_on': true,
+            'pump_on': pumpOn,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+      expect(
+        find.descendant(of: pumpStatusTile(), matching: find.text('IDLE')),
+        findsOneWidget,
+      );
+      pumpOn = true;
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(
+        find.descendant(of: pumpStatusTile(), matching: find.text('ACTIVE')),
+        findsOneWidget,
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
