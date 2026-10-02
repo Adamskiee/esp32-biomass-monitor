@@ -106,7 +106,7 @@ ManualSprinklerResult applyManualSprinklerCommand(bool enabled) {
   }
 
   manual_sprinkler = enabled;
-  setSolenoid(enabled, true);
+  requestSprinkler(enabled);
 
 #ifdef ARDUINO
   xSemaphoreGive(stateMutex);
@@ -188,14 +188,14 @@ void evaluateSafetyLoop() {
   active_triggers_json = triggers;
 
   if (catastrophic_latch || temp_latch_danger) {
-    setSolenoid(true, true);
+    requestSprinkler(true);
     manual_sprinkler = false;
   } else if (is_temp_fault) {
     // Temp fault defaults to OFF unless manual sprinkler is actively engaged
     // (blind-fire) Critical ruling: Do not clear manual_sprinkler here
-    setSolenoid(manual_sprinkler, false);
+    requestSprinkler(manual_sprinkler);
   } else {
-    setSolenoid(manual_sprinkler, false);
+    requestSprinkler(manual_sprinkler);
   }
 
   setFan(true);
@@ -207,4 +207,18 @@ void evaluateSafetyLoop() {
     setLedStatus(false, false, true);
   }
   setBuzzer(!is_temp_fault && current_chamber_c > threshold_chamber_temp_c);
+}
+
+void updateActuatorTransitions() {
+#ifdef ARDUINO
+  if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) {
+    return;
+  }
+#endif
+
+  updateSprinklerActuators();
+
+#ifdef ARDUINO
+  xSemaphoreGive(stateMutex);
+#endif
 }
