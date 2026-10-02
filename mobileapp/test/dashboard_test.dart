@@ -34,6 +34,80 @@ void main() {
   }
 
   group('DashboardScreen Loading, Error and Display', () {
+    testWidgets('shows active pump state', (tester) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'fan_on': false,
+            'sprinkler_on': true,
+            'pump_on': true,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(find.text('Pump Status'), findsOneWidget);
+      expect(find.text('ACTIVE'), findsWidgets);
+      expect(find.byType(Switch), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('shows idle pump state', (tester) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'fan_on': false,
+            'sprinkler_on': true,
+            'pump_on': false,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(find.text('Pump Status'), findsOneWidget);
+      expect(find.text('IDLE'), findsWidgets);
+      expect(find.byType(Switch), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('shows unavailable when pump state is missing', (tester) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'fan_on': false,
+            'sprinkler_on': true,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(find.text('Pump Status'), findsOneWidget);
+      expect(find.text('UNAVAILABLE'), findsOneWidget);
+      expect(find.byType(Switch), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('displays CircularProgressIndicator when state is empty', (
       tester,
     ) async {
@@ -115,10 +189,10 @@ void main() {
         expect(find.text('Live Sensor Data'), findsOneWidget);
         expect(find.text('65.4 °C'), findsOneWidget);
         expect(find.text('1.25 V'), findsOneWidget);
-        expect(find.text('Manual Sprinkler'), findsOneWidget);
-        expect(find.text('Safety Thresholds'), findsOneWidget);
 
         await tester.scrollUntilVisible(find.text('70.0 °C'), 100);
+        expect(find.text('Manual Sprinkler'), findsOneWidget);
+        expect(find.text('Safety Thresholds'), findsOneWidget);
         expect(find.text('70.0 °C'), findsOneWidget);
         expect(find.text('1.80 V'), findsOneWidget);
 
@@ -523,6 +597,7 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
       expect(find.text('ESP32 disconnected'), findsOneWidget);
+      await tester.scrollUntilVisible(find.byType(Switch), 100);
       expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });

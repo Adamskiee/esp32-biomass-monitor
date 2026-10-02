@@ -47,6 +47,7 @@ void main() {
               'threshold_mq2_v': 1.5,
               'fan_on': true,
               'sprinkler_on': false,
+              'pump_on': false,
               'manual_sprinkler': false,
               'active_triggers': ['high_mq2_gas'],
             }),
@@ -59,6 +60,7 @@ void main() {
       final state = await service.fetchState();
 
       expect(state['chamber_temp_c'], 45.2);
+      expect(state['pump_on'], isFalse);
       expect(state['active_triggers'], ['high_mq2_gas']);
     });
 

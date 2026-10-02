@@ -23,6 +23,12 @@ against the device before opening the dashboard. The safety dashboard polls
 sends `POST /api/control`, then refreshes from device state. A safety override
 returns `409` and the switch returns to the reported state.
 
+The dashboard also shows a read-only Pump Status indicator. It can briefly
+differ from Sprinkler Status while the controller opens the valve before
+starting the pump or stops the pump before closing the valve. The indicator
+reports the commanded relay output, so it does not confirm that the pump ran or
+that water flowed.
+
 The main telemetry view shows no live readings while the ESP32 is disconnected.
 It stores history only from successful responses and creates gas alerts from
 firmware triggers. MQ sensor values are voltages; the app does not calculate a
