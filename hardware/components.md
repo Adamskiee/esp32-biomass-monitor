@@ -12,8 +12,14 @@
 | S-250-12 | 1 | 12V 20A Power Supply | |
 | Fan | 1 | 12V 0.30A Brushless DC Motor | |
 | Valve | 1 | 12V 1/4 Inch Solenoid Valve | |
-| Relay | 1 | 1-Channel 5V Relay Module | |
+| Pump | 1 | 12V DC pump | |
+| Buzzer | 1 | 12V DC buzzer | |
+| Relay | 1 | 8-channel, 5V optocoupled relay module with 3.3V-compatible inputs | |
 | IRF520 | 1 | MOSFET Module | |
 | IRLZ44N | 2 | N-Channel MOSFET | |
 | Fuse | 1 | 18AWG 2A Inline Fuse | |
 | Diode | 1 | Flyback Diode | |
+
+The relay contacts must be rated above each load's measured running and startup
+current. A printed 10 A relay rating does not by itself establish that a relay
+is suitable for a particular motor load.
