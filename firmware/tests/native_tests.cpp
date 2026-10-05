@@ -13,6 +13,7 @@ uint32_t test_millis = 1000;
 int failure_count = 0;
 int test_count = 0;
 uint8_t pin_levels[40] = {};
+uint8_t pin_modes[40] = {};
 
 void fail(const char *test_name, const char *expression, int line) {
   std::cerr << "FAIL " << test_name << " at line " << line << ": " << expression
@@ -47,6 +48,10 @@ void resetSafetyState() {
 
 void testSprinklerStartupOutputsOff() {
   const char *name = "sprinkler startup outputs off";
+  pin_modes[PIN_RELAY_SOLENOID] = INPUT;
+  pin_modes[PIN_RELAY_PUMP] = INPUT;
+  pin_levels[PIN_RELAY_SOLENOID] = RELAY_ON;
+  pin_levels[PIN_RELAY_PUMP] = RELAY_ON;
   initActuators();
   EXPECT_FALSE(name, current_solenoid_state);
   EXPECT_FALSE(name, current_pump_state);
@@ -465,9 +470,13 @@ void run(const char *name, const std::function<void()> &test) {
 
 uint32_t millis() { return test_millis; }
 
-void pinMode(uint8_t, uint8_t) {}
+void pinMode(uint8_t pin, uint8_t mode) { pin_modes[pin] = mode; }
 
-void digitalWrite(uint8_t pin, uint8_t level) { pin_levels[pin] = level; }
+void digitalWrite(uint8_t pin, uint8_t level) {
+  if (pin_modes[pin] == OUTPUT) {
+    pin_levels[pin] = level;
+  }
+}
 
 int main() {
   run("sprinkler startup outputs off", testSprinklerStartupOutputsOff);

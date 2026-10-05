@@ -1,5 +1,8 @@
 #include "Actuators.h"
 #include <BiomassConfig.h>
+#ifdef ARDUINO
+#include <driver/gpio.h>
+#endif
 
 bool current_solenoid_state = false;
 bool current_pump_state = false;
@@ -12,6 +15,15 @@ enum class SprinklerPhase { Off, StartingPump, On, StoppingValve };
 SprinklerPhase sprinkler_phase = SprinklerPhase::Off;
 bool sprinkler_requested = false;
 uint32_t transition_started_at = 0;
+
+void initRelayOutput(uint8_t pin) {
+#ifdef ARDUINO
+  // Arduino-ESP32 ignores digitalWrite until pinMode registers the GPIO.
+  gpio_set_level(static_cast<gpio_num_t>(pin), RELAY_OFF);
+#endif
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, RELAY_OFF);
+}
 
 void setSolenoidOutput(bool state) {
   digitalWrite(PIN_RELAY_SOLENOID, state ? RELAY_ON : RELAY_OFF);
@@ -26,11 +38,9 @@ void setPumpOutput(bool state) {
 } // namespace
 
 void initSolenoid() {
-  digitalWrite(PIN_RELAY_SOLENOID, RELAY_OFF);
-  pinMode(PIN_RELAY_SOLENOID, OUTPUT);
+  initRelayOutput(PIN_RELAY_SOLENOID);
   current_solenoid_state = false;
-  digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
-  pinMode(PIN_RELAY_PUMP, OUTPUT);
+  initRelayOutput(PIN_RELAY_PUMP);
   current_pump_state = false;
   sprinkler_requested = false;
   sprinkler_phase = SprinklerPhase::Off;
@@ -38,25 +48,18 @@ void initSolenoid() {
 }
 
 void initActuators() {
-  // Drive pins HIGH (RELAY_OFF) before enabling OUTPUT mode to prevent startup
-  // glitch/clicking
   initSolenoid();
 
-  digitalWrite(PIN_RELAY_FAN, RELAY_OFF);
-  pinMode(PIN_RELAY_FAN, OUTPUT);
+  initRelayOutput(PIN_RELAY_FAN);
   current_fan_state = false;
 
-  digitalWrite(PIN_RELAY_LED_RED, RELAY_OFF);
-  pinMode(PIN_RELAY_LED_RED, OUTPUT);
+  initRelayOutput(PIN_RELAY_LED_RED);
 
-  digitalWrite(PIN_RELAY_LED_YELLOW, RELAY_OFF);
-  pinMode(PIN_RELAY_LED_YELLOW, OUTPUT);
+  initRelayOutput(PIN_RELAY_LED_YELLOW);
 
-  digitalWrite(PIN_RELAY_LED_GREEN, RELAY_OFF);
-  pinMode(PIN_RELAY_LED_GREEN, OUTPUT);
+  initRelayOutput(PIN_RELAY_LED_GREEN);
 
-  digitalWrite(PIN_RELAY_BUZZER, RELAY_OFF);
-  pinMode(PIN_RELAY_BUZZER, OUTPUT);
+  initRelayOutput(PIN_RELAY_BUZZER);
 }
 
 void setFan(bool state) {
