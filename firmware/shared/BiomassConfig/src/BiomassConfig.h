@@ -2,6 +2,8 @@
 
 // Relay Pins (Active LOW)
 #define PIN_RELAY_SOLENOID 27
+#define PIN_RELAY_PUMP 13
+#define PIN_RELAY_BUZZER 4
 #define PIN_RELAY_FAN 26
 #define PIN_RELAY_LED_RED 25
 #define PIN_RELAY_LED_YELLOW 33
@@ -9,9 +11,6 @@
 
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
-
-// Other Actuators
-#define PIN_BUZZER 4
 
 // Digital Sensors
 #define PIN_DHT22 32
@@ -30,3 +29,4 @@
 
 // Timing and Safety Thresholds
 #define POLL_INTERVAL_MS 2000
+#define SPRINKLER_TRANSITION_MS 500UL

@@ -17,6 +17,27 @@ actual hardware before powering the device. The ESP32 serves Basic Auth over
 plain HTTP, so keep it on a trusted local network and replace the example API
 password.
 
+## How do I commission the relay outputs?
+
+1. Disconnect all 12 V loads. Power the ESP32 and relay module, then verify
+   every relay is released at startup. Confirm `HIGH` releases a channel and
+   `LOW` energizes it before connecting a load.
+2. Confirm the seven assigned channels one at a time: solenoid GPIO 27, pump
+   GPIO 13, buzzer GPIO 4, fan GPIO 26, red GPIO 25, yellow GPIO 33, and green
+   GPIO 14. Keep channel 8 disconnected.
+3. Connect the fan, lights, and buzzer, then verify their expected status
+   behavior. Connect the solenoid and pump through their separate fused 12 V
+   branches with the required inductive-load suppression.
+4. Restart the ESP32 and verify that the normally open contacts leave all 12 V
+   loads off until firmware commands them. Repeat after a relay-module power
+   cycle.
+5. Request the sprinkler with the loads connected. Verify the valve relay
+   energizes at least 500 ms before the pump relay. Request shutdown and verify
+   the pump relay releases at least 500 ms before the valve relay releases.
+
+The API and Pump Status indicator report commanded relay outputs. They do not
+confirm that the valve moved, the pump ran, or water flowed.
+
 ## What should I check during operation?
 
 - A green LED indicates the current readings are safe. The fan runs from

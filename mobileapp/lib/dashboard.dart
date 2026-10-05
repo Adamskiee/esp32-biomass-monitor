@@ -203,6 +203,18 @@ class _DashboardScreenState extends State<DashboardScreen>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final pumpOn = _state['pump_on'] is bool ? _state['pump_on'] as bool : null;
+    final pumpLabel = pumpOn == true
+        ? 'ACTIVE'
+        : pumpOn == false
+        ? 'IDLE'
+        : 'UNAVAILABLE';
+    final pumpColor = pumpOn == true
+        ? Colors.blue
+        : pumpOn == false
+        ? Colors.grey
+        : Colors.orange;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Biomass Monitor'),
@@ -246,6 +258,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(Icons.water, color: pumpColor),
+                    title: const Text('Pump Status'),
+                    trailing: Text(
+                      pumpLabel,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: pumpColor,
                       ),
                     ),
                   ),

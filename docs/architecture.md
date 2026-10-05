@@ -30,6 +30,19 @@ MQ135 is included in telemetry but does not currently trigger automatic
 actuation. The fan output is an on/off relay; variable PWM speed is not
 implemented.
 
+## How are the valve and pump sequenced?
+
+`Actuators` owns the requested sprinkler state and the commanded solenoid and
+pump relay outputs. Every manual or automatic sprinkler decision requests that
+coordinator, while the main loop advances its transition on every pass without
+blocking sensor polling or HTTP handling.
+
+For activation, it energizes the solenoid relay and waits at least 500 ms before
+energizing the pump relay. For shutdown, it releases the pump relay and waits
+at least 500 ms before releasing the solenoid relay. `sprinkler_on` and
+`pump_on` report those commanded relay outputs, so they can differ during a
+transition and do not verify valve movement or water flow.
+
 ## How are settings and network access handled?
 
 The adjustable chamber-temperature limit ranges from 20 to 150 °C. The API
