@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:biomass_iot_app/api_service.dart';
-import 'package:biomass_iot_app/dashboard.dart';
+import 'package:biomass_iot_app/features/safety/safety_dashboard_screen.dart';
 
 void main() {
   late http.Client client;

@@ -42,7 +42,7 @@ void main() {
       session,
       SensorHistoryStore(database),
       pollInterval: const Duration(days: 1),
-      onReading: (_, __) async {},
+      onReading: (_, _) async {},
     );
 
     status = 503;
