@@ -8,7 +8,7 @@ from simulator.model import SafetyOverrideError, SimulatorState
 
 
 def make_handler(state: SimulatorState, username: str, password: str) -> type[BaseHTTPRequestHandler]:
-    expected = f"{username}:{password}"
+    expected = f"{username}:{password}".encode("utf-8")
 
     class SimulatorHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -61,9 +61,9 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
             valid = False
             if header.startswith("Basic "):
                 try:
-                    credentials = base64.b64decode(header[6:], validate=True).decode("utf-8")
+                    credentials = base64.b64decode(header[6:], validate=True)
                     valid = hmac.compare_digest(credentials, expected)
-                except (binascii.Error, UnicodeDecodeError, ValueError):
+                except (binascii.Error, ValueError):
                     pass
             if not valid:
                 self._send_json(

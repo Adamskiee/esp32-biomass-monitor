@@ -89,6 +89,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
 
     def test_mq2_zero_is_valid_and_above_4_8_is_fault(self):
+        self.state.select_scenario("gas")
         self.state._mq2_v = 0.0
         self.state._evaluate_safety()
         self.assertNotIn("mq2_sensor_fault", self.state.snapshot()["active_triggers"])
@@ -109,6 +110,14 @@ class SimulatorStateTests(unittest.TestCase):
         self.state._mq2_v = 2.375
         self.state._evaluate_safety()
         self.assertNotIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
+
+    def test_normal_reading_crossing_threshold_activates_safety(self):
+        self.state.update_thresholds({"threshold_chamber_temp_c": 45.1})
+        self.assertFalse(self.state.snapshot()["sprinkler_on"])
+        crossing = self.state.snapshot()
+        self.assertGreaterEqual(crossing["chamber_temp_c"], 45.1)
+        self.assertIn("high_chamber_temp", crossing["active_triggers"])
+        self.assertTrue(crossing["sprinkler_on"])
 
     def test_rapid_manual_toggle_preserves_valve_pump_order(self):
         self.state.set_manual_sprinkler(True)

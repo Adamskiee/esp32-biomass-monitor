@@ -89,10 +89,15 @@ class SimulatorState:
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:
-            self._advance_actuators()
-            tick = self._tick
             if self._scenario == "normal":
+                drift = (self._tick % 5) * 0.1
+                self._temperature_c = 25.0 + drift
+                self._chamber_temp_c = 45.0 + drift
+                self._mq135_v = 1.2 + drift / 10
+                self._mq2_v = 1.0 + drift / 10
                 self._tick += 1
+                self._evaluate_safety()
+            self._advance_actuators()
             triggers = []
             if self._catastrophic_latch:
                 triggers.append("catastrophic_latch")
@@ -104,12 +109,11 @@ class SimulatorState:
                 triggers.append("temp_sensor_fault")
             if self._mq2_v is None or self._mq2_v > 4.8:
                 triggers.append("mq2_sensor_fault")
-            drift = (tick % 5) * 0.1 if self._scenario == "normal" else 0.0
             return {
-                "temperature_c": self._temperature_c + drift,
-                "chamber_temp_c": None if self._chamber_temp_c is None else self._chamber_temp_c + drift,
-                "mq135_v": self._mq135_v + drift / 10,
-                "mq2_v": None if self._mq2_v is None else self._mq2_v + drift / 10,
+                "temperature_c": self._temperature_c,
+                "chamber_temp_c": self._chamber_temp_c,
+                "mq135_v": self._mq135_v,
+                "mq2_v": self._mq2_v,
                 "threshold_chamber_temp_c": self._threshold_chamber_temp_c,
                 "threshold_mq2_v": self._threshold_mq2_v,
                 "fan_on": True,

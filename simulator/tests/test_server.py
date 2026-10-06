@@ -77,6 +77,24 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(status, 401)
                 self.assertEqual(headers["WWW-Authenticate"], 'Basic realm="Login Required"')
 
+    def test_non_ascii_basic_auth_returns_401_and_configured_credentials_work(self):
+        bad = "Basic " + base64.b64encode("démo:demo".encode()).decode()
+        status, headers, _ = self.request("/api/state", authorization=bad)
+        self.assertEqual(status, 401)
+        self.assertEqual(headers["WWW-Authenticate"], 'Basic realm="Login Required"')
+
+        with ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.state, "démo", "secret")) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                auth = "Basic " + base64.b64encode("démo:secret".encode()).decode()
+                request = Request(f"http://127.0.0.1:{server.server_port}/api/state", headers={"Authorization": auth})
+                with urlopen(request, timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+            finally:
+                server.shutdown()
+                thread.join()
+
     def test_boolean_threshold_is_rejected_atomically(self):
         status, _, _ = self.request("/api/thresholds", "POST", {
             "threshold_chamber_temp_c": True, "threshold_mq2_v": 3,
