@@ -12,8 +12,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'database_helper.dart';
 import 'api_service.dart';
 import 'dashboard.dart';
@@ -30,14 +28,6 @@ export 'dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint("Firebase initialization info: $e");
-  }
 
   final prefs = await SharedPreferences.getInstance();
 
