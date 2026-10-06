@@ -23,6 +23,9 @@ against the device before opening the dashboard. The safety dashboard polls
 sends `POST /api/control`, then refreshes from device state. A safety override
 returns `409` and the switch returns to the reported state.
 
+Without an ESP32, use the [local simulator](esp32-simulator.md) to exercise
+the same app flows with repeatable readings and alerts.
+
 The dashboard also shows a read-only Pump Status indicator. It can briefly
 differ from Sprinkler Status while the controller opens the valve before
 starting the pump or stops the pump before closing the valve. The indicator

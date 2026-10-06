@@ -45,6 +45,9 @@ Arduino sketchbook.
 The mobile app connects to the IP of the selected node. The firmware does not
 advertise an `esp32.local` mDNS hostname.
 
+To try the app without an ESP32, run the local API simulator. See the
+[ESP32 simulator guide](docs/esp32-simulator.md) for setup and scenarios.
+
 ## How do I verify a change?
 
 Arduino CLI provides the same production compile check used by continuous
@@ -79,6 +82,7 @@ flutter test
 - `firmware/`: ESP32 firmware, hardware tests, and shared configuration
 - `hardware/`: schematics, bill of materials, and physical design files
 - `mobileapp/`: Flutter monitoring and control app
+- `simulator/`: local API simulator for app development and demonstrations
 - `docs/`: architecture, API, operations, and developer documentation
 
 ## Where can I learn more?
