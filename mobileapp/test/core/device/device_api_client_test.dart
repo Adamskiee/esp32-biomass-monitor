@@ -1,14 +1,14 @@
 import 'dart:convert';
 
-import 'package:biomass_iot_app/api_service.dart';
+import 'package:biomass_iot_app/core/device/device_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 const authorizationHeader = 'Basic YWRtaW46c2VjcmV0';
 
-ApiService createService(http.Client client) {
-  return ApiService(
+DeviceApiClient createService(http.Client client) {
+  return DeviceApiClient(
     baseUrl: 'http://192.168.1.51/api',
     authorizationHeader: authorizationHeader,
     client: client,
