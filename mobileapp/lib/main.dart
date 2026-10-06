@@ -21,6 +21,7 @@ import 'core/widgets/glass_container.dart';
 import 'core/widgets/glowing_card.dart';
 import 'features/alerts/alert_item.dart';
 import 'features/alerts/alert_timestamp.dart';
+import 'features/authentication/device_address_store.dart';
 import 'features/monitoring/sensor_data.dart';
 import 'features/monitoring/widgets/sensor_metric_card.dart';
 import 'features/safety/audit_log.dart';
@@ -42,25 +43,12 @@ void main() async {
   );
 }
 
-class IoTNode {
-  String id, name, ipAddress, macAddress;
-  IoTNode(this.id, this.name, this.ipAddress, this.macAddress);
-
-  factory IoTNode.fromJson(Map<String, dynamic> json) =>
-      IoTNode(json['id'], json['name'], json['ipAddress'], json['macAddress']);
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'ipAddress': ipAddress,
-    'macAddress': macAddress,
-  };
-}
-
 // ==========================================
 // 3. STATE MANAGEMENT & ANALYTICS
 // ==========================================
 class AppStateProvider extends ChangeNotifier {
   final SharedPreferences _prefs;
+  late final DeviceAddressStore _deviceAddresses;
   final http.Client _client;
   final bool _ownsClient;
 
@@ -68,9 +56,6 @@ class AppStateProvider extends ChangeNotifier {
   int _currentTab = 0;
   String _currentUser = "";
   String _password = "";
-
-  List<IoTNode> _availableNodes = [];
-  late IoTNode _activeNode;
 
   SensorData _currentData = SensorData(timestamp: DateTime.now());
   final List<SensorData> _history = [];
@@ -83,38 +68,9 @@ class AppStateProvider extends ChangeNotifier {
   AppStateProvider(this._prefs, {http.Client? client})
     : _client = client ?? http.Client(),
       _ownsClient = client == null {
-    _loadNodes();
-    _activeNode = _availableNodes[0];
+    _deviceAddresses = DeviceAddressStore(_prefs);
+    _deviceAddresses.migrateLegacyNodes().then((_) => notifyListeners());
     _loadHistory();
-  }
-
-  void _loadNodes() {
-    final nodesStr = _prefs.getString('savedNodes');
-    if (nodesStr != null) {
-      final List dec = json.decode(nodesStr);
-      _availableNodes = dec.map((n) => IoTNode.fromJson(n)).toList();
-    } else {
-      _availableNodes = [IoTNode("1", "ESP32", "", "")];
-      _saveNodes();
-    }
-  }
-
-  void _saveNodes() {
-    _prefs.setString(
-      'savedNodes',
-      json.encode(_availableNodes.map((n) => n.toJson()).toList()),
-    );
-  }
-
-  void updateNode(IoTNode node, String name, String ip, String mac) {
-    node.name = name;
-    node.ipAddress = ip;
-    node.macAddress = mac;
-    _saveNodes();
-    notifyListeners();
-    if (_activeNode.id == node.id) {
-      startLiveTelemetryStream();
-    }
   }
 
   bool get isAuthenticated => _isAuthenticated;
@@ -123,8 +79,7 @@ class AppStateProvider extends ChangeNotifier {
   bool get canResumeWithBiometrics =>
       _currentUser.isNotEmpty && _password.isNotEmpty;
   int get currentTab => _currentTab;
-  IoTNode get activeNode => _activeNode;
-  List<IoTNode> get availableNodes => _availableNodes;
+  String get deviceIp => _deviceAddresses.deviceIp;
   SensorData get currentData => _currentData;
   List<SensorData> get history => _history;
   List<AlertItem> get alerts => _alerts;
@@ -201,7 +156,7 @@ class AppStateProvider extends ChangeNotifier {
           'Basic ${base64Encode(utf8.encode("$user:$password"))}';
       final response = await _client
           .get(
-            Uri.parse('http://${_activeNode.ipAddress}/api/state'),
+            Uri.parse('http://$deviceIp/api/state'),
             headers: {'Authorization': authorization},
           )
           .timeout(const Duration(seconds: 3));
@@ -235,29 +190,8 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setActiveNode(IoTNode node) {
-    _activeNode = node;
-    _isHardwareConnected = false;
-    _history.clear();
-    _loadHistory();
-    _addAuditLog("Switched Node View");
-    notifyListeners();
-  }
-
-  void setLoginNodeIp(String ipAddress) {
-    _activeNode.ipAddress = ipAddress;
-    _saveNodes();
-    notifyListeners();
-  }
-
-  Future<void> _addAuditLog(String actionName) async {
-    final log = AuditLog(
-      actionName,
-      _currentUser,
-      "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}",
-    );
-    _auditLogs.insert(0, log);
-    await DatabaseHelper().insertAuditLog(log);
+  Future<void> saveDeviceIp(String ipAddress) async {
+    await _deviceAddresses.saveDeviceIp(ipAddress);
     notifyListeners();
   }
 
@@ -285,7 +219,7 @@ class AppStateProvider extends ChangeNotifier {
       try {
         final response = await _client
             .get(
-              Uri.parse('http://${_activeNode.ipAddress}/api/state'),
+              Uri.parse('http://$deviceIp/api/state'),
               headers: {'Authorization': _basicAuthHeader},
             )
             .timeout(const Duration(seconds: 2));
@@ -579,7 +513,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
-    _ipCtrl.text = context.read<AppStateProvider>().activeNode.ipAddress;
+    _ipCtrl.text = context.read<AppStateProvider>().deviceIp;
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 15),
@@ -627,7 +561,7 @@ class _LoginScreenState extends State<LoginScreen>
       });
       return;
     }
-    state.setLoginNodeIp(ipAddress);
+    await state.saveDeviceIp(ipAddress);
     final accepted = await state.login(_userCtrl.text, _passCtrl.text);
     if (!mounted) return;
     setState(() {
@@ -972,7 +906,7 @@ class _MainWrapperState extends State<MainWrapper> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      "Hardware Offline: Tap to reconnect to ${state.activeNode.ipAddress}",
+                      "Hardware Offline: Tap to reconnect to ${state.deviceIp}",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -986,41 +920,6 @@ class _MainWrapperState extends State<MainWrapper> {
             ),
           )
         : const SizedBox.shrink();
-
-    Widget nodeSelector = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<IoTNode>(
-          isExpanded: true,
-          value: state.activeNode,
-          dropdownColor: theme.cardColor,
-          icon: const Icon(
-            CupertinoIcons.chevron_down,
-            size: 16,
-            color: Colors.grey,
-          ),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: theme.textTheme.bodyLarge?.color,
-          ),
-          items: state.availableNodes
-              .map(
-                (node) => DropdownMenuItem(value: node, child: Text(node.name)),
-              )
-              .toList(),
-          onChanged: (node) {
-            if (node != null) state.setActiveNode(node);
-          },
-        ),
-      ),
-    );
 
     return Scaffold(
       extendBody: true,
@@ -1094,7 +993,6 @@ class _MainWrapperState extends State<MainWrapper> {
                       ],
                     ),
                   ),
-                  nodeSelector,
                   const SizedBox(height: 16),
                   Expanded(
                     child: ListView(
@@ -1152,7 +1050,6 @@ class _MainWrapperState extends State<MainWrapper> {
             child: Column(
               children: [
                 offlineBanner,
-                if (!isDesktop) nodeSelector,
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
@@ -2265,82 +2162,6 @@ class _MonitorTabState extends State<MonitorTab> {
 class ControlTab extends StatelessWidget {
   const ControlTab({super.key});
 
-  void _showEditNodeDialog(
-    BuildContext context,
-    AppStateProvider state,
-    ThemeData theme,
-  ) {
-    final node = state.activeNode;
-    final nameCtrl = TextEditingController(text: node.name);
-    final ipCtrl = TextEditingController(text: node.ipAddress);
-    final macCtrl = TextEditingController(text: node.macAddress);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.cardColor,
-        title: Text(
-          "Edit Node Configuration",
-          style: TextStyle(
-            color: theme.textTheme.bodyLarge?.color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: "Node Name",
-                labelStyle: const TextStyle(color: Colors.grey),
-              ),
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ipCtrl,
-              decoration: InputDecoration(
-                labelText: "IP Address",
-                labelStyle: const TextStyle(color: Colors.grey),
-              ),
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: macCtrl,
-              decoration: InputDecoration(
-                labelText: "MAC Address",
-                labelStyle: const TextStyle(color: Colors.grey),
-              ),
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.neonBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              state.updateNode(node, nameCtrl.text, ipCtrl.text, macCtrl.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showCalibrationDialog(
     BuildContext context,
     String sensor,
@@ -2465,24 +2286,13 @@ class ControlTab extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(
-                                CupertinoIcons.settings,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () =>
-                                  _showEditNodeDialog(context, state, theme),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         _infoRow(
                           CupertinoIcons.wifi,
                           "IP Address",
-                          state.activeNode.ipAddress,
+                          state.deviceIp,
                           AppTheme.neonBlue,
                           theme,
                         ),
@@ -2539,7 +2349,7 @@ class ControlTab extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => DashboardScreen(
                         apiService: ApiService(
-                          baseUrl: 'http://${state.activeNode.ipAddress}/api',
+                          baseUrl: 'http://${state.deviceIp}/api',
                           authorizationHeader: state._basicAuthHeader,
                         ),
                       ),
@@ -3327,7 +3137,7 @@ class MyApp extends StatelessWidget {
           final state = context.read<AppStateProvider>();
           return DashboardScreen(
             apiService: ApiService(
-              baseUrl: 'http://${state.activeNode.ipAddress}/api',
+              baseUrl: 'http://${state.deviceIp}/api',
               authorizationHeader: state._basicAuthHeader,
             ),
           );

@@ -9,32 +9,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('login accepts device credentials and uses the selected IP', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final requests = <http.Request>[];
-    final client = MockClient((request) async {
-      requests.add(request);
-      return http.Response(
-        '{}',
-        request.headers['Authorization'] ==
-                'Basic ${base64Encode(utf8.encode('operator:secret'))}'
-            ? 200
-            : 401,
-      );
-    });
-    final state = AppStateProvider(prefs, client: client);
-    state.setLoginNodeIp('192.168.1.42');
+  test(
+    'login accepts device credentials and uses the saved device IP',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final requests = <http.Request>[];
+      final client = MockClient((request) async {
+        requests.add(request);
+        return http.Response(
+          '{}',
+          request.headers['Authorization'] ==
+                  'Basic ${base64Encode(utf8.encode('operator:secret'))}'
+              ? 200
+              : 401,
+        );
+      });
+      final state = AppStateProvider(prefs, client: client);
+      await state.saveDeviceIp('192.168.1.42');
 
-    expect(await state.login('operator', 'wrong'), isFalse);
-    expect(state.isAuthenticated, isFalse);
-    expect(await state.login('operator', 'secret'), isTrue);
-    expect(state.isAuthenticated, isTrue);
-    expect(requests.last.url.host, '192.168.1.42');
+      expect(await state.login('operator', 'wrong'), isFalse);
+      expect(state.isAuthenticated, isFalse);
+      expect(await state.login('operator', 'secret'), isTrue);
+      expect(state.isAuthenticated, isTrue);
+      expect(requests.last.url.host, '192.168.1.42');
 
-    state.dispose();
-    client.close();
-  });
+      state.dispose();
+      client.close();
+    },
+  );
 
   testWidgets('offline polls do not create sensor history', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -45,7 +48,7 @@ void main() {
           http.Response(online ? '{}' : 'Unavailable', online ? 200 : 503),
     );
     final state = AppStateProvider(prefs, client: client);
-    state.setLoginNodeIp('192.168.1.42');
+    await state.saveDeviceIp('192.168.1.42');
     expect(await state.login('operator', 'secret'), isTrue);
     online = false;
 
