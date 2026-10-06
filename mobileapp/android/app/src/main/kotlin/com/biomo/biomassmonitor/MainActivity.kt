@@ -1,4 +1,4 @@
-package com.example.biomass_iot_app
+package com.biomo.biomassmonitor
 
 import io.flutter.embedding.android.FlutterActivity
 

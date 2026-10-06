@@ -45,6 +45,61 @@ flutter analyze
 flutter test
 ```
 
+## How do I publish an Android release?
+
+Android requires every update for `com.biomo.biomassmonitor` to use the same
+signing key. Create the key outside the repository and keep an offline backup;
+losing it prevents future APKs from updating installations of the first release.
+
+```bash
+keytool -genkeypair -keystore ~/biomass-release.jks -alias biomass-release \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w 0 ~/biomass-release.jks
+```
+
+Add the encoded output and the passwords to these GitHub repository secrets:
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`,
+and `ANDROID_KEY_ALIAS`. Keep the keystore and its passwords out of the
+repository. The release workflow reconstructs them only on its runner.
+
+Publish a three-part numeric version tag after the normal checks pass:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+The workflow creates or updates the matching GitHub Release. It includes the
+firmware binary and `biomo-biomassmonitor-v1.2.3.apk`; a hardware archive is
+included only when matching hardware files exist. A manual workflow run must
+target a valid tag in the same `vMAJOR.MINOR.PATCH` format.
+
+## How do I inspect and update an APK?
+
+Download the APK from the GitHub Release page. Android Build Tools can check
+the signature and the package metadata before installation:
+
+```bash
+apksigner verify biomo-biomassmonitor-v1.2.3.apk
+aapt2 dump badging biomo-biomassmonitor-v1.2.3.apk
+```
+
+The output must identify `com.biomo.biomassmonitor`. Install later releases
+over the earlier APK on a device to confirm the retained signing key permits an
+update. APK distribution uses manual installation and does not provide Google
+Play or in-app updates.
+
+## What can prevent a release from working?
+
+Missing signing secrets, an invalid tag, failed Flutter analysis or tests, and
+missing firmware or APK artifacts stop publication. The workflow verifies the
+APK signature, application ID, version name, and version code before upload.
+
+`lib/firebase_options.dart` contains placeholder configuration. Register
+`com.biomo.biomassmonitor` with the intended Firebase project, regenerate that
+configuration, and smoke test Firebase features on an installed release before
+relying on them. The release workflow does not validate those runtime services.
+
 The app needs local network access to the device. This firmware connects to a
 configured Wi-Fi network; it does not implement access point provisioning,
 cloud telemetry, or over-the-air updates. Basic authentication travels over

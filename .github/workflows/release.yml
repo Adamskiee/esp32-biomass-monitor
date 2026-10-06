@@ -2,22 +2,22 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  firmware:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Cache Arduino data
-        uses: actions/cache@v6
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.arduino15
@@ -25,28 +25,113 @@ jobs:
           key: ${{ runner.os }}-arduino-${{ hashFiles('firmware/install_deps.sh') }}
           restore-keys: |
             ${{ runner.os }}-arduino-
-
-      - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v2
-
-      - name: Install ESP32 Core and Dependencies
-        run: ./firmware/install_deps.sh
-
-      - name: Compile Sketches and Export
-        run: arduino-cli compile --profile esp32 --warnings all --export-binaries firmware/main/
-
-      - name: Package Hardware Assets
+      - uses: arduino/setup-arduino-cli@v2
+      - run: ./firmware/install_deps.sh
+      - run: arduino-cli compile --profile esp32 --warnings all --export-binaries firmware/main/
+      - name: Collect firmware
         run: |
-          # Package specific release-ready files from the hardware directory
-          # Note: Fails gracefully if no such files exist yet, ensuring pipeline doesn't break
-          cd hardware
-          zip -r ../hardware-release.zip . -i "*.pdf" "*.zip" "*.csv" || true
-          cd ..
-
-      - name: Create GitHub Release and Upload Assets
-        uses: softprops/action-gh-release@v3
+          mkdir -p release-artifacts/firmware
+          find firmware/main/build -name '*.bin' -type f -exec cp {} release-artifacts/firmware/ \;
+          find release-artifacts/firmware -name '*.bin' -type f -print -quit | grep -q .
+      - name: Package hardware assets
+        run: |
+          mkdir -p release-artifacts/hardware
+          if find hardware -type f \( -name '*.pdf' -o -name '*.zip' -o -name '*.csv' \) -print -quit | grep -q .; then
+            (cd hardware && zip -r ../release-artifacts/hardware/hardware-release.zip . -i '*.pdf' '*.zip' '*.csv')
+          fi
+      - uses: actions/upload-artifact@v7
         with:
-          files: |
-            firmware/main/build/esp32.esp32.esp32/*.bin
-            hardware-release*.zip
+          name: firmware
+          path: release-artifacts/firmware/*.bin
+          if-no-files-found: error
+          overwrite: true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hardware
+          path: release-artifacts/hardware/*.zip
+          if-no-files-found: ignore
+          overwrite: true
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate release tag
+        run: mobileapp/tool/release_tag.sh "$GITHUB_REF_TYPE" "$GITHUB_REF_NAME" > "$RUNNER_TEMP/version"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Check signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          for secret in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEY_ALIAS; do
+            test -n "${!secret}" || { echo "Missing required signing secret: $secret" >&2; exit 1; }
+          done
+      - name: Build and test Android APK
+        working-directory: mobileapp
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          EOF
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build apk --release --build-name "$(cat "$RUNNER_TEMP/version")" --build-number "$GITHUB_RUN_NUMBER"
+      - name: Verify and stage APK
+        working-directory: mobileapp
+        run: |
+          build_tools="$ANDROID_HOME/build-tools/$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -1)"
+          export PATH="$build_tools:$PATH"
+          version=$(cat "$RUNNER_TEMP/version")
+          tool/verify_release_apk.sh build/app/outputs/flutter-apk/app-release.apk com.biomo.biomassmonitor "$version" "$GITHUB_RUN_NUMBER"
+          mkdir -p release-artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/biomo-biomassmonitor-$GITHUB_REF_NAME.apk"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: apk
+          path: mobileapp/release-artifacts/biomo-biomassmonitor-${{ github.ref_name }}.apk
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    needs: [firmware, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate release tag
+        run: mobileapp/tool/release_tag.sh "$GITHUB_REF_TYPE" "$GITHUB_REF_NAME" > /dev/null
+      - uses: actions/download-artifact@v8
+        with:
+          path: downloaded-artifacts
+      - name: Stage required release assets
+        run: |
+          mkdir release-assets
+          find downloaded-artifacts -name '*.bin' -type f -exec cp {} release-assets/ \;
+          find downloaded-artifacts -name '*.zip' -type f -exec cp {} release-assets/ \;
+          cp "downloaded-artifacts/apk/biomo-biomassmonitor-$GITHUB_REF_NAME.apk" release-assets/
+          find release-assets -name '*.bin' -type f -print -quit | grep -q .
+          test -f "release-assets/biomo-biomassmonitor-$GITHUB_REF_NAME.apk"
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
+          files: release-assets/*
