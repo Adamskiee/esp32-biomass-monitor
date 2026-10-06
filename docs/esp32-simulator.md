@@ -20,25 +20,43 @@ both `demo`. The simulator prints its address and available terminal commands.
 Stop it with `quit` or an end-of-input signal. State lives in memory and returns
 to defaults when the process starts again.
 
-Use these options if you need a different listener or credentials:
+For computer-only use, you can change the port or credentials:
 
 ```bash
-python3 -m simulator --host 127.0.0.1 --port 8766 --user local --password secret
+python3 -m simulator --port 8766 --user local --password secret
 ```
 
-## How do I connect the app?
+This still listens on `127.0.0.1`, which a physical phone cannot reach.
+Use the network listener below when connecting a phone.
+
+## How do I connect an Android emulator?
 
 1. Start the simulator on the computer running the Android emulator.
 2. Enter `10.0.2.2:8765` as the ESP32 address in the app. The emulator uses
    `10.0.2.2` to reach the host computer's loopback listener.
 3. Log in with `demo` / `demo` and open the dashboard.
 
-For a physical phone on the same trusted Wi-Fi network, start the simulator
-with `python3 -m simulator --host 0.0.0.0`. Enter the computer's local IP
-address followed by `:8765` in the app, such as `192.168.1.50:8765`. Allow
-inbound traffic to that port in the computer's firewall if needed. Binding to
-`0.0.0.0` makes the simulator reachable from the local network, so use it only
-on a trusted network. Basic authentication travels over plain HTTP.
+## How do I connect a physical phone?
+
+The default listener accepts connections from the computer only. For a phone
+on the same trusted Wi-Fi network, run this from the repository root and keep
+the terminal open:
+
+```bash
+python3 -m simulator --host 0.0.0.0 --port 8765
+```
+
+Find the computer's Wi-Fi IPv4 address. On Linux, `ip -4 addr` lists it beside
+the active Wi-Fi interface. For example, if the address is `192.168.1.50`,
+enter **`192.168.1.50:8765`** in the app and log in with `demo` / `demo`.
+Enter only the address and port, without `http://` or `/api`. Use the port
+printed by the simulator if you changed `--port`.
+
+`127.0.0.1` refers to the phone itself, and `10.0.2.2` works only inside the
+Android emulator. `0.0.0.0` is the server's bind address, not the address to
+enter in the app. Binding to it makes the simulator reachable on the local
+network. Use it only on a trusted network because Basic authentication travels
+over plain HTTP.
 
 ## Which scenarios can I show?
 
@@ -83,13 +101,19 @@ python3 -m unittest discover -s simulator/tests -v
 
 ## What if the app cannot connect?
 
+- First open `http://<computer-ip>:8765/api/state` in the phone's browser,
+  replacing `<computer-ip>` with the computer's Wi-Fi IPv4 address. A login
+  prompt followed by JSON confirms the phone can reach the simulator. Use the
+  same address and credentials in the app.
+- If the phone's browser cannot connect, confirm the simulator printed
+  `http://0.0.0.0:8765/api`, the phone and computer use the same Wi-Fi network,
+  and the computer's firewall allows inbound TCP traffic on port `8765`.
+  Guest Wi-Fi or client isolation can also block devices on the same network.
 - A `401` response means the username or password does not match the
   simulator's startup credentials. Check any `--user` or `--password` options.
 - A connection refusal usually means the simulator is stopped or the address
-  or port is wrong. Use `10.0.2.2` for the Android emulator, or the computer's
-  local IP for a physical phone.
-- If a phone times out, check that the phone and computer share a network,
-  the server was started with `--host 0.0.0.0`, and the firewall allows the port.
+  or port is wrong. A listener bound to `127.0.0.1` also refuses connections
+  through the computer's Wi-Fi address.
 - A `503` response is expected after selecting `offline`. Enter `normal` or
   another scenario to reconnect.
 - If startup says the port is already in use, stop the other listener or set
