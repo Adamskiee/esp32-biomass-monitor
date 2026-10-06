@@ -17,6 +17,15 @@ import 'firebase_options.dart';
 import 'database_helper.dart';
 import 'api_service.dart';
 import 'dashboard.dart';
+import 'app/app_theme.dart';
+import 'core/widgets/fluid_tile_grid.dart';
+import 'core/widgets/glass_container.dart';
+import 'core/widgets/glowing_card.dart';
+import 'features/alerts/alert_item.dart';
+import 'features/alerts/alert_timestamp.dart';
+import 'features/monitoring/sensor_data.dart';
+import 'features/monitoring/widgets/sensor_metric_card.dart';
+import 'features/safety/audit_log.dart';
 export 'dashboard.dart';
 
 void main() async {
@@ -41,138 +50,6 @@ void main() async {
       child: const MyApp(),
     ),
   );
-}
-
-// ==========================================
-// 1. DYNAMIC THEME ENGINE & UI CONSTANTS
-// ==========================================
-class AppTheme {
-  static const Color backgroundDark = Color(
-    0xFF090A0F,
-  ); // Deeper, richer background
-  static const Color cardDark = Color(0xFF12141D); // Sleeker card color
-  static const Color cardBorder = Color(0xFF1F2433); // Subtle border
-
-  static const Color neonGreen = Color(0xFF30D158);
-  static const Color neonBlue = Color(0xFF0A84FF);
-  static const Color neonOrange = Color(0xFFFF9F0A);
-  static const Color neonRed = Color(0xFFFF453A);
-  static const Color neonPurple = Color(0xFFBF5AF2);
-
-  static ThemeData getDarkTheme() {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: backgroundDark,
-      cardColor: cardDark,
-      dividerColor: cardBorder,
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      colorScheme: const ColorScheme.dark(
-        primary: neonGreen,
-        surface: backgroundDark,
-      ),
-    );
-  }
-
-  static ThemeData getLightTheme() {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.light,
-      scaffoldBackgroundColor: const Color(0xFFF8FAFC), // Cleaner light mode bg
-      cardColor: const Color(0xFFFFFFFF),
-      dividerColor: const Color(0xFFE2E8F0),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
-      colorScheme: const ColorScheme.light(
-        primary: neonGreen,
-        surface: Color(0xFFF8FAFC),
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 2. DATA MODELS
-// ==========================================
-class SensorData {
-  final double? temperatureC, chamberTempC, mq135V, mq2V;
-  final DateTime timestamp;
-
-  SensorData({
-    this.temperatureC,
-    this.chamberTempC,
-    this.mq135V,
-    this.mq2V,
-    required this.timestamp,
-  });
-
-  factory SensorData.fromJson(Map<String, dynamic> json) {
-    return SensorData(
-      temperatureC: json['temperature_c'] != null
-          ? (json['temperature_c'] as num).toDouble()
-          : null,
-      chamberTempC: json['chamber_temp_c'] != null
-          ? (json['chamber_temp_c'] as num).toDouble()
-          : null,
-      mq135V: json['mq135_v'] != null
-          ? (json['mq135_v'] as num).toDouble()
-          : null,
-      mq2V: json['mq2_v'] != null ? (json['mq2_v'] as num).toDouble() : null,
-      timestamp: DateTime.now(),
-    );
-  }
-}
-
-class AlertItem {
-  final String id, title, description, severity;
-  final DateTime? timestamp;
-
-  AlertItem({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.severity,
-    required this.timestamp,
-  });
-}
-
-String formatAlertTimestamp(DateTime? timestamp, {DateTime? now}) {
-  if (timestamp == null) return 'Timestamp unavailable';
-
-  final elapsed = (now ?? DateTime.now()).difference(timestamp);
-  if (elapsed.inMinutes < 1) return 'Just now';
-  if (elapsed.inHours < 1) {
-    final minutes = elapsed.inMinutes;
-    return '$minutes ${minutes == 1 ? 'minute' : 'minutes'} ago';
-  }
-  if (elapsed.inHours < 24) {
-    final hours = elapsed.inHours;
-    return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
-  }
-  if (elapsed.inDays < 7) {
-    final days = elapsed.inDays;
-    return '$days ${days == 1 ? 'day' : 'days'} ago';
-  }
-
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return '${months[timestamp.month - 1]} ${timestamp.day}, ${timestamp.year}';
-}
-
-class AuditLog {
-  final String action, user, timestamp;
-  AuditLog(this.action, this.user, this.timestamp);
 }
 
 class IoTNode {
@@ -526,12 +403,12 @@ class SettingsProvider extends ChangeNotifier {
 // ==========================================
 // 4. RESPONSIVE FLUID LAYOUT & GLASS COMPONENTS
 // ==========================================
-class FluidTileGrid extends StatelessWidget {
+class LegacyFluidTileGrid extends StatelessWidget {
   final List<Widget> children;
   final double minTileWidth;
   final double spacing;
 
-  const FluidTileGrid({
+  const LegacyFluidTileGrid({
     super.key,
     required this.children,
     this.minTileWidth = 160.0,
@@ -563,12 +440,12 @@ class FluidTileGrid extends StatelessWidget {
   }
 }
 
-class GlowingCard extends StatefulWidget {
+class LegacyGlowingCard extends StatefulWidget {
   final Widget child;
   final Color glowColor;
   final EdgeInsetsGeometry padding;
 
-  const GlowingCard({
+  const LegacyGlowingCard({
     super.key,
     required this.child,
     this.glowColor = AppTheme.neonGreen,
@@ -576,10 +453,10 @@ class GlowingCard extends StatefulWidget {
   });
 
   @override
-  State<GlowingCard> createState() => _GlowingCardState();
+  State<LegacyGlowingCard> createState() => _LegacyGlowingCardState();
 }
 
-class _GlowingCardState extends State<GlowingCard> {
+class _LegacyGlowingCardState extends State<LegacyGlowingCard> {
   bool _isHovered = false;
 
   @override
@@ -633,13 +510,13 @@ class _GlowingCardState extends State<GlowingCard> {
   }
 }
 
-class GlassContainer extends StatelessWidget {
+class LegacyGlassContainer extends StatelessWidget {
   final Widget child;
   final double borderRadius;
   final Color? color;
   final bool hasBorder;
 
-  const GlassContainer({
+  const LegacyGlassContainer({
     super.key,
     required this.child,
     this.borderRadius = 20,
@@ -1844,8 +1721,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-class SensorMetricCard extends StatelessWidget {
-  const SensorMetricCard({
+class LegacySensorMetricCard extends StatelessWidget {
+  const LegacySensorMetricCard({
     super.key,
     required this.title,
     required this.value,
