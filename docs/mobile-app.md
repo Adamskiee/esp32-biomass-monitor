@@ -36,9 +36,11 @@ reports the commanded relay output, so it does not confirm that the pump ran or
 that water flowed.
 
 The main telemetry view shows no live readings while the ESP32 is disconnected.
-It stores history only from successful responses and creates gas alerts from
-firmware triggers. MQ sensor values are voltages; the app does not calculate a
-certified air quality index or carbon monoxide concentration from them.
+It stores history, alerts, and audit logs locally in `biomass_iot.db` only from
+successful responses. The app keeps one saved device IP; it does not keep a
+node list or save credentials. MQ sensor values are voltages; the app does not
+calculate a certified air quality index or carbon monoxide concentration from
+them.
 
 The safety dashboard sends threshold changes to `POST /api/thresholds`. The
 firmware also accepts `/api/settings` for older clients, with the same
@@ -100,11 +102,6 @@ Play or in-app updates.
 Missing signing secrets, an invalid tag, failed Flutter analysis or tests, and
 missing firmware or APK artifacts stop publication. The workflow verifies the
 APK signature, application ID, version name, and version code before upload.
-
-`lib/firebase_options.dart` contains placeholder configuration. Register
-`com.biomo.biomassmonitor` with the intended Firebase project, regenerate that
-configuration, and smoke test Firebase features on an installed release before
-relying on them. The release workflow does not validate those runtime services.
 
 The app needs local network access to the device. This firmware connects to a
 configured Wi-Fi network; it does not implement access point provisioning,

@@ -1,0 +1,419 @@
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+class MonitorTab extends StatefulWidget {
+  const MonitorTab({super.key});
+  @override
+  State<MonitorTab> createState() => _MonitorTabState();
+}
+
+class _MonitorTabState extends State<MonitorTab> {
+  int _segIndex = 0;
+
+  void _exportCSV(
+    BuildContext context,
+    ThemeData theme,
+    List<SensorData> history,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Export Telemetry Data",
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Select the parameters for your CSV report.",
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            ListTile(
+              title: Text(
+                "Date Range",
+                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              ),
+              trailing: const Text(
+                "Current Session",
+                style: TextStyle(color: AppTheme.neonGreen),
+              ),
+              tileColor: theme.scaffoldBackgroundColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              title: Text(
+                "Include Sensors",
+                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              ),
+              trailing: const Text(
+                "Temperature, chamber, MQ135, MQ2",
+                style: TextStyle(color: AppTheme.neonGreen),
+              ),
+              tileColor: theme.scaffoldBackgroundColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.neonGreen,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(CupertinoIcons.share),
+                label: const Text(
+                  "GENERATE & SHARE CSV",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _generateAndShareCSV(history);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _generateAndShareCSV(List<SensorData> history) {
+    if (history.isEmpty) return;
+    StringBuffer csv = StringBuffer();
+    csv.writeln(
+      "Timestamp,Temperature(C),ChamberTemperature(C),MQ135(V),MQ2(V)",
+    );
+    for (var d in history) {
+      csv.writeln(
+        "${d.timestamp.toIso8601String()},${d.temperatureC?.toStringAsFixed(2) ?? ''},${d.chamberTempC?.toStringAsFixed(2) ?? ''},${d.mq135V?.toStringAsFixed(2) ?? ''},${d.mq2V?.toStringAsFixed(2) ?? ''}",
+      );
+    }
+    // ignore: deprecated_member_use
+    Share.share(csv.toString(), subject: 'Biomass_Telemetry_Export.csv');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppStateProvider>();
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: CupertinoSegmentedControl<int>(
+                    selectedColor: AppTheme.neonGreen,
+                    borderColor: AppTheme.neonGreen,
+                    unselectedColor: theme.cardColor,
+                    groupValue: _segIndex,
+                    children: const {
+                      0: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text("Sensors Log"),
+                      ),
+                      1: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text("Air Quality"),
+                      ),
+                    },
+                    onValueChanged: (val) => setState(() => _segIndex = val),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _segIndex == 0
+                      ? _buildSensorsView(state, theme)
+                      : state.isHardwareConnected
+                      ? _buildAirQualityView(state.currentData, theme)
+                      : const Center(
+                          child: Text(
+                            'ESP32 disconnected. Air quality is unavailable.',
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSensorsView(AppStateProvider state, ThemeData theme) {
+    final stats = state.getSessionAnalytics();
+    final isCompact = MediaQuery.of(context).size.width < 600;
+
+    return ListView(
+      key: const ValueKey(0),
+      padding: EdgeInsets.only(
+        left: isCompact ? 16 : 24,
+        right: isCompact ? 16 : 24,
+        bottom: 100,
+      ),
+      children: [
+        Text(
+          "Session Analytics",
+          style: TextStyle(
+            color: theme.textTheme.bodyLarge?.color,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        const SizedBox(height: 16),
+        FluidTileGrid(
+          minTileWidth: 200,
+          children: [
+            _statCard(
+              "Peak Temp",
+              "${stats['maxT']} °C",
+              AppTheme.neonOrange,
+              theme,
+            ),
+            _statCard(
+              "Peak MQ2",
+              "${stats['maxMq2']} V",
+              AppTheme.neonRed,
+              theme,
+            ),
+            _statCard(
+              "Avg Temp",
+              "${stats['avgT']} °C",
+              AppTheme.neonOrange,
+              theme,
+            ),
+            _statCard(
+              "Avg MQ2",
+              "${stats['avgMq2']} V",
+              AppTheme.neonRed,
+              theme,
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Sensor Data Log",
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                CupertinoIcons.arrow_down_doc,
+                color: AppTheme.neonGreen,
+              ),
+              onPressed: () => _exportCSV(context, theme, state.history),
+              tooltip: "Export CSV",
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ...state.history.reversed.map(
+          (log) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.dividerColor),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Telemetry Record",
+                      style: TextStyle(
+                        color: theme.textTheme.bodyLarge?.color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Chamber: ${log.chamberTempC?.toStringAsFixed(1) ?? '--'}°C | MQ2: ${log.mq2V?.toStringAsFixed(2) ?? '--'}V | Temp: ${log.temperatureC?.toStringAsFixed(1) ?? '--'}°C",
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
+                ),
+                Text(
+                  "${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard(String title, String val, Color color, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            val,
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAirQualityView(SensorData data, ThemeData theme) {
+    final isCompact = MediaQuery.of(context).size.width < 600;
+
+    return ListView(
+      key: const ValueKey(1),
+      padding: EdgeInsets.only(
+        left: isCompact ? 16 : 24,
+        right: isCompact ? 16 : 24,
+        bottom: 100,
+      ),
+      children: [
+        Text(
+          "Reported Gas Sensor Voltages",
+          style: TextStyle(
+            color: theme.textTheme.bodyLarge?.color,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _pollutantBar(
+          "MQ135 Gas Voltage",
+          (data.mq135V ?? 0) / 5.0,
+          AppTheme.neonOrange,
+          "${(data.mq135V ?? 0).toStringAsFixed(2)} V",
+          theme,
+        ),
+        const SizedBox(height: 24),
+        _pollutantBar(
+          "MQ2 Smoke/Gas Voltage",
+          (data.mq2V ?? 0) / 5.0,
+          AppTheme.neonPurple,
+          "${(data.mq2V ?? 0).toStringAsFixed(2)} V",
+          theme,
+        ),
+      ],
+    );
+  }
+
+  Widget _pollutantBar(
+    String label,
+    double percent,
+    Color color,
+    String valLabel,
+    ThemeData theme,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              valLabel,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 1000),
+          curve: Curves.easeOutCubic,
+          tween: Tween<double>(begin: 0.0, end: percent.clamp(0.0, 1.0)),
+          builder: (context, value, _) => ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: value,
+              backgroundColor: theme.dividerColor.withValues(alpha: 0.5),
+              color: color,
+              minHeight: 14,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==========================================
+// TAB 3: CONTROL (NETWORK, AUDIT LOG & CALIBRATION)
+// ==========================================

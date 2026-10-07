@@ -5,7 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'main.dart'; // To access SensorData, AlertItem, AuditLog models
+import 'features/alerts/alert_item.dart';
+import 'features/monitoring/sensor_data.dart';
+import 'features/safety/audit_log.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
