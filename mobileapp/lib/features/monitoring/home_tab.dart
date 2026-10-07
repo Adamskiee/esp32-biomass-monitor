@@ -55,6 +55,7 @@ class _HomeTabState extends State<HomeTab> {
       (state) => state.isHardwareConnected,
     );
     context.select<AppStateProvider, int>((state) => state.telemetryRevision);
+    context.select<AppStateProvider, int>((state) => state.history.length);
     final state = context.read<AppStateProvider>();
     final theme = Theme.of(context);
     final isCompact = MediaQuery.of(context).size.width < 600;
