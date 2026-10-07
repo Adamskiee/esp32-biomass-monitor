@@ -70,8 +70,9 @@ void main() {
   Future<void> mount(
     WidgetTester tester, {
     Widget child = const MainWrapper(),
+    Size size = const Size(450, 900),
   }) async {
-    tester.view.physicalSize = const Size(450, 900);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -89,6 +90,48 @@ void main() {
     state.dispose();
     client.close();
   }
+
+  testWidgets('mobile navigation has no backdrop blur', (tester) async {
+    await initialize(tester);
+    await mount(tester);
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    expect(
+      find.descendant(
+        of: find.byWidget(scaffold.bottomNavigationBar!),
+        matching: find.byType(BackdropFilter),
+      ),
+      findsNothing,
+    );
+    await dispose(tester);
+  });
+
+  testWidgets('desktop navigation uses the sidebar', (tester) async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    // Navigation assertions do not need the sidebar's remote font download.
+    messenger.setMockMessageHandler('flutter/assets', (message) async {
+      final asset = utf8.decode(message!.buffer.asUint8List());
+      if (asset == 'AssetManifest.bin') {
+        return const StandardMessageCodec().encodeMessage({
+          'Inter-Bold.ttf': [
+            {'asset': 'Inter-Bold.ttf'},
+          ],
+        });
+      }
+      if (asset == 'Inter-Bold.ttf') return ByteData(0);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMessageHandler('flutter/assets', null));
+    await initialize(tester);
+    await mount(tester, size: const Size(1200, 900));
+    expect(find.byType(BottomNavigationBar), findsNothing);
+    expect(find.text('Home Dashboard'), findsOneWidget);
+    expect(find.text('Air Quality Monitor'), findsOneWidget);
+    expect(find.text('System Control'), findsOneWidget);
+    expect(find.text('Active Alerts'), findsOneWidget);
+    expect(find.text('Settings & Admin'), findsOneWidget);
+    await dispose(tester);
+  });
 
   testWidgets('Monitor remains selected through the tab transition', (
     tester,
@@ -218,10 +261,11 @@ void main() {
           if (call.method == 'openDatabase') return {'id': 1};
           if (call.method != 'query') return null;
           final sql = (call.arguments as Map)['sql'] as String;
-          if (sql == 'PRAGMA user_version')
+          if (sql == 'PRAGMA user_version') {
             return [
               {'user_version': 2},
             ];
+          }
           if (sql.contains('sensor_data')) return storedHistory.future;
           return <Map<String, Object?>>[];
         });

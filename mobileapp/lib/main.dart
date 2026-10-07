@@ -1328,9 +1328,19 @@ class _MainWrapperState extends State<MainWrapper> {
       bottomNavigationBar: !isDesktop
           ? Padding(
               padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-              child: GlassContainer(
-                borderRadius: 30,
-                color: theme.cardColor.withValues(alpha: 0.85),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: theme.dividerColor, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 30,
+                      spreadRadius: -5,
+                    ),
+                  ],
+                ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
