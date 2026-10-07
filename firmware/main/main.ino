@@ -29,24 +29,26 @@ void loop() {
     // Block main loop to read hardware sensors
     float t_mq135 = readMQ135Voltage();
     float t_mq2 = readMQ2Voltage();
-    float t_temp = readTemperature();
-    float t_chamber = readThermocouple();
+    const DigitalSensorReadings digital = readDigitalSensors();
 
     char tempStr[16];
-    if (isnan(t_temp)) {
+    if (isnan(digital.temperature_c)) {
       snprintf(tempStr, sizeof(tempStr), "ERR");
     } else {
-      snprintf(tempStr, sizeof(tempStr), "%.1fC", t_temp);
+      snprintf(tempStr, sizeof(tempStr), "%.1fC", digital.temperature_c);
     }
 
     Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %s | Chamber: %.1fC\n",
-                  t_mq135, t_mq2, tempStr, t_chamber);
+                  t_mq135, t_mq2, tempStr, digital.chamber_temp_c);
 
     bool do_save = false;
     static float safe_chamber_limit = 80.0;
     static float safe_mq2_limit = 2.5;
 
-    processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2);
+    processSensorReadings(
+        digital.temperature_c, digital.humidity_percent,
+        digital.chamber_temp_c, t_mq135, t_mq2, digital.pm1_ug_m3,
+        digital.pm25_ug_m3, digital.pm10_ug_m3);
 
     // Grab safe copies for persistence without holding the mutex during flash
     // writes

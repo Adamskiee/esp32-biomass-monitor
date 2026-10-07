@@ -20,9 +20,13 @@ extern float threshold_chamber_temp_c;
 extern float threshold_mq2_v;
 // Cached Sensor Readings (API reads these instead of blocking)
 extern float current_temp_c;
+extern float current_humidity_percent;
 extern float current_chamber_c;
 extern float current_mq135_v;
 extern float current_mq2_v;
+extern int current_pm1_ug_m3;
+extern int current_pm25_ug_m3;
+extern int current_pm10_ug_m3;
 
 extern bool state_needs_save;
 extern SemaphoreHandle_t stateMutex;
@@ -47,8 +51,9 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit, float mq2_limit);
 ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
-void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
-                           float mq2_v);
+void processSensorReadings(float temperature_c, float humidity_percent,
+                           float chamber_c, float mq135_v, float mq2_v,
+                           int pm1_ug_m3, int pm25_ug_m3, int pm10_ug_m3);
 // On Arduino, the caller must hold stateMutex while evaluating outputs.
 void evaluateSafetyLoop();
 void updateActuatorTransitions();

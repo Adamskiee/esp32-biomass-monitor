@@ -1,34 +1,37 @@
 #include "DigitalSensors.h"
+#include <Adafruit_PM25AQI.h>
 #include <BiomassConfig.h>
 #include <DHT.h>
 #include <max6675.h>
 
 static DHT dht(PIN_DHT22, DHT22);
 static MAX6675 thermocouple(PIN_MAX6675_SCK, PIN_MAX6675_CS, PIN_MAX6675_SO);
+static Adafruit_PM25AQI pms;
+static bool pms_initialized = false;
 
 void initDigitalSensors() {
   dht.begin();
   Serial2.begin(9600, SERIAL_8N1, PIN_PM25_RX, PIN_PM25_TX);
+  pms_initialized = pms.begin_UART(&Serial2);
 }
 
-float readTemperature() {
-  return dht.readTemperature();
-}
+DigitalSensorReadings readDigitalSensors() {
+  const float temperature_c = dht.readTemperature();
+  const float humidity_percent = dht.readHumidity();
+  DigitalSensorReadings readings = {NAN, NAN, thermocouple.readCelsius(), -1,
+                                    -1, -1};
 
-float readHumidity() {
-  return dht.readHumidity();
-}
-
-float readThermocouple() {
-  return thermocouple.readCelsius();
-}
-
-int readPM25() {
-  // TODO: Implement real PM2.5 serial frame parsing
-  // Dummy implementation for PM2.5 frame reading
-  if (Serial2.available()) {
-    while(Serial2.available()) Serial2.read(); // flush for now
-    return 25; // mock value
+  if (isfinite(temperature_c) && isfinite(humidity_percent)) {
+    readings.temperature_c = temperature_c;
+    readings.humidity_percent = humidity_percent;
   }
-  return -1;
+
+  PM25_AQI_Data data;
+  if (pms_initialized && pms.read(&data)) {
+    readings.pm1_ug_m3 = data.pm10_env;
+    readings.pm25_ug_m3 = data.pm25_env;
+    readings.pm10_ug_m3 = data.pm100_env;
+  }
+
+  return readings;
 }

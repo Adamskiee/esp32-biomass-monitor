@@ -45,6 +45,10 @@ void initApiServer() {
       doc["temperature_c"] = nullptr;
     else
       doc["temperature_c"] = current_temp_c;
+    if (isnan(current_humidity_percent))
+      doc["humidity_percent"] = nullptr;
+    else
+      doc["humidity_percent"] = current_humidity_percent;
     if (isnan(current_chamber_c))
       doc["chamber_temp_c"] = nullptr;
     else
@@ -57,6 +61,18 @@ void initApiServer() {
       doc["mq2_v"] = nullptr;
     else
       doc["mq2_v"] = current_mq2_v;
+    if (current_pm1_ug_m3 < 0)
+      doc["pm1_ug_m3"] = nullptr;
+    else
+      doc["pm1_ug_m3"] = current_pm1_ug_m3;
+    if (current_pm25_ug_m3 < 0)
+      doc["pm25_ug_m3"] = nullptr;
+    else
+      doc["pm25_ug_m3"] = current_pm25_ug_m3;
+    if (current_pm10_ug_m3 < 0)
+      doc["pm10_ug_m3"] = nullptr;
+    else
+      doc["pm10_ug_m3"] = current_pm10_ug_m3;
     doc["threshold_chamber_temp_c"] = threshold_chamber_temp_c;
     doc["threshold_mq2_v"] = threshold_mq2_v;
     doc["fan_on"] = current_fan_state;

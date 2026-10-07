@@ -9,9 +9,13 @@ float threshold_chamber_temp_c = 80.0;
 float threshold_mq2_v = 2.5;
 
 float current_temp_c = NAN;
+float current_humidity_percent = NAN;
 float current_chamber_c = NAN;
 float current_mq135_v = NAN;
 float current_mq2_v = NAN;
+int current_pm1_ug_m3 = -1;
+int current_pm25_ug_m3 = -1;
+int current_pm10_ug_m3 = -1;
 
 bool state_needs_save = false;
 
@@ -114,16 +118,21 @@ ManualSprinklerResult applyManualSprinklerCommand(bool enabled) {
   return ManualSprinklerResult::Accepted;
 }
 
-void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
-                           float mq2_v) {
+void processSensorReadings(float temperature_c, float humidity_percent,
+                           float chamber_c, float mq135_v, float mq2_v,
+                           int pm1_ug_m3, int pm25_ug_m3, int pm10_ug_m3) {
   if (stateMutex != nullptr) {
     xSemaphoreTake(stateMutex, portMAX_DELAY);
   }
 
   current_temp_c = temperature_c;
+  current_humidity_percent = humidity_percent;
   current_chamber_c = chamber_c;
   current_mq135_v = mq135_v;
   current_mq2_v = mq2_v;
+  current_pm1_ug_m3 = pm1_ug_m3;
+  current_pm25_ug_m3 = pm25_ug_m3;
+  current_pm10_ug_m3 = pm10_ug_m3;
 
   evaluateSafetyLoop();
 

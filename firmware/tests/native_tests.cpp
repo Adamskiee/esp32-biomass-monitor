@@ -182,7 +182,33 @@ void testLedFollowsLatchedTemperatureDanger() {
 void testProcessingSensorReadingsEvaluatesSafety() {
   const char *name = "processing sensor readings evaluates safety";
   resetSafetyState();
-  processSensorReadings(28.0f, 85.0f, 1.2f, 0.5f);
+  processSensorReadings(28.0f, 55.0f, 85.0f, 1.2f, 0.5f, 10, 20, 30);
+  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
+}
+
+void testProcessingSensorReadingsCachesEnvironmentalValues() {
+  const char *name = "processing sensor readings caches environmental values";
+  resetSafetyState();
+  processSensorReadings(28.0f, 55.0f, 85.0f, 1.2f, 0.5f, 10, 20, 30);
+  EXPECT_TRUE(name, current_temp_c == 28.0f);
+  EXPECT_TRUE(name, current_humidity_percent == 55.0f);
+  EXPECT_TRUE(name, current_chamber_c == 85.0f);
+  EXPECT_TRUE(name, current_mq135_v == 1.2f);
+  EXPECT_TRUE(name, current_mq2_v == 0.5f);
+  EXPECT_TRUE(name, current_pm1_ug_m3 == 10);
+  EXPECT_TRUE(name, current_pm25_ug_m3 == 20);
+  EXPECT_TRUE(name, current_pm10_ug_m3 == 30);
+}
+
+void testProcessingSensorReadingsCachesEnvironmentalFailures() {
+  const char *name = "processing sensor readings caches environmental failures";
+  resetSafetyState();
+  processSensorReadings(28.0f, NAN, 85.0f, 1.2f, 0.5f, -1, -1, -1);
+  EXPECT_TRUE(name, std::isnan(current_humidity_percent));
+  EXPECT_TRUE(name, current_pm1_ug_m3 == -1);
+  EXPECT_TRUE(name, current_pm25_ug_m3 == -1);
+  EXPECT_TRUE(name, current_pm10_ug_m3 == -1);
   EXPECT_TRUE(name, current_solenoid_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
@@ -493,6 +519,10 @@ int main() {
       testLedFollowsLatchedTemperatureDanger);
   run("processing sensor readings evaluates safety",
       testProcessingSensorReadingsEvaluatesSafety);
+  run("processing sensor readings caches environmental values",
+      testProcessingSensorReadingsCachesEnvironmentalValues);
+  run("processing sensor readings caches environmental failures",
+      testProcessingSensorReadingsCachesEnvironmentalFailures);
   run("temperature danger reasserts sprinkler request",
       testTemperatureDangerReassertsSprinklerRequest);
   run("temperature hysteresis", testTemperatureHysteresis);
