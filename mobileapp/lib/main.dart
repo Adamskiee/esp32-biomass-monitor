@@ -208,6 +208,7 @@ class AppStateProvider extends ChangeNotifier {
 
   SensorData _currentData = SensorData(timestamp: DateTime.now());
   final List<SensorData> _history = [];
+  int _telemetryRevision = 0;
   final List<AlertItem> _alerts = [];
   final List<AuditLog> _auditLogs = [
     AuditLog("System Initialized", "SYSTEM", "08:00 AM"),
@@ -261,6 +262,7 @@ class AppStateProvider extends ChangeNotifier {
   List<IoTNode> get availableNodes => _availableNodes;
   SensorData get currentData => _currentData;
   List<SensorData> get history => _history;
+  int get telemetryRevision => _telemetryRevision;
   List<AlertItem> get alerts => _alerts;
   List<AuditLog> get auditLogs => _auditLogs;
 
@@ -444,6 +446,7 @@ class AppStateProvider extends ChangeNotifier {
 
       _history.add(_currentData);
       if (_history.length > 60) _history.removeAt(0);
+      _telemetryRevision++;
       DatabaseHelper().insertSensorData(_currentData);
 
       if (gasDanger &&
@@ -1084,13 +1087,32 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppStateProvider>();
+    final currentTab = context.select<AppStateProvider, int>(
+      (state) => state.currentTab,
+    );
+    final isHardwareConnected = context.select<AppStateProvider, bool>(
+      (state) => state.isHardwareConnected,
+    );
+    final activeNode = context
+        .select<AppStateProvider, ({String id, String ip})>(
+          (state) => (id: state.activeNode.id, ip: state.activeNode.ipAddress),
+        );
+    final availableNodes = context
+        .select<AppStateProvider, List<({String id, String name})>>(
+          (state) => state.availableNodes
+              .map((node) => (id: node.id, name: node.name))
+              .toList(),
+        );
+    final alertCount = context.select<AppStateProvider, int>(
+      (state) => state.alerts.length,
+    );
     final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width > 850;
 
-    Widget offlineBanner = !state.isHardwareConnected
+    Widget offlineBanner = !isHardwareConnected
         ? GestureDetector(
-            onTap: () => state.startLiveTelemetryStream(),
+            onTap: () =>
+                context.read<AppStateProvider>().startLiveTelemetryStream(),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -1106,7 +1128,7 @@ class _MainWrapperState extends State<MainWrapper> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      "Hardware Offline: Tap to reconnect to ${state.activeNode.ipAddress}",
+                      "Hardware Offline: Tap to reconnect to ${activeNode.ip}",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -1130,9 +1152,9 @@ class _MainWrapperState extends State<MainWrapper> {
         border: Border.all(color: theme.dividerColor),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<IoTNode>(
+        child: DropdownButton<String>(
           isExpanded: true,
-          value: state.activeNode,
+          value: activeNode.id,
           dropdownColor: theme.cardColor,
           icon: const Icon(
             CupertinoIcons.chevron_down,
@@ -1144,13 +1166,18 @@ class _MainWrapperState extends State<MainWrapper> {
             fontWeight: FontWeight.bold,
             color: theme.textTheme.bodyLarge?.color,
           ),
-          items: state.availableNodes
+          items: availableNodes
               .map(
-                (node) => DropdownMenuItem(value: node, child: Text(node.name)),
+                (node) =>
+                    DropdownMenuItem(value: node.id, child: Text(node.name)),
               )
               .toList(),
-          onChanged: (node) {
-            if (node != null) state.setActiveNode(node);
+          onChanged: (nodeId) {
+            if (nodeId == null) return;
+            final state = context.read<AppStateProvider>();
+            state.setActiveNode(
+              state.availableNodes.firstWhere((node) => node.id == nodeId),
+            );
           },
         ),
       ),
@@ -1173,7 +1200,7 @@ class _MainWrapperState extends State<MainWrapper> {
               actions: [
                 Icon(
                   CupertinoIcons.wifi,
-                  color: state.isHardwareConnected
+                  color: isHardwareConnected
                       ? AppTheme.neonGreen
                       : AppTheme.neonRed,
                   size: 20,
@@ -1252,7 +1279,7 @@ class _MainWrapperState extends State<MainWrapper> {
                           CupertinoIcons.bell_fill,
                           "Active Alerts",
                           theme,
-                          badge: state.alerts.length,
+                          badge: alertCount,
                         ),
                         _sidebarItem(
                           4,
@@ -1289,7 +1316,7 @@ class _MainWrapperState extends State<MainWrapper> {
                 if (!isDesktop) nodeSelector,
                 Expanded(
                   child: TabTransition(
-                    currentIndex: state.currentTab,
+                    currentIndex: currentTab,
                     children: _screens,
                   ),
                 ),
@@ -1310,7 +1337,7 @@ class _MainWrapperState extends State<MainWrapper> {
                     vertical: 8,
                   ),
                   child: BottomNavigationBar(
-                    currentIndex: state.currentTab,
+                    currentIndex: currentTab,
                     type: BottomNavigationBarType.fixed,
                     backgroundColor: Colors.transparent,
                     elevation: 0,
@@ -1318,7 +1345,8 @@ class _MainWrapperState extends State<MainWrapper> {
                     unselectedItemColor: Colors.grey,
                     showSelectedLabels: false,
                     showUnselectedLabels: false,
-                    onTap: (index) => state.setTab(index),
+                    onTap: (index) =>
+                        context.read<AppStateProvider>().setTab(index),
                     items: const [
                       BottomNavigationBarItem(
                         icon: Icon(CupertinoIcons.house_fill, size: 26),
@@ -1356,12 +1384,13 @@ class _MainWrapperState extends State<MainWrapper> {
     ThemeData theme, {
     int badge = 0,
   }) {
-    final state = context.watch<AppStateProvider>();
-    bool isSel = state.currentTab == index;
+    final isSel = context.select<AppStateProvider, bool>(
+      (state) => state.currentTab == index,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
-        onTap: () => state.setTab(index),
+        onTap: () => context.read<AppStateProvider>().setTab(index),
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -1459,8 +1488,19 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppStateProvider>();
-    final data = state.currentData;
+    final data = context.select<AppStateProvider, SensorData>(
+      (state) => state.currentData,
+    );
+    final isHardwareConnected = context.select<AppStateProvider, bool>(
+      (state) => state.isHardwareConnected,
+    );
+    final recentAlerts = context.select<AppStateProvider, List<AlertItem>>(
+      (state) => state.alerts.take(2).toList(),
+    );
+    // History mutates in place; length also tracks SQLite loads and node resets.
+    context.select<AppStateProvider, int>((state) => state.telemetryRevision);
+    context.select<AppStateProvider, int>((state) => state.history.length);
+    final history = context.read<AppStateProvider>().history;
     final theme = Theme.of(context);
     final isCompact = MediaQuery.of(context).size.width < 600;
 
@@ -1473,7 +1513,7 @@ class _HomeTabState extends State<HomeTab> {
           child: RefreshIndicator(
             color: AppTheme.neonGreen,
             backgroundColor: theme.cardColor,
-            onRefresh: () => state.forceRefresh(),
+            onRefresh: () => context.read<AppStateProvider>().forceRefresh(),
             child: ListView(
               padding: EdgeInsets.only(
                 left: isCompact ? 16 : 24,
@@ -1482,7 +1522,7 @@ class _HomeTabState extends State<HomeTab> {
                 bottom: 160,
               ),
               children: [
-                if (!state.isHardwareConnected)
+                if (!isHardwareConnected)
                   const Card(
                     child: ListTile(
                       leading: Icon(CupertinoIcons.wifi_slash),
@@ -1617,7 +1657,7 @@ class _HomeTabState extends State<HomeTab> {
                             );
                           }
                           final chartData = _chartTimeframe == 0
-                              ? state.history
+                              ? history
                               : (_historicalData ?? []);
                           if (chartData.isEmpty) {
                             return SizedBox(
@@ -1662,42 +1702,40 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                   ],
                 ),
-                if (state.alerts.isNotEmpty)
-                  ...state.alerts
-                      .take(2)
-                      .map(
-                        (a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            tileColor: theme.cardColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: theme.dividerColor),
-                            ),
-                            leading: Icon(
-                              CupertinoIcons.exclamationmark_triangle_fill,
-                              color: a.severity == 'critical'
-                                  ? AppTheme.neonRed
-                                  : AppTheme.neonOrange,
-                            ),
-                            title: Text(
-                              a.title,
-                              style: TextStyle(
-                                color: theme.textTheme.bodyLarge?.color,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              formatAlertTimestamp(a.timestamp),
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
+                if (recentAlerts.isNotEmpty)
+                  ...recentAlerts.map(
+                    (a) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        tileColor: theme.cardColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: theme.dividerColor),
+                        ),
+                        leading: Icon(
+                          CupertinoIcons.exclamationmark_triangle_fill,
+                          color: a.severity == 'critical'
+                              ? AppTheme.neonRed
+                              : AppTheme.neonOrange,
+                        ),
+                        title: Text(
+                          a.title,
+                          style: TextStyle(
+                            color: theme.textTheme.bodyLarge?.color,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          formatAlertTimestamp(a.timestamp),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
                           ),
                         ),
                       ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -3428,16 +3466,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
+    final isDarkMode = context.select<SettingsProvider, bool>(
+      (settings) => settings.isDarkMode,
+    );
     return MaterialApp(
       title: 'Biomass IoT Monitor',
       debugShowCheckedModeBanner: false,
-      theme: settings.isDarkMode
-          ? AppTheme.getDarkTheme()
-          : AppTheme.getLightTheme(),
-      home: Consumer<AppStateProvider>(
-        builder: (context, state, _) =>
-            state.isAuthenticated ? const MainWrapper() : const LoginScreen(),
+      theme: isDarkMode ? AppTheme.getDarkTheme() : AppTheme.getLightTheme(),
+      home: Selector<AppStateProvider, bool>(
+        selector: (context, state) => state.isAuthenticated,
+        builder: (context, isAuthenticated, _) =>
+            isAuthenticated ? const MainWrapper() : const LoginScreen(),
       ),
       routes: {
         '/dashboard': (context) {
