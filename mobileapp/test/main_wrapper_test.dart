@@ -211,6 +211,48 @@ void main() {
     await dispose(tester);
   });
 
+  testWidgets('Home resumes telemetry after a completed tab round trip', (
+    tester,
+  ) async {
+    await initialize(tester);
+    expect(await state.login('operator', 'secret'), isTrue);
+    await mount(tester, size: const Size(800, 900));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('26.5 °C'), findsOneWidget);
+    final originalHomeState = tester.state(find.byType(HomeTab));
+
+    await tester.tap(find.text('Monitor'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    expect(find.byType(MonitorTab), findsOneWidget);
+    expect(find.byType(HomeTab), findsNothing);
+    expect(originalHomeState.mounted, isFalse);
+
+    await tester.tap(find.text('Home'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    expect(find.byType(MonitorTab), findsNothing);
+    expect(find.byType(HomeTab), findsOneWidget);
+    final returnedHomeState = tester.state(find.byType(HomeTab));
+    expect(returnedHomeState, isNot(same(originalHomeState)));
+    expect(returnedHomeState.mounted, isTrue);
+
+    final revisionBeforeSample = state.telemetryRevision;
+    temperature = 29.5;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(state.telemetryRevision, greaterThan(revisionBeforeSample));
+    expect(find.text('29.5 °C'), findsOneWidget);
+    expect(find.text('26.5 °C'), findsNothing);
+    expect(tester.state(find.byType(HomeTab)), same(returnedHomeState));
+    await dispose(tester);
+  });
+
   testWidgets('successful telemetry leaves shell navigation widgets intact', (
     tester,
   ) async {
