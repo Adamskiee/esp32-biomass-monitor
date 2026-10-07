@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:biomass_iot_app/main.dart';
+import 'package:biomass_iot_app/app/app_shell.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
+import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
+import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -63,7 +67,7 @@ void main() {
 
   Future<void> initialize(WidgetTester tester) async {
     state = AppStateProvider(prefs, client: client);
-    state.setLoginNodeIp('192.168.1.42');
+    await state.saveDeviceIp('192.168.1.42');
     await tester.pump();
   }
 

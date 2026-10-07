@@ -42,8 +42,8 @@ Arduino sketchbook.
 5. Open Serial Monitor at 115200 baud to find the device IP and confirm sensor
    readings.
 
-The mobile app connects to the IP of the selected node. The firmware does not
-advertise an `esp32.local` mDNS hostname.
+The mobile app connects to one ESP32 IP address entered on the login screen.
+The firmware does not advertise an `esp32.local` mDNS hostname.
 
 To try the app without an ESP32, run the local API simulator. See the
 [ESP32 simulator guide](docs/esp32-simulator.md) for setup and scenarios.
