@@ -8,8 +8,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'features/alerts/alert_item.dart';
 import 'features/monitoring/sensor_data.dart';
 import 'features/safety/audit_log.dart';
+import 'core/storage/database_provider.dart';
+import 'core/storage/database_schema.dart';
 
-class DatabaseHelper {
+class DatabaseHelper implements DatabaseProvider {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   DatabaseHelper._internal();
@@ -30,53 +32,11 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'biomass_iot.db');
     return await openDatabase(
       path,
-      version: 2,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      version: DatabaseSchema.version,
+      onConfigure: DatabaseSchema.configure,
+      onCreate: DatabaseSchema.create,
+      onUpgrade: DatabaseSchema.upgrade,
     );
-  }
-
-  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('DROP TABLE IF EXISTS sensor_data');
-      await _createSensorDataTable(db);
-    }
-  }
-
-  Future _createSensorDataTable(Database db) async {
-    await db.execute('''
-      CREATE TABLE sensor_data (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        temperature_c REAL,
-        chamber_temp_c REAL,
-        mq135_v REAL,
-        mq2_v REAL,
-        timestamp TEXT
-      )
-    ''');
-  }
-
-  Future _onCreate(Database db, int version) async {
-    await _createSensorDataTable(db);
-
-    await db.execute('''
-      CREATE TABLE alerts (
-        id TEXT PRIMARY KEY,
-        title TEXT,
-        description TEXT,
-        severity TEXT,
-        time TEXT
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE audit_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        action TEXT,
-        user TEXT,
-        timestamp TEXT
-      )
-    ''');
   }
 
   // --- Sensor Data CRUD ---
@@ -85,9 +45,13 @@ class DatabaseHelper {
     Database db = await database;
     return await db.insert('sensor_data', {
       'temperature_c': data.temperatureC,
+      'humidity_percent': data.humidityPercent,
       'chamber_temp_c': data.chamberTempC,
       'mq135_v': data.mq135V,
       'mq2_v': data.mq2V,
+      'pm1_ug_m3': data.pm1UgM3,
+      'pm25_ug_m3': data.pm25UgM3,
+      'pm10_ug_m3': data.pm10UgM3,
       'timestamp': data.timestamp.toIso8601String(),
     });
   }
@@ -104,9 +68,13 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) {
       return SensorData(
         temperatureC: maps[i]['temperature_c'] as double?,
+        humidityPercent: maps[i]['humidity_percent'] as double?,
         chamberTempC: maps[i]['chamber_temp_c'] as double?,
         mq135V: maps[i]['mq135_v'] as double?,
         mq2V: maps[i]['mq2_v'] as double?,
+        pm1UgM3: maps[i]['pm1_ug_m3'] as double?,
+        pm25UgM3: maps[i]['pm25_ug_m3'] as double?,
+        pm10UgM3: maps[i]['pm10_ug_m3'] as double?,
         timestamp: DateTime.parse(maps[i]['timestamp'] as String),
       );
     });
@@ -141,34 +109,39 @@ class DatabaseHelper {
       int end = (i + step < maps.length) ? i + step : maps.length;
       var chunk = maps.sublist(i, end);
 
-      double sumTempC = 0, sumChamberC = 0, sumMq135 = 0, sumMq2 = 0;
-      int countTempC = 0, countChamberC = 0, countMq135 = 0, countMq2 = 0;
+      final columns = [
+        'temperature_c',
+        'humidity_percent',
+        'chamber_temp_c',
+        'mq135_v',
+        'mq2_v',
+        'pm1_ug_m3',
+        'pm25_ug_m3',
+        'pm10_ug_m3',
+      ];
+      final sums = {for (final column in columns) column: 0.0};
+      final counts = {for (final column in columns) column: 0};
 
       for (var row in chunk) {
-        if (row['temperature_c'] != null) {
-          sumTempC += row['temperature_c'] as double;
-          countTempC++;
-        }
-        if (row['chamber_temp_c'] != null) {
-          sumChamberC += row['chamber_temp_c'] as double;
-          countChamberC++;
-        }
-        if (row['mq135_v'] != null) {
-          sumMq135 += row['mq135_v'] as double;
-          countMq135++;
-        }
-        if (row['mq2_v'] != null) {
-          sumMq2 += row['mq2_v'] as double;
-          countMq2++;
+        for (final column in columns) {
+          final value = row[column] as num?;
+          if (value != null) {
+            sums[column] = sums[column]! + value.toDouble();
+            counts[column] = counts[column]! + 1;
+          }
         }
       }
 
       aggregated.add(
         SensorData(
-          temperatureC: countTempC > 0 ? sumTempC / countTempC : null,
-          chamberTempC: countChamberC > 0 ? sumChamberC / countChamberC : null,
-          mq135V: countMq135 > 0 ? sumMq135 / countMq135 : null,
-          mq2V: countMq2 > 0 ? sumMq2 / countMq2 : null,
+          temperatureC: _mean(sums, counts, 'temperature_c'),
+          humidityPercent: _mean(sums, counts, 'humidity_percent'),
+          chamberTempC: _mean(sums, counts, 'chamber_temp_c'),
+          mq135V: _mean(sums, counts, 'mq135_v'),
+          mq2V: _mean(sums, counts, 'mq2_v'),
+          pm1UgM3: _mean(sums, counts, 'pm1_ug_m3'),
+          pm25UgM3: _mean(sums, counts, 'pm25_ug_m3'),
+          pm10UgM3: _mean(sums, counts, 'pm10_ug_m3'),
           timestamp: DateTime.parse(chunk.last['timestamp'] as String),
         ),
       );
@@ -176,6 +149,12 @@ class DatabaseHelper {
 
     return aggregated;
   }
+
+  double? _mean(
+    Map<String, double> sums,
+    Map<String, int> counts,
+    String column,
+  ) => counts[column] == 0 ? null : sums[column]! / counts[column]!;
 
   // --- Alerts CRUD ---
   Future<int> insertAlert(AlertItem alert) async {
