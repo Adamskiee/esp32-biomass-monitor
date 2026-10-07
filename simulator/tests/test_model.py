@@ -1,3 +1,4 @@
+import math
 import unittest
 
 from simulator.model import SafetyOverrideError, SimulatorState
@@ -23,7 +24,8 @@ class SimulatorStateTests(unittest.TestCase):
         first = self.state.snapshot()
         second = self.state.snapshot()
         self.assertEqual(set(first), {
-            "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
+            "temperature_c", "humidity_percent", "chamber_temp_c", "mq135_v", "mq2_v",
+            "pm1_ug_m3", "pm25_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "fan_on",
             "sprinkler_on", "pump_on", "manual_sprinkler", "active_triggers",
         })
@@ -32,6 +34,15 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertTrue(first["fan_on"])
         self.assertEqual(first["active_triggers"], [])
         self.assertNotEqual(first["temperature_c"], second["temperature_c"])
+
+    def test_normal_snapshot_changes_environmental_values_repeatably(self):
+        first = self.state.snapshot()
+        second = self.state.snapshot()
+        for field in ("humidity_percent", "pm1_ug_m3", "pm25_ug_m3", "pm10_ug_m3"):
+            self.assertTrue(math.isfinite(first[field]))
+            self.assertNotEqual(first[field], second[field])
+        self.assertEqual((first["humidity_percent"], first["pm1_ug_m3"], first["pm25_ug_m3"], first["pm10_ug_m3"]), (55.0, 10.0, 20.0, 30.0))
+        self.assertEqual((second["humidity_percent"], second["pm1_ug_m3"], second["pm25_ug_m3"], second["pm10_ug_m3"]), (55.1, 11.0, 21.0, 31.0))
 
     def test_heat_forces_valve_then_pump_and_fault_latches(self):
         self.state.select_scenario("heat")
@@ -69,6 +80,17 @@ class SimulatorStateTests(unittest.TestCase):
         gas = self.state.snapshot()
         self.assertIsNone(gas["mq2_v"])
         self.assertIn("mq2_sensor_fault", gas["active_triggers"])
+        self.state.select_scenario("dht-fault")
+        dht = self.state.snapshot()
+        self.assertIsNone(dht["temperature_c"])
+        self.assertIsNone(dht["humidity_percent"])
+        self.assertEqual(dht["active_triggers"], [])
+        self.state.select_scenario("pms-fault")
+        pms = self.state.snapshot()
+        self.assertIsNone(pms["pm1_ug_m3"])
+        self.assertIsNone(pms["pm25_ug_m3"])
+        self.assertIsNone(pms["pm10_ug_m3"])
+        self.assertEqual(pms["active_triggers"], [])
 
     def test_threshold_update_is_atomic_and_rejects_bool(self):
         for bad in (True, float("nan"), 19.9, 150.1):

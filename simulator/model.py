@@ -10,10 +10,12 @@ class SafetyOverrideError(Exception):
 
 class SimulatorState:
     _READINGS = {
-        "gas": (25.0, 45.0, 1.2, 2.8),
-        "heat": (25.0, 100.0, 1.2, 1.0),
-        "temp-fault": (25.0, None, 1.2, 1.0),
-        "mq2-fault": (25.0, 45.0, 1.2, None),
+        "gas": (25.0, 65.0, 45.0, 1.2, 2.8, 35.0, 70.0, 105.0),
+        "heat": (25.0, 40.0, 100.0, 1.2, 1.0, 25.0, 50.0, 75.0),
+        "temp-fault": (25.0, 55.0, None, 1.2, 1.0, 10.0, 20.0, 30.0),
+        "mq2-fault": (25.0, 55.0, 45.0, 1.2, None, 10.0, 20.0, 30.0),
+        "dht-fault": (None, None, 45.0, 1.2, 1.0, 10.0, 20.0, 30.0),
+        "pms-fault": (25.0, 55.0, 45.0, 1.2, 1.0, None, None, None),
     }
     _LIMITS = {
         "threshold_chamber_temp_c": (20.0, 150.0),
@@ -35,9 +37,13 @@ class SimulatorState:
             self._scenario = "normal"
             self._tick = 0
             self._temperature_c = 25.0
+            self._humidity_percent = 55.0
             self._chamber_temp_c = 45.0
             self._mq135_v = 1.2
             self._mq2_v = 1.0
+            self._pm1_ug_m3 = 10.0
+            self._pm25_ug_m3 = 20.0
+            self._pm10_ug_m3 = 30.0
             self._threshold_chamber_temp_c = 80.0
             self._threshold_mq2_v = 2.5
             self._temp_danger = False
@@ -59,9 +65,9 @@ class SimulatorState:
                 return
             self._scenario = name
             if name == "normal":
-                self._temperature_c, self._chamber_temp_c, self._mq135_v, self._mq2_v = (25.0, 45.0, 1.2, 1.0)
+                self._temperature_c, self._humidity_percent, self._chamber_temp_c, self._mq135_v, self._mq2_v, self._pm1_ug_m3, self._pm25_ug_m3, self._pm10_ug_m3 = (25.0, 55.0, 45.0, 1.2, 1.0, 10.0, 20.0, 30.0)
             else:
-                self._temperature_c, self._chamber_temp_c, self._mq135_v, self._mq2_v = self._READINGS[name]
+                self._temperature_c, self._humidity_percent, self._chamber_temp_c, self._mq135_v, self._mq2_v, self._pm1_ug_m3, self._pm25_ug_m3, self._pm10_ug_m3 = self._READINGS[name]
             self._evaluate_safety()
 
     def update_thresholds(self, values: Mapping[str, object]) -> None:
@@ -92,9 +98,13 @@ class SimulatorState:
             if self._scenario == "normal":
                 drift = (self._tick % 5) * 0.1
                 self._temperature_c = 25.0 + drift
+                self._humidity_percent = 55.0 + drift
                 self._chamber_temp_c = 45.0 + drift
                 self._mq135_v = 1.2 + drift / 10
                 self._mq2_v = 1.0 + drift / 10
+                self._pm1_ug_m3 = 10.0 + self._tick
+                self._pm25_ug_m3 = 20.0 + self._tick
+                self._pm10_ug_m3 = 30.0 + self._tick
                 self._tick += 1
                 self._evaluate_safety()
             self._advance_actuators()
@@ -111,9 +121,13 @@ class SimulatorState:
                 triggers.append("mq2_sensor_fault")
             return {
                 "temperature_c": self._temperature_c,
+                "humidity_percent": self._humidity_percent,
                 "chamber_temp_c": self._chamber_temp_c,
                 "mq135_v": self._mq135_v,
                 "mq2_v": self._mq2_v,
+                "pm1_ug_m3": self._pm1_ug_m3,
+                "pm25_ug_m3": self._pm25_ug_m3,
+                "pm10_ug_m3": self._pm10_ug_m3,
                 "threshold_chamber_temp_c": self._threshold_chamber_temp_c,
                 "threshold_mq2_v": self._threshold_mq2_v,
                 "fan_on": True,
