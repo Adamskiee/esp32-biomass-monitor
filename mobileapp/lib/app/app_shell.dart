@@ -1,4 +1,15 @@
-part of 'legacy_ui.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/glass_container.dart';
+import 'package:biomass_iot_app/features/alerts/alerts_tab.dart';
+import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
+import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
+import 'package:biomass_iot_app/features/safety/control_tab.dart';
+import 'package:biomass_iot_app/features/settings/settings_screen.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});

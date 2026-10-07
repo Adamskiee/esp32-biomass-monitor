@@ -1,4 +1,11 @@
-part of '../../app/legacy_ui.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/glass_container.dart';
+import 'package:biomass_iot_app/features/settings/settings_controller.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _checkBiometrics() async {
-    final settings = context.read<SettingsProvider>();
+    final settings = context.read<SettingsController>();
     if (settings.biometricLogin &&
         context.read<AppStateProvider>().canResumeWithBiometrics) {
       try {
@@ -79,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final settings = context.watch<SettingsProvider>();
+    final settings = context.watch<SettingsController>();
 
     return Scaffold(
       body: Stack(

@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:biomass_iot_app/main.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

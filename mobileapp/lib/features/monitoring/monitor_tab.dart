@@ -1,4 +1,11 @@
-part of '../../app/legacy_ui.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class MonitorTab extends StatefulWidget {
   const MonitorTab({super.key});

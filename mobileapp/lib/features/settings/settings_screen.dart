@@ -1,4 +1,10 @@
-part of '../../app/legacy_ui.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
+import 'package:biomass_iot_app/features/settings/settings_controller.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -83,7 +89,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.select<AppStateProvider, bool>((s) => s.isAdmin);
-    final settings = context.watch<SettingsProvider>();
+    final settings = context.watch<SettingsController>();
     final theme = Theme.of(context);
 
     final isCompact = MediaQuery.of(context).size.width < 600;

@@ -1,4 +1,15 @@
-part of '../../app/legacy_ui.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
+import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
+import 'package:biomass_iot_app/database_helper.dart';
+import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});

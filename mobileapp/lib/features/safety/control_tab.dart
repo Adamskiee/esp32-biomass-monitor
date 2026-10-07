@@ -1,4 +1,13 @@
-part of '../../app/legacy_ui.dart';
+import 'package:biomass_iot_app/api_service.dart';
+import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
+import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
+import 'package:biomass_iot_app/dashboard.dart';
+import 'package:biomass_iot_app/features/settings/settings_controller.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class ControlTab extends StatelessWidget {
   const ControlTab({super.key});
@@ -7,7 +16,7 @@ class ControlTab extends StatelessWidget {
     BuildContext context,
     String sensor,
     double currentVal,
-    SettingsProvider settings,
+    SettingsController settings,
   ) {
     double tempVal = currentVal;
     final theme = Theme.of(context);
@@ -80,7 +89,7 @@ class ControlTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppStateProvider>();
-    final settings = context.watch<SettingsProvider>();
+    final settings = context.watch<SettingsController>();
     final theme = Theme.of(context);
 
     final isCompact = MediaQuery.of(context).size.width < 600;
@@ -191,7 +200,7 @@ class ControlTab extends StatelessWidget {
                       builder: (_) => DashboardScreen(
                         apiService: ApiService(
                           baseUrl: 'http://${state.deviceIp}/api',
-                          authorizationHeader: state._basicAuthHeader,
+                          authorizationHeader: state.authorizationHeader,
                         ),
                       ),
                     ),
