@@ -26,6 +26,7 @@ class AppStateProvider extends ChangeNotifier {
 
   SensorData _currentData = SensorData(timestamp: DateTime.now());
   final List<SensorData> _history = [];
+  int _telemetryRevision = 0;
   final List<AlertItem> _alerts = [];
   final List<AuditLog> _auditLogs = [
     AuditLog("System Initialized", "SYSTEM", "08:00 AM"),
@@ -50,6 +51,7 @@ class AppStateProvider extends ChangeNotifier {
   String get authorizationHeader => _basicAuthHeader;
   SensorData get currentData => _currentData;
   List<SensorData> get history => _history;
+  int get telemetryRevision => _telemetryRevision;
   List<AlertItem> get alerts => _alerts;
   List<AuditLog> get auditLogs => _auditLogs;
 
@@ -213,6 +215,7 @@ class AppStateProvider extends ChangeNotifier {
       _history.add(_currentData);
       if (_history.length > 60) _history.removeAt(0);
       DatabaseHelper().insertSensorData(_currentData);
+      _telemetryRevision++;
 
       if (gasDanger &&
           _currentData.mq2V != null &&

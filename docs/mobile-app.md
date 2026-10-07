@@ -53,6 +53,23 @@ flutter analyze
 flutter test
 ```
 
+## How do I profile tab transitions?
+
+Debug builds include extra checks and are not performance evidence. Connect
+the affected Android device, then run from `mobileapp/`:
+
+```bash
+flutter run --profile
+```
+
+Open Flutter DevTools from the run output and record frame timings in its
+Performance view while repeatedly switching among all five tabs. Confirm the
+fade-and-scale effect remains visible and live telemetry keeps updating on the
+active tab with an ESP32 or the local simulator connected. Compare UI and raster
+frame times with the device's frame budget, for example 16.7 ms at 60 Hz.
+Isolated first-use shader warm-up can occur, but recurring transition-related
+jank or frame-budget spikes are not expected.
+
 ## How do I publish an Android release?
 
 Android requires every update for `com.biomo.biomassmonitor` to use the same

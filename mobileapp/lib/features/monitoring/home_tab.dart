@@ -48,8 +48,15 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppStateProvider>();
-    final data = state.currentData;
+    final data = context.select<AppStateProvider, SensorData>(
+      (state) => state.currentData,
+    );
+    final isHardwareConnected = context.select<AppStateProvider, bool>(
+      (state) => state.isHardwareConnected,
+    );
+    context.select<AppStateProvider, int>((state) => state.telemetryRevision);
+    context.select<AppStateProvider, int>((state) => state.history.length);
+    final state = context.read<AppStateProvider>();
     final theme = Theme.of(context);
     final isCompact = MediaQuery.of(context).size.width < 600;
 
@@ -71,7 +78,7 @@ class _HomeTabState extends State<HomeTab> {
                 bottom: 160,
               ),
               children: [
-                if (!state.isHardwareConnected)
+                if (!isHardwareConnected)
                   const Card(
                     child: ListTile(
                       leading: Icon(CupertinoIcons.wifi_slash),

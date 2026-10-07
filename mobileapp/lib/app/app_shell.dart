@@ -1,6 +1,6 @@
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
-import 'package:biomass_iot_app/core/widgets/glass_container.dart';
+import 'package:biomass_iot_app/tab_transition.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
@@ -59,11 +59,23 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppStateProvider>();
+    final currentTab = context.select<AppStateProvider, int>(
+      (state) => state.currentTab,
+    );
+    final isHardwareConnected = context.select<AppStateProvider, bool>(
+      (state) => state.isHardwareConnected,
+    );
+    final deviceIp = context.select<AppStateProvider, String>(
+      (state) => state.deviceIp,
+    );
+    final alertCount = context.select<AppStateProvider, int>(
+      (state) => state.alerts.length,
+    );
+    final state = context.read<AppStateProvider>();
     final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width > 850;
 
-    Widget offlineBanner = !state.isHardwareConnected
+    Widget offlineBanner = !isHardwareConnected
         ? GestureDetector(
             onTap: () => state.startLiveTelemetryStream(),
             child: Container(
@@ -81,7 +93,7 @@ class _MainWrapperState extends State<MainWrapper> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      "Hardware Offline: Tap to reconnect to ${state.deviceIp}",
+                      "Hardware Offline: Tap to reconnect to $deviceIp",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -113,7 +125,7 @@ class _MainWrapperState extends State<MainWrapper> {
               actions: [
                 Icon(
                   CupertinoIcons.wifi,
-                  color: state.isHardwareConnected
+                  color: isHardwareConnected
                       ? AppTheme.neonGreen
                       : AppTheme.neonRed,
                   size: 20,
@@ -191,7 +203,7 @@ class _MainWrapperState extends State<MainWrapper> {
                           CupertinoIcons.bell_fill,
                           "Active Alerts",
                           theme,
-                          badge: state.alerts.length,
+                          badge: alertCount,
                         ),
                         _sidebarItem(
                           4,
@@ -226,26 +238,9 @@ class _MainWrapperState extends State<MainWrapper> {
               children: [
                 offlineBanner,
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutCubic,
-                          ),
-                        ),
-                        child: child,
-                      ),
-                    ),
-                    child: KeyedSubtree(
-                      key: ValueKey<int>(state.currentTab),
-                      child: _screens[state.currentTab],
-                    ),
+                  child: TabTransition(
+                    currentIndex: currentTab,
+                    children: _screens,
                   ),
                 ),
               ],
@@ -256,16 +251,26 @@ class _MainWrapperState extends State<MainWrapper> {
       bottomNavigationBar: !isDesktop
           ? Padding(
               padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-              child: GlassContainer(
-                borderRadius: 30,
-                color: theme.cardColor.withValues(alpha: 0.85),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 30,
+                      spreadRadius: -5,
+                    ),
+                  ],
+                ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 8,
                   ),
                   child: BottomNavigationBar(
-                    currentIndex: state.currentTab,
+                    currentIndex: currentTab,
                     type: BottomNavigationBarType.fixed,
                     backgroundColor: Colors.transparent,
                     elevation: 0,
@@ -311,12 +316,14 @@ class _MainWrapperState extends State<MainWrapper> {
     ThemeData theme, {
     int badge = 0,
   }) {
-    final state = context.watch<AppStateProvider>();
-    bool isSel = state.currentTab == index;
+    final currentTab = context.select<AppStateProvider, int>(
+      (state) => state.currentTab,
+    );
+    bool isSel = currentTab == index;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
-        onTap: () => state.setTab(index),
+        onTap: () => context.read<AppStateProvider>().setTab(index),
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
