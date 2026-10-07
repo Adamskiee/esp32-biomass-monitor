@@ -17,6 +17,7 @@ import 'firebase_options.dart';
 import 'database_helper.dart';
 import 'api_service.dart';
 import 'dashboard.dart';
+import 'tab_transition.dart';
 export 'dashboard.dart';
 
 void main() async {
@@ -1287,26 +1288,9 @@ class _MainWrapperState extends State<MainWrapper> {
                 offlineBanner,
                 if (!isDesktop) nodeSelector,
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutCubic,
-                          ),
-                        ),
-                        child: child,
-                      ),
-                    ),
-                    child: KeyedSubtree(
-                      key: ValueKey<int>(state.currentTab),
-                      child: _screens[state.currentTab],
-                    ),
+                  child: TabTransition(
+                    currentIndex: state.currentTab,
+                    children: _screens,
                   ),
                 ),
               ],
