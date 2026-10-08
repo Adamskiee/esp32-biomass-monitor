@@ -42,6 +42,12 @@ node list or save credentials. MQ sensor values are voltages; the app does not
 calculate a certified air quality index or carbon monoxide concentration from
 them.
 
+The Air Quality tab also shows PM1.0, PM2.5, and PM10 mass concentrations in
+µg/m³. `--` means the device has not provided a fresh particulate reading.
+The paginated sensor log and current-session CSV export retain these three
+fields as `PM1.0(ug/m3)`, `PM2.5(ug/m3)`, and `PM10(ug/m3)`. Particulate data
+is telemetry only and does not control the sprinkler or other safety outputs.
+
 The sensor data log reads the full local history in pages of 10 records, newest
 first. Live updates are off by default so records do not move between pages
 while they are being reviewed. Use Refresh to create a newer snapshot, or turn
