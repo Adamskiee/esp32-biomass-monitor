@@ -38,8 +38,9 @@ class AttemptStore {
         );
       });
     } on DatabaseException catch (error) {
-      if (error.isUniqueConstraintError())
+      if (error.isUniqueConstraintError()) {
         throw StateError('An attempt is already active');
+      }
       rethrow;
     }
   }
@@ -150,8 +151,9 @@ class AttemptStore {
       whereArgs: [attemptId],
     );
     if (rows.isNotEmpty &&
-        rows.single['status'] == AttemptStatus.active.storageValue)
+        rows.single['status'] == AttemptStatus.active.storageValue) {
       throw StateError('Cannot delete an active attempt');
+    }
     await database.delete('attempts', where: 'id = ?', whereArgs: [attemptId]);
   }
 

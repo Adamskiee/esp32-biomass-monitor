@@ -44,14 +44,17 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isAdmin => _isAdmin;
+  @override
   bool get isHardwareConnected => _isHardwareConnected;
   bool get canResumeWithBiometrics =>
       _currentUser.isNotEmpty && _password.isNotEmpty;
   int get currentTab => _currentTab;
   String get deviceIp => _deviceAddresses.deviceIp;
   String get authorizationHeader => _basicAuthHeader;
+  @override
   SensorData get currentData => _currentData;
   List<SensorData> get history => _history;
+  @override
   int get telemetryRevision => _telemetryRevision;
   List<AlertItem> get alerts => _alerts;
   List<AuditLog> get auditLogs => _auditLogs;

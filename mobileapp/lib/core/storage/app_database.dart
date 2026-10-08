@@ -16,6 +16,7 @@ class AppDatabase implements DatabaseProvider {
   final String? _databasePath;
   Database? _database;
 
+  @override
   Future<Database> get database async {
     if (_database != null) return _database!;
     if (kIsWeb) throw UnsupportedError('SQLite is not supported on the Web');

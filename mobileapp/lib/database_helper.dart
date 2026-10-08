@@ -18,6 +18,7 @@ class DatabaseHelper implements DatabaseProvider {
 
   static Database? _database;
 
+  @override
   Future<Database> get database async {
     if (_database != null) return _database!;
     if (kIsWeb) {
