@@ -55,6 +55,9 @@ Returns cached readings and current safety outputs:
   "chamber_temp_c": 120.0,
   "mq135_v": 2.1,
   "mq2_v": 1.5,
+  "pm1_0_ug_m3": 8,
+  "pm2_5_ug_m3": 12,
+  "pm10_ug_m3": 18,
   "threshold_chamber_temp_c": 130.0,
   "threshold_mq2_v": 2.5,
   "fan_on": true,
@@ -81,6 +84,12 @@ readings from 0.0 V through 2.4 V are safe. Readings at or above 2.5 V add the
 - `temp_sensor_fault`
 - `mq2_sensor_fault`
 - `catastrophic_latch`
+
+PMS5003 particulate readings report environmental PM1.0, PM2.5, and PM10 mass
+concentrations in µg/m³. All three PMS fields are `null` before the first valid
+frame and more than ten seconds after the most recent valid frame. A valid zero
+is returned as `0`. PMS readings are telemetry only and do not affect safety
+outputs or `active_triggers`.
 
 ## Control the sprinkler
 
