@@ -19,7 +19,7 @@ class AppDatabase {
     _database = await _databaseFactory.openDatabase(
       _databasePath ?? await _defaultPath(),
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -41,6 +41,11 @@ class AppDatabase {
     if (oldVersion < 2) {
       await db.execute('DROP TABLE IF EXISTS sensor_data');
       await _createSensorDataTable(db);
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE sensor_data ADD COLUMN pm1_0_ug_m3 REAL');
+      await db.execute('ALTER TABLE sensor_data ADD COLUMN pm2_5_ug_m3 REAL');
+      await db.execute('ALTER TABLE sensor_data ADD COLUMN pm10_ug_m3 REAL');
     }
   }
 
@@ -72,6 +77,9 @@ class AppDatabase {
       chamber_temp_c REAL,
       mq135_v REAL,
       mq2_v REAL,
+      pm1_0_ug_m3 REAL,
+      pm2_5_ug_m3 REAL,
+      pm10_ug_m3 REAL,
       timestamp TEXT
     )
   ''');

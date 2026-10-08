@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:biomass_iot_app/core/storage/app_database.dart';
+import 'package:biomass_iot_app/database_helper.dart';
 import 'package:biomass_iot_app/features/alerts/alert_item.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
@@ -27,7 +28,7 @@ void main() {
     await temporaryDirectory.delete(recursive: true);
   });
 
-  test('preserves version two rows after reopening the database', () async {
+  test('preserves rows after reopening the database', () async {
     final firstDatabase = AppDatabase(
       databaseFactory: databaseFactoryFfi,
       databasePath: databasePath,
@@ -75,14 +76,64 @@ void main() {
     final version = await (await reopenedDatabase.database).rawQuery(
       'PRAGMA user_version',
     );
-    expect(version.single['user_version'], 2);
+    expect(version.single['user_version'], 3);
     expect((await reopenedHistory.getSensorData()).single.chamberTempC, 36.5);
+    expect((await reopenedHistory.getSensorData()).single.pm1_0UgM3, isNull);
     expect((await reopenedAlerts.getAlerts()).single.id, 'alert-1');
     expect(
       (await reopenedAuditLogs.getAuditLogs()).single.action,
       'Enabled sprinkler',
     );
     await reopenedDatabase.close();
+  });
+
+  test('migrates version two rows through each history API', () async {
+    Future<void> seedVersionTwo(String path) async {
+      final database = await databaseFactoryFfi.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: (db, _) async {
+            await db.execute('CREATE TABLE sensor_data (id INTEGER PRIMARY KEY AUTOINCREMENT, temperature_c REAL, chamber_temp_c REAL, mq135_v REAL, mq2_v REAL, timestamp TEXT)');
+            await db.execute('CREATE TABLE alerts (id TEXT PRIMARY KEY, title TEXT, description TEXT, severity TEXT, time TEXT)');
+            await db.execute('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, user TEXT, timestamp TEXT)');
+          },
+        ),
+      );
+      await database.insert('sensor_data', {'temperature_c': 25.0, 'timestamp': DateTime.utc(2026, 10, 8).toIso8601String()});
+      await database.insert('alerts', {'id': 'old-alert', 'title': 'Old', 'description': 'Saved', 'severity': 'info', 'time': DateTime.utc(2026, 10, 8).toIso8601String()});
+      await database.insert('audit_logs', {'action': 'Old action', 'user': 'admin', 'timestamp': '08:00'});
+      await database.close();
+    }
+
+    final appPath = '${temporaryDirectory.path}/app.db';
+    await seedVersionTwo(appPath);
+    final appDatabase = AppDatabase(databaseFactory: databaseFactoryFfi, databasePath: appPath);
+    final appHistory = SensorHistoryStore(appDatabase);
+    expect(await (await appDatabase.database).getVersion(), 3);
+    expect((await appHistory.getSensorData()).single.pm2_5UgM3, isNull);
+    expect((await AlertsStore(appDatabase).getAlerts()).single.id, 'old-alert');
+    expect((await AuditLogStore(appDatabase).getAuditLogs()).single.action, 'Old action');
+    await appHistory.insertSensorData(SensorData(pm1_0UgM3: 8, pm2_5UgM3: 12, pm10UgM3: 18, timestamp: DateTime.utc(2026, 10, 8, 1)));
+    expect((await appHistory.getSensorData()).first.pm10UgM3, 18.0);
+    await appHistory.insertSensorData(
+      SensorData(timestamp: DateTime.now().subtract(const Duration(minutes: 1))),
+    );
+    await appHistory.insertSensorData(
+      SensorData(pm2_5UgM3: 12, timestamp: DateTime.now()),
+    );
+    expect((await appHistory.getAggregatedSensorData(1)).last.pm2_5UgM3, 12.0);
+    await appDatabase.close();
+
+    final legacyPath = '${temporaryDirectory.path}/legacy.db';
+    await seedVersionTwo(legacyPath);
+    final legacyStorage = AppDatabase(databaseFactory: databaseFactoryFfi, databasePath: legacyPath);
+    final legacyHistory = DatabaseHelper.forTesting(legacyStorage);
+    expect(await (await legacyStorage.database).getVersion(), 3);
+    expect((await legacyHistory.getSensorData()).single.pm1_0UgM3, isNull);
+    await legacyHistory.insertSensorData(SensorData(pm1_0UgM3: 8, pm2_5UgM3: 12, pm10UgM3: 18, timestamp: DateTime.utc(2026, 10, 8, 2)));
+    expect((await legacyHistory.getSensorData()).first.pm2_5UgM3, 12.0);
+    await legacyStorage.close();
   });
 
   test('reads a stable sensor history page with its total count', () async {

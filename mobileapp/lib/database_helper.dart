@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'core/storage/app_database.dart';
 
 import 'features/alerts/alert_item.dart';
 import 'features/monitoring/sensor_data.dart';
@@ -11,72 +9,16 @@ import 'features/safety/audit_log.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
+  static final AppDatabase _defaultStorage = AppDatabase();
   factory DatabaseHelper() => _instance;
-  DatabaseHelper._internal();
+  DatabaseHelper._internal() : _storage = null;
+  DatabaseHelper.forTesting(AppDatabase storage) : _storage = storage;
 
-  static Database? _database;
+  final AppDatabase? _storage;
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    if (kIsWeb) {
-      throw UnsupportedError('SQLite is not supported on the Web');
-    }
-    _database = await _initDatabase();
-    return _database!;
-  }
-
-  Future<Database> _initDatabase() async {
-    Directory documentsDirectory = await getApplicationDocumentsDirectory();
-    String path = join(documentsDirectory.path, 'biomass_iot.db');
-    return await openDatabase(
-      path,
-      version: 2,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
-  }
-
-  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('DROP TABLE IF EXISTS sensor_data');
-      await _createSensorDataTable(db);
-    }
-  }
-
-  Future _createSensorDataTable(Database db) async {
-    await db.execute('''
-      CREATE TABLE sensor_data (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        temperature_c REAL,
-        chamber_temp_c REAL,
-        mq135_v REAL,
-        mq2_v REAL,
-        timestamp TEXT
-      )
-    ''');
-  }
-
-  Future _onCreate(Database db, int version) async {
-    await _createSensorDataTable(db);
-
-    await db.execute('''
-      CREATE TABLE alerts (
-        id TEXT PRIMARY KEY,
-        title TEXT,
-        description TEXT,
-        severity TEXT,
-        time TEXT
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE audit_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        action TEXT,
-        user TEXT,
-        timestamp TEXT
-      )
-    ''');
+  Future<Database> get database {
+    if (kIsWeb) throw UnsupportedError('SQLite is not supported on the Web');
+    return (_storage ?? _defaultStorage).database;
   }
 
   // --- Sensor Data CRUD ---
@@ -88,6 +30,9 @@ class DatabaseHelper {
       'chamber_temp_c': data.chamberTempC,
       'mq135_v': data.mq135V,
       'mq2_v': data.mq2V,
+      'pm1_0_ug_m3': data.pm1_0UgM3,
+      'pm2_5_ug_m3': data.pm2_5UgM3,
+      'pm10_ug_m3': data.pm10UgM3,
       'timestamp': data.timestamp.toIso8601String(),
     });
   }
@@ -107,6 +52,9 @@ class DatabaseHelper {
         chamberTempC: maps[i]['chamber_temp_c'] as double?,
         mq135V: maps[i]['mq135_v'] as double?,
         mq2V: maps[i]['mq2_v'] as double?,
+        pm1_0UgM3: (maps[i]['pm1_0_ug_m3'] as num?)?.toDouble(),
+        pm2_5UgM3: (maps[i]['pm2_5_ug_m3'] as num?)?.toDouble(),
+        pm10UgM3: (maps[i]['pm10_ug_m3'] as num?)?.toDouble(),
         timestamp: DateTime.parse(maps[i]['timestamp'] as String),
       );
     });
@@ -142,7 +90,9 @@ class DatabaseHelper {
       var chunk = maps.sublist(i, end);
 
       double sumTempC = 0, sumChamberC = 0, sumMq135 = 0, sumMq2 = 0;
+      double sumPm1 = 0, sumPm25 = 0, sumPm10 = 0;
       int countTempC = 0, countChamberC = 0, countMq135 = 0, countMq2 = 0;
+      int countPm1 = 0, countPm25 = 0, countPm10 = 0;
 
       for (var row in chunk) {
         if (row['temperature_c'] != null) {
@@ -161,6 +111,18 @@ class DatabaseHelper {
           sumMq2 += row['mq2_v'] as double;
           countMq2++;
         }
+        if (row['pm1_0_ug_m3'] != null) {
+          sumPm1 += (row['pm1_0_ug_m3'] as num).toDouble();
+          countPm1++;
+        }
+        if (row['pm2_5_ug_m3'] != null) {
+          sumPm25 += (row['pm2_5_ug_m3'] as num).toDouble();
+          countPm25++;
+        }
+        if (row['pm10_ug_m3'] != null) {
+          sumPm10 += (row['pm10_ug_m3'] as num).toDouble();
+          countPm10++;
+        }
       }
 
       aggregated.add(
@@ -169,6 +131,9 @@ class DatabaseHelper {
           chamberTempC: countChamberC > 0 ? sumChamberC / countChamberC : null,
           mq135V: countMq135 > 0 ? sumMq135 / countMq135 : null,
           mq2V: countMq2 > 0 ? sumMq2 / countMq2 : null,
+          pm1_0UgM3: countPm1 > 0 ? sumPm1 / countPm1 : null,
+          pm2_5UgM3: countPm25 > 0 ? sumPm25 / countPm25 : null,
+          pm10UgM3: countPm10 > 0 ? sumPm10 / countPm10 : null,
           timestamp: DateTime.parse(chunk.last['timestamp'] as String),
         ),
       );
