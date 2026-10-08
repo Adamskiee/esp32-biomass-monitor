@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'attempt.dart';
+import 'attempt_comparison_screen.dart';
 import 'attempt_controller.dart';
 
 class AttemptsSection extends StatefulWidget {
@@ -60,6 +61,40 @@ class _AttemptsSectionState extends State<AttemptsSection> {
                   ? null
                   : () => controller.deleteAttempt(attempt.id),
             ),
+            enabled:
+                attempt.status != AttemptStatus.active &&
+                attempt.sampleCount > 0,
+            selected: attempt.id == _withoutId || attempt.id == _withId,
+            onTap:
+                attempt.status == AttemptStatus.active ||
+                    attempt.sampleCount == 0
+                ? null
+                : () => setState(() {
+                    if (attempt.scenario == AttemptScenario.withoutFiltration) {
+                      _withoutId = attempt.id;
+                    } else {
+                      _withId = attempt.id;
+                    }
+                  }),
+          ),
+        if (_withoutId != null && _withId != null)
+          ElevatedButton(
+            onPressed: controller.isBusy
+                ? null
+                : () async {
+                    final comparison = await controller.compare(
+                      _withoutId!,
+                      _withId!,
+                    );
+                    if (!context.mounted) return;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AttemptComparisonScreen(comparison: comparison),
+                      ),
+                    );
+                  },
+            child: const Text('Compare attempts'),
           ),
         const SizedBox(height: 12),
         Text('Select one saved attempt from each scenario before comparing.'),
