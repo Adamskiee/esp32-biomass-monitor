@@ -30,6 +30,12 @@ MQ135 is included in telemetry but does not currently trigger automatic
 actuation. The fan output is an on/off relay; variable PWM speed is not
 implemented.
 
+The PMS5003 is also telemetry only. Each two-second poll attempts one validated
+UART frame and records environmental PM1.0, PM2.5, and PM10 together. Invalid
+or absent frames leave the previous sample unchanged, so the API reports it
+until it ages out after ten seconds. PMS data never contributes to safety
+triggers or actuator decisions.
+
 ## How are the valve and pump sequenced?
 
 `Actuators` owns the requested sprinkler state and the commanded solenoid and

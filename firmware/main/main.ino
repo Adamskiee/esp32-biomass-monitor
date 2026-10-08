@@ -48,6 +48,11 @@ void loop() {
 
     processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2);
 
+    PmsReading pms_reading{};
+    if (readPmsReading(pms_reading)) {
+      recordPmsReading(pms_reading, millis());
+    }
+
     // Grab safe copies for persistence without holding the mutex during flash
     // writes
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10))) {
