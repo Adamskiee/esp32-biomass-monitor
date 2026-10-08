@@ -11,9 +11,10 @@ import '../database_helper.dart';
 import '../features/alerts/alert_item.dart';
 import '../features/authentication/device_address_store.dart';
 import '../features/monitoring/sensor_data.dart';
+import '../features/monitoring/telemetry_source.dart';
 import '../features/safety/audit_log.dart';
 
-class AppStateProvider extends ChangeNotifier {
+class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   final SharedPreferences _prefs;
   late final DeviceAddressStore _deviceAddresses;
   final http.Client _client;
