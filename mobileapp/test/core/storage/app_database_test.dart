@@ -84,4 +84,54 @@ void main() {
     );
     await reopenedDatabase.close();
   });
+
+  test('reads a stable sensor history page with its total count', () async {
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: databasePath,
+    );
+    final history = SensorHistoryStore(database);
+    final start = DateTime.utc(2026, 10, 7, 12);
+
+    expect(await history.getLatestSensorDataId(), 0);
+
+    for (var index = 0; index < 25; index++) {
+      await history.insertSensorData(
+        SensorData(
+          temperatureC: index.toDouble(),
+          timestamp: start.add(Duration(minutes: index)),
+        ),
+      );
+    }
+
+    final snapshotId = await history.getLatestSensorDataId();
+    final page = await history.getSensorData(
+      limit: 10,
+      offset: 10,
+      throughId: snapshotId,
+    );
+
+    expect(snapshotId, 25);
+    expect(await history.getSensorDataCount(throughId: snapshotId), 25);
+    expect(page, hasLength(10));
+    expect(page.first.temperatureC, 14);
+    expect(page.last.temperatureC, 5);
+
+    await history.insertSensorData(
+      SensorData(
+        temperatureC: 99,
+        timestamp: start.add(const Duration(days: 1)),
+      ),
+    );
+
+    expect(await history.getSensorDataCount(throughId: snapshotId), 25);
+    expect(
+      (await history.getSensorData(
+        limit: 10,
+        throughId: snapshotId,
+      )).first.temperatureC,
+      24,
+    );
+    await database.close();
+  });
 }

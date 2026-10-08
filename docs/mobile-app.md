@@ -42,6 +42,14 @@ node list or save credentials. MQ sensor values are voltages; the app does not
 calculate a certified air quality index or carbon monoxide concentration from
 them.
 
+The sensor data log reads the full local history in pages of 10 records, newest
+first. Live updates are off by default so records do not move between pages
+while they are being reviewed. Use Refresh to create a newer snapshot, or turn
+on Live updates to refresh the first page as telemetry arrives. When new data
+arrives while an older page is open, the app keeps that page stable and shows a
+New records available action that returns to the refreshed first page. Session
+analytics and CSV exports continue to use the current in-memory session.
+
 The safety dashboard sends threshold changes to `POST /api/thresholds`. The
 firmware also accepts `/api/settings` for older clients, with the same
 validation. See [the API reference](api.md) for ranges and examples.

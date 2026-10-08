@@ -1,20 +1,66 @@
+import 'dart:async';
+
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
+import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_history_store.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_log_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 class MonitorTab extends StatefulWidget {
-  const MonitorTab({super.key});
+  const MonitorTab({super.key, this.sensorLogController});
+
+  final SensorLogController? sensorLogController;
+
   @override
   State<MonitorTab> createState() => _MonitorTabState();
 }
 
 class _MonitorTabState extends State<MonitorTab> {
   int _segIndex = 0;
+  late SensorLogController _sensorLogController;
+  late bool _ownsSensorLogController;
+  int? _lastTelemetryRevision;
+
+  @override
+  void initState() {
+    super.initState();
+    _attachSensorLogController();
+  }
+
+  void _attachSensorLogController() {
+    _ownsSensorLogController = widget.sensorLogController == null;
+    _sensorLogController =
+        widget.sensorLogController ??
+        SensorLogController(SensorHistoryStore(AppDatabase()));
+    _sensorLogController.addListener(_onSensorLogChanged);
+    unawaited(_sensorLogController.loadInitialPage());
+  }
+
+  void _onSensorLogChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant MonitorTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sensorLogController == widget.sensorLogController) return;
+    _sensorLogController.removeListener(_onSensorLogChanged);
+    if (_ownsSensorLogController) _sensorLogController.dispose();
+    _attachSensorLogController();
+  }
+
+  @override
+  void dispose() {
+    _sensorLogController.removeListener(_onSensorLogChanged);
+    if (_ownsSensorLogController) _sensorLogController.dispose();
+    super.dispose();
+  }
 
   void _exportCSV(
     BuildContext context,
@@ -124,6 +170,7 @@ class _MonitorTabState extends State<MonitorTab> {
   Widget build(BuildContext context) {
     final state = context.watch<AppStateProvider>();
     final theme = Theme.of(context);
+    _handleTelemetryRevision(state.telemetryRevision);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -175,6 +222,18 @@ class _MonitorTabState extends State<MonitorTab> {
         ),
       ),
     );
+  }
+
+  void _handleTelemetryRevision(int revision) {
+    if (_lastTelemetryRevision == null) {
+      _lastTelemetryRevision = revision;
+      return;
+    }
+    if (_lastTelemetryRevision == revision) return;
+    _lastTelemetryRevision = revision;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_sensorLogController.onTelemetryRevision());
+    });
   }
 
   Widget _buildSensorsView(AppStateProvider state, ThemeData theme) {
@@ -231,12 +290,14 @@ class _MonitorTabState extends State<MonitorTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              "Sensor Data Log",
-              style: TextStyle(
-                color: theme.textTheme.bodyLarge?.color,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+            Expanded(
+              child: Text(
+                "Sensor Data Log",
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
             ),
             IconButton(
@@ -249,8 +310,66 @@ class _MonitorTabState extends State<MonitorTab> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        ...state.history.reversed.map(
+        Row(
+          children: [
+            const Expanded(child: Text('Live updates')),
+            Switch(
+              value: _sensorLogController.liveUpdates,
+              onChanged: _sensorLogController.isLoading
+                  ? null
+                  : (enabled) =>
+                        unawaited(_sensorLogController.setLiveUpdates(enabled)),
+            ),
+            IconButton(
+              icon: const Icon(CupertinoIcons.refresh),
+              tooltip: 'Refresh sensor log',
+              onPressed: _sensorLogController.isLoading
+                  ? null
+                  : () => unawaited(_sensorLogController.refresh()),
+            ),
+          ],
+        ),
+        if (_sensorLogController.hasNewRecords)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _sensorLogController.isLoading
+                  ? null
+                  : () => unawaited(_sensorLogController.showNewRecords()),
+              icon: const Icon(CupertinoIcons.arrow_up),
+              label: const Text('New records available'),
+            ),
+          ),
+        const SizedBox(height: 8),
+        if (_sensorLogController.isLoading &&
+            _sensorLogController.records.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_sensorLogController.errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              children: [
+                Text(
+                  _sensorLogController.errorMessage!,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => unawaited(_sensorLogController.refresh()),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          )
+        else if (_sensorLogController.records.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: Text('No sensor records yet.')),
+          ),
+        ..._sensorLogController.records.map(
           (log) => Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
@@ -260,25 +379,31 @@ class _MonitorTabState extends State<MonitorTab> {
               border: Border.all(color: theme.dividerColor),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Telemetry Record",
-                      style: TextStyle(
-                        color: theme.textTheme.bodyLarge?.color,
-                        fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Telemetry Record",
+                        style: TextStyle(
+                          color: theme.textTheme.bodyLarge?.color,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Chamber: ${log.chamberTempC?.toStringAsFixed(1) ?? '--'}°C | MQ2: ${log.mq2V?.toStringAsFixed(2) ?? '--'}V | Temp: ${log.temperatureC?.toStringAsFixed(1) ?? '--'}°C",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        "Chamber: ${log.chamberTempC?.toStringAsFixed(1) ?? '--'}°C | MQ2: ${log.mq2V?.toStringAsFixed(2) ?? '--'}V | Temp: ${log.temperatureC?.toStringAsFixed(1) ?? '--'}°C",
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 12),
                 Text(
                   "${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}",
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
@@ -286,6 +411,31 @@ class _MonitorTabState extends State<MonitorTab> {
               ],
             ),
           ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed:
+                  !_sensorLogController.isLoading &&
+                      _sensorLogController.currentPage > 1
+                  ? () => unawaited(_sensorLogController.previousPage())
+                  : null,
+              child: const Text('Previous'),
+            ),
+            Text(
+              'Page ${_sensorLogController.currentPage} of ${_sensorLogController.pageCount}',
+            ),
+            TextButton(
+              onPressed:
+                  !_sensorLogController.isLoading &&
+                      _sensorLogController.currentPage <
+                          _sensorLogController.pageCount
+                  ? () => unawaited(_sensorLogController.nextPage())
+                  : null,
+              child: const Text('Next'),
+            ),
+          ],
         ),
       ],
     );

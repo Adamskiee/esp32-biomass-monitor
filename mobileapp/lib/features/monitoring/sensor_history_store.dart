@@ -2,7 +2,19 @@ import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-class SensorHistoryStore {
+abstract interface class SensorHistoryReader {
+  Future<List<SensorData>> getSensorData({
+    int limit,
+    int offset,
+    int? throughId,
+  });
+
+  Future<int> getLatestSensorDataId();
+
+  Future<int> getSensorDataCount({int? throughId});
+}
+
+class SensorHistoryStore implements SensorHistoryReader {
   SensorHistoryStore(this._database);
 
   final AppDatabase _database;
@@ -18,14 +30,43 @@ class SensorHistoryStore {
     });
   }
 
-  Future<List<SensorData>> getSensorData({int limit = 100}) async {
+  @override
+  Future<List<SensorData>> getSensorData({
+    int limit = 100,
+    int offset = 0,
+    int? throughId,
+  }) async {
     if (kIsWeb) return [];
     final rows = await (await _database.database).query(
       'sensor_data',
-      orderBy: 'timestamp DESC',
+      where: throughId == null ? null : 'id <= ?',
+      whereArgs: throughId == null ? null : [throughId],
+      orderBy: 'id DESC',
       limit: limit,
+      offset: offset,
     );
     return rows.map(_sensorDataFromRow).toList();
+  }
+
+  @override
+  Future<int> getLatestSensorDataId() async {
+    if (kIsWeb) return 0;
+    final rows = await (await _database.database).rawQuery(
+      'SELECT COALESCE(MAX(id), 0) AS latest_id FROM sensor_data',
+    );
+    return (rows.single['latest_id'] as num).toInt();
+  }
+
+  @override
+  Future<int> getSensorDataCount({int? throughId}) async {
+    if (kIsWeb) return 0;
+    final rows = await (await _database.database).rawQuery(
+      throughId == null
+          ? 'SELECT COUNT(*) AS record_count FROM sensor_data'
+          : 'SELECT COUNT(*) AS record_count FROM sensor_data WHERE id <= ?',
+      throughId == null ? null : [throughId],
+    );
+    return (rows.single['record_count'] as num).toInt();
   }
 
   Future<List<SensorData>> getAggregatedSensorData(int hours) async {
