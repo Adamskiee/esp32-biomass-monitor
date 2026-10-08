@@ -75,6 +75,10 @@ Type one command into the simulator terminal while the app is open:
 | `help` | Print available commands. |
 | `quit` | Stop the server. |
 
+Every online scenario also returns stable PMS telemetry: PM1.0 is 8 µg/m³,
+PM2.5 is 12 µg/m³, and PM10 is 18 µg/m³. These values exercise the same
+device-state fields as the firmware without affecting simulated safety rules.
+
 The sprinkler state represents the commanded valve relay. The pump starts
 500 ms after the valve is commanded on. During shutdown, the pump turns off
 first and the valve closes 500 ms later. The app may briefly show different
@@ -90,6 +94,16 @@ With the simulator running, request state from another terminal:
 
 ```bash
 curl --user demo:demo http://127.0.0.1:8765/api/state
+```
+
+The response includes particulate values alongside the existing telemetry:
+
+```json
+{
+  "pm1_0_ug_m3": 8,
+  "pm2_5_ug_m3": 12,
+  "pm10_ug_m3": 18
+}
 ```
 
 See the [API reference](api.md) for request bodies, response fields, and
