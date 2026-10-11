@@ -1,4 +1,5 @@
 #pragma once
+#include "PmsReading.h"
 #ifdef ARDUINO
 #include <Arduino.h>
 #include <Preferences.h>
@@ -49,6 +50,10 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
 ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
                            float mq2_v);
+void recordPmsReading(const PmsReading &reading, uint32_t sampled_at_ms);
+void resetPmsReadingCache();
+// The caller holds stateMutex while copying the sample.
+bool copyFreshPmsReadingLocked(uint32_t now_ms, PmsReading &out);
 // On Arduino, the caller must hold stateMutex while evaluating outputs.
 void evaluateSafetyLoop();
 void updateActuatorTransitions();

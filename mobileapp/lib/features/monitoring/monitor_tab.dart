@@ -7,6 +7,8 @@ import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_history_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_log_controller.dart';
+import 'package:biomass_iot_app/features/monitoring/pms_readings.dart';
+import 'package:biomass_iot_app/features/monitoring/telemetry_csv.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -114,7 +116,7 @@ class _MonitorTabState extends State<MonitorTab> {
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
               ),
               trailing: const Text(
-                "Temperature, chamber, MQ135, MQ2",
+                "Temperature, chamber, MQ135, MQ2, PMS",
                 style: TextStyle(color: AppTheme.neonGreen),
               ),
               tileColor: theme.scaffoldBackgroundColor,
@@ -153,17 +155,8 @@ class _MonitorTabState extends State<MonitorTab> {
 
   void _generateAndShareCSV(List<SensorData> history) {
     if (history.isEmpty) return;
-    StringBuffer csv = StringBuffer();
-    csv.writeln(
-      "Timestamp,Temperature(C),ChamberTemperature(C),MQ135(V),MQ2(V)",
-    );
-    for (var d in history) {
-      csv.writeln(
-        "${d.timestamp.toIso8601String()},${d.temperatureC?.toStringAsFixed(2) ?? ''},${d.chamberTempC?.toStringAsFixed(2) ?? ''},${d.mq135V?.toStringAsFixed(2) ?? ''},${d.mq2V?.toStringAsFixed(2) ?? ''}",
-      );
-    }
     // ignore: deprecated_member_use
-    Share.share(csv.toString(), subject: 'Biomass_Telemetry_Export.csv');
+    Share.share(buildTelemetryCsv(history), subject: 'Biomass_Telemetry_Export.csv');
   }
 
   @override
@@ -400,6 +393,11 @@ class _MonitorTabState extends State<MonitorTab> {
                           fontSize: 12,
                         ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "PM1.0: ${log.pm1_0UgM3?.toStringAsFixed(0) ?? '--'} | PM2.5: ${log.pm2_5UgM3?.toStringAsFixed(0) ?? '--'} | PM10: ${log.pm10UgM3?.toStringAsFixed(0) ?? '--'} µg/m³",
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -501,6 +499,8 @@ class _MonitorTabState extends State<MonitorTab> {
           "${(data.mq135V ?? 0).toStringAsFixed(2)} V",
           theme,
         ),
+        const SizedBox(height: 24),
+        PmsReadings(data: data),
         const SizedBox(height: 24),
         _pollutantBar(
           "MQ2 Smoke/Gas Voltage",

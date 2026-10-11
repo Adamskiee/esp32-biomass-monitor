@@ -57,6 +57,16 @@ void initApiServer() {
       doc["mq2_v"] = nullptr;
     else
       doc["mq2_v"] = current_mq2_v;
+    PmsReading pms_reading{};
+    if (copyFreshPmsReadingLocked(millis(), pms_reading)) {
+      doc["pm1_0_ug_m3"] = pms_reading.pm1_0_ug_m3;
+      doc["pm2_5_ug_m3"] = pms_reading.pm2_5_ug_m3;
+      doc["pm10_ug_m3"] = pms_reading.pm10_ug_m3;
+    } else {
+      doc["pm1_0_ug_m3"] = nullptr;
+      doc["pm2_5_ug_m3"] = nullptr;
+      doc["pm10_ug_m3"] = nullptr;
+    }
     doc["threshold_chamber_temp_c"] = threshold_chamber_temp_c;
     doc["threshold_mq2_v"] = threshold_mq2_v;
     doc["fan_on"] = current_fan_state;

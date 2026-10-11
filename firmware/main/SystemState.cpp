@@ -21,6 +21,9 @@ String active_triggers_json = "[]";
 
 static bool temp_latch_danger = false;
 static bool mq2_latch_danger = false;
+static PmsReading latest_pms_reading{};
+static uint32_t latest_pms_sampled_at_ms = 0;
+static bool has_pms_reading = false;
 
 constexpr float MQ2_GAS_DANGER_V = 2.5f;
 constexpr float MQ2_RAIL_SHORT_V = 4.8f;
@@ -38,6 +41,8 @@ void initSystemState() {
 
   preferences.begin("biomass", false);
 
+  resetPmsReadingCache();
+
   threshold_chamber_temp_c = preferences.getFloat("chamber_temp", 80.0);
   threshold_mq2_v = preferences.getFloat("mq2_v", 2.5);
 }
@@ -48,7 +53,7 @@ void saveSystemState(float chamber_limit, float mq2_limit) {
 }
 #else
 SemaphoreHandle_t stateMutex = nullptr;
-void initSystemState() {}
+void initSystemState() { resetPmsReadingCache(); }
 void saveSystemState(float chamber_limit, float mq2_limit) {}
 #endif
 
@@ -130,6 +135,37 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
   if (stateMutex != nullptr) {
     xSemaphoreGive(stateMutex);
   }
+}
+
+void recordPmsReading(const PmsReading &reading, uint32_t sampled_at_ms) {
+  if (stateMutex != nullptr) {
+    xSemaphoreTake(stateMutex, portMAX_DELAY);
+  }
+
+  latest_pms_reading = reading;
+  latest_pms_sampled_at_ms = sampled_at_ms;
+  has_pms_reading = true;
+
+  if (stateMutex != nullptr) {
+    xSemaphoreGive(stateMutex);
+  }
+}
+
+void resetPmsReadingCache() {
+  latest_pms_reading = {};
+  latest_pms_sampled_at_ms = 0;
+  has_pms_reading = false;
+}
+
+bool copyFreshPmsReadingLocked(uint32_t now_ms, PmsReading &out) {
+  if (!has_pms_reading ||
+      static_cast<uint32_t>(now_ms - latest_pms_sampled_at_ms) >
+          PMS_READING_FRESHNESS_MS) {
+    return false;
+  }
+
+  out = latest_pms_reading;
+  return true;
 }
 
 void evaluateSafetyLoop() {

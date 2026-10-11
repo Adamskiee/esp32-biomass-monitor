@@ -99,6 +99,9 @@ void main() {
         SensorData(
           chamberTempC: 58.4,
           mq2V: 1.75,
+          pm1_0UgM3: 8,
+          pm2_5UgM3: 12,
+          pm10UgM3: 18,
           temperatureC: 31.2,
           timestamp: DateTime(2026, 10, 7, 12, 34, 56),
         ),

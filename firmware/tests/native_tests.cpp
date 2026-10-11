@@ -457,6 +457,53 @@ void testLowerThresholdImmediatelyReevaluatesSafety() {
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
 
+void testPmsReadingFreshness() {
+  const char *name = "PMS reading freshness";
+  resetPmsReadingCache();
+  PmsReading reading{};
+  EXPECT_FALSE(name, copyFreshPmsReadingLocked(1000, reading));
+
+  const PmsReading expected{0, 12, 18};
+  recordPmsReading(expected, 5000);
+  EXPECT_TRUE(name, copyFreshPmsReadingLocked(15000, reading));
+  EXPECT_TRUE(name, reading.pm1_0_ug_m3 == 0);
+  EXPECT_TRUE(name, reading.pm2_5_ug_m3 == 12);
+  EXPECT_TRUE(name, reading.pm10_ug_m3 == 18);
+  EXPECT_FALSE(name, copyFreshPmsReadingLocked(15001, reading));
+}
+
+void testPmsFreshnessAcrossClockWrap() {
+  const char *name = "PMS freshness across clock wrap";
+  resetPmsReadingCache();
+  const uint32_t sampled_at_ms = UINT32_MAX - 5000;
+  const PmsReading expected{0, 12, 18};
+  PmsReading reading{};
+
+  recordPmsReading(expected, sampled_at_ms);
+  EXPECT_TRUE(name,
+              copyFreshPmsReadingLocked(sampled_at_ms + 10000, reading));
+  EXPECT_TRUE(name, reading.pm1_0_ug_m3 == 0);
+  EXPECT_FALSE(name,
+               copyFreshPmsReadingLocked(sampled_at_ms + 10001, reading));
+}
+
+void testPmsDoesNotAffectSafety() {
+  const char *name = "PMS does not affect safety";
+  resetSafetyState();
+  const std::string triggers_before = active_triggers_json;
+  const bool sprinkler_before = current_solenoid_state;
+  const PmsReading reading{8, 12, 18};
+
+  recordPmsReading(reading, 1000);
+
+  EXPECT_TRUE(name, active_triggers_json == triggers_before);
+  EXPECT_TRUE(name, current_solenoid_state == sprinkler_before);
+  current_mq2_v = 3.0f;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  EXPECT_FALSE(name, current_solenoid_state);
+}
+
 void run(const char *name, const std::function<void()> &test) {
   ++test_count;
   const int failures_before = failure_count;
@@ -527,6 +574,9 @@ int main() {
       testValidThresholdUpdateChangesRequestedFields);
   run("lower threshold immediately reevaluates safety",
       testLowerThresholdImmediatelyReevaluatesSafety);
+  run("PMS reading freshness", testPmsReadingFreshness);
+  run("PMS freshness across clock wrap", testPmsFreshnessAcrossClockWrap);
+  run("PMS does not affect safety", testPmsDoesNotAffectSafety);
 
   if (failure_count != 0) {
     std::cerr << failure_count << " native firmware test assertion(s) failed\n";

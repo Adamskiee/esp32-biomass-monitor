@@ -26,6 +26,9 @@ class SensorHistoryStore implements SensorHistoryReader {
       'chamber_temp_c': data.chamberTempC,
       'mq135_v': data.mq135V,
       'mq2_v': data.mq2V,
+      'pm1_0_ug_m3': data.pm1_0UgM3,
+      'pm2_5_ug_m3': data.pm2_5UgM3,
+      'pm10_ug_m3': data.pm10UgM3,
       'timestamp': data.timestamp.toIso8601String(),
     });
   }
@@ -94,6 +97,9 @@ class SensorHistoryStore implements SensorHistoryReader {
           chamberTempC: _average(chunk, 'chamber_temp_c'),
           mq135V: _average(chunk, 'mq135_v'),
           mq2V: _average(chunk, 'mq2_v'),
+          pm1_0UgM3: _average(chunk, 'pm1_0_ug_m3'),
+          pm2_5UgM3: _average(chunk, 'pm2_5_ug_m3'),
+          pm10UgM3: _average(chunk, 'pm10_ug_m3'),
           timestamp: DateTime.parse(chunk.last['timestamp']! as String),
         ),
       );
@@ -106,6 +112,9 @@ class SensorHistoryStore implements SensorHistoryReader {
     chamberTempC: (row['chamber_temp_c'] as num?)?.toDouble(),
     mq135V: (row['mq135_v'] as num?)?.toDouble(),
     mq2V: (row['mq2_v'] as num?)?.toDouble(),
+    pm1_0UgM3: (row['pm1_0_ug_m3'] as num?)?.toDouble(),
+    pm2_5UgM3: (row['pm2_5_ug_m3'] as num?)?.toDouble(),
+    pm10UgM3: (row['pm10_ug_m3'] as num?)?.toDouble(),
     timestamp: DateTime.parse(row['timestamp']! as String),
   );
 
