@@ -2,12 +2,13 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'core/storage/app_database.dart';
+import 'core/storage/database_provider.dart';
 
 import 'features/alerts/alert_item.dart';
 import 'features/monitoring/sensor_data.dart';
 import 'features/safety/audit_log.dart';
 
-class DatabaseHelper {
+class DatabaseHelper implements DatabaseProvider {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static final AppDatabase _defaultStorage = AppDatabase();
   factory DatabaseHelper() => _instance;
@@ -16,6 +17,7 @@ class DatabaseHelper {
 
   final AppDatabase? _storage;
 
+  @override
   Future<Database> get database {
     if (kIsWeb) throw UnsupportedError('SQLite is not supported on the Web');
     return (_storage ?? _defaultStorage).database;

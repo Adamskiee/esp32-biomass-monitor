@@ -60,6 +60,20 @@ The safety dashboard sends threshold changes to `POST /api/thresholds`. The
 firmware also accepts `/api/settings` for older clients, with the same
 validation. See [the API reference](api.md) for ranges and examples.
 
+## How do filtration attempts work?
+
+The **Attempts** segment records local snapshots while the app remains open,
+authenticated, and connected to the ESP32. Start one attempt as **Without
+filtration** and another as **With filtration**, then stop each one. A lost
+connection marks the active attempt interrupted while preserving its readings.
+
+Select one saved attempt from each scenario and choose **Compare attempts**.
+The app shows average, minimum, maximum, and elapsed-time series for MQ-2,
+MQ-135, DHT-22 temperature and humidity, and PM1.0, PM2.5, and PM10. A
+percentage is `(with filtration average - without filtration average) / without
+filtration average`. Missing data and zero baselines are shown as unavailable.
+The comparison describes observations and never gives a success verdict.
+
 ## How do I check the app?
 
 ```bash

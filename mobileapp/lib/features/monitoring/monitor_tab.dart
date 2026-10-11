@@ -13,6 +13,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../experiments/attempts_section.dart';
 
 class MonitorTab extends StatefulWidget {
   const MonitorTab({super.key, this.sensorLogController});
@@ -191,6 +192,10 @@ class _MonitorTabState extends State<MonitorTab> {
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text("Air Quality"),
                       ),
+                      2: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text("Attempts"),
+                      ),
                     },
                     onValueChanged: (val) => setState(() => _segIndex = val),
                   ),
@@ -201,6 +206,8 @@ class _MonitorTabState extends State<MonitorTab> {
                   duration: const Duration(milliseconds: 300),
                   child: _segIndex == 0
                       ? _buildSensorsView(state, theme)
+                      : _segIndex == 2
+                      ? const AttemptsSection()
                       : state.isHardwareConnected
                       ? _buildAirQualityView(state.currentData, theme)
                       : const Center(

@@ -3,7 +3,9 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
-class AppDatabase {
+import 'database_provider.dart';
+
+class AppDatabase implements DatabaseProvider {
   AppDatabase({DatabaseFactory? databaseFactory, String? databasePath})
     : _databaseFactory = databaseFactory ?? _defaultDatabaseFactory,
       _databasePath = databasePath;
@@ -13,13 +15,15 @@ class AppDatabase {
   final String? _databasePath;
   Database? _database;
 
+  @override
   Future<Database> get database async {
     if (_database != null) return _database!;
     if (kIsWeb) throw UnsupportedError('SQLite is not supported on the Web');
     _database = await _databaseFactory.openDatabase(
       _databasePath ?? await _defaultPath(),
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
+        onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -47,6 +51,7 @@ class AppDatabase {
       await db.execute('ALTER TABLE sensor_data ADD COLUMN pm2_5_ug_m3 REAL');
       await db.execute('ALTER TABLE sensor_data ADD COLUMN pm10_ug_m3 REAL');
     }
+    if (oldVersion < 4) await _createAttemptTables(db);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -60,6 +65,7 @@ class AppDatabase {
         time TEXT
       )
     ''');
+    await _createAttemptTables(db);
     await db.execute('''
       CREATE TABLE audit_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,4 +89,39 @@ class AppDatabase {
       timestamp TEXT
     )
   ''');
+
+  Future<void> _createAttemptTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scenario TEXT NOT NULL,
+        sequence_number INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        status TEXT NOT NULL,
+        UNIQUE(scenario, sequence_number)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE attempt_readings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attempt_id INTEGER NOT NULL REFERENCES attempts(id) ON DELETE CASCADE,
+        recorded_at TEXT NOT NULL,
+        elapsed_ms INTEGER NOT NULL,
+        temperature_c REAL,
+        humidity_percent REAL,
+        mq135_v REAL,
+        mq2_v REAL,
+        pm1_ug_m3 REAL,
+        pm25_ug_m3 REAL,
+        pm10_ug_m3 REAL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX attempt_readings_attempt_elapsed ON attempt_readings(attempt_id, elapsed_ms)',
+    );
+    await db.execute(
+      "CREATE UNIQUE INDEX one_active_attempt ON attempts(status) WHERE status = 'active'",
+    );
+  }
 }

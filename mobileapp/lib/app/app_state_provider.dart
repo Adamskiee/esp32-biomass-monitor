@@ -11,9 +11,10 @@ import '../database_helper.dart';
 import '../features/alerts/alert_item.dart';
 import '../features/authentication/device_address_store.dart';
 import '../features/monitoring/sensor_data.dart';
+import '../features/monitoring/telemetry_source.dart';
 import '../features/safety/audit_log.dart';
 
-class AppStateProvider extends ChangeNotifier {
+class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   final SharedPreferences _prefs;
   late final DeviceAddressStore _deviceAddresses;
   final http.Client _client;
@@ -43,14 +44,17 @@ class AppStateProvider extends ChangeNotifier {
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isAdmin => _isAdmin;
+  @override
   bool get isHardwareConnected => _isHardwareConnected;
   bool get canResumeWithBiometrics =>
       _currentUser.isNotEmpty && _password.isNotEmpty;
   int get currentTab => _currentTab;
   String get deviceIp => _deviceAddresses.deviceIp;
   String get authorizationHeader => _basicAuthHeader;
+  @override
   SensorData get currentData => _currentData;
   List<SensorData> get history => _history;
+  @override
   int get telemetryRevision => _telemetryRevision;
   List<AlertItem> get alerts => _alerts;
   List<AuditLog> get auditLogs => _auditLogs;
