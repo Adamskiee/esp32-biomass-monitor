@@ -51,6 +51,10 @@ void setup() {
       
       JsonDocument doc;
       doc["temperature_c"] = 25.4;
+      doc["humidity_percent"] = 54.5;
+      doc["pm1_ug_m3"] = 10;
+      doc["pm25_ug_m3"] = 20;
+      doc["pm10_ug_m3"] = 30;
       doc["chamber_temp_c"] = nullptr; // Mocking disconnected sensor behavior
       doc["mq135_v"] = 1.25;
       doc["mq2_v"] = 0.85;

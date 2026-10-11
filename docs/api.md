@@ -52,6 +52,10 @@ Returns cached readings and current safety outputs:
 ```json
 {
   "temperature_c": 25.5,
+  "humidity_percent": 54.5,
+  "pm1_ug_m3": 10,
+  "pm25_ug_m3": 20,
+  "pm10_ug_m3": 30,
   "chamber_temp_c": 120.0,
   "mq135_v": 2.1,
   "mq2_v": 1.5,
@@ -71,7 +75,10 @@ the 500 ms startup and shutdown sequence. The example above shows startup:
 the valve is commanded on while the pump is still off. Neither field confirms
 that the valve moved, the pump ran, or water flowed.
 
-Sensor reads represented internally as `NaN` are returned as `null`. MQ2
+Sensor reads represented internally as `NaN` are returned as `null`. A missing
+DHT-22 makes both temperature and `humidity_percent` null. A missing PMS5003
+makes all three PM fields null. PM values use PMS5003 environmental mass
+concentrations in µg/m³. MQ2
 readings from 0.0 V through 2.4 V are safe. Readings at or above 2.5 V add the
 `high_mq2_gas` trigger, while only `NaN` values and values above 4.8 V add the
 `mq2_sensor_fault` trigger. `active_triggers` can contain:

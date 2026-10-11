@@ -64,16 +64,23 @@ Type one command into the simulator terminal while the app is open:
 
 | Command | Expected app result |
 | --- | --- |
-| `normal` | Safe readings near 25 °C ambient, 45 °C chamber, 1.2 V MQ135, and 1.0 V MQ2. Readings change slightly on each poll so charts grow. |
+| `normal` | Safe readings near 25 °C ambient, 45 °C chamber, 1.2 V MQ135, 1.0 V MQ2, and finite DHT-22 humidity and PMS5003 PM values. Readings change slightly on each poll so charts grow. |
 | `gas` | MQ2 rises to 2.8 V and `high_mq2_gas` appears. The sprinkler stays under manual control. |
 | `heat` | Chamber temperature rises to 100 °C. `high_chamber_temp` forces the sprinkler on and blocks manual control. |
 | `temp-fault` | Chamber temperature becomes unavailable. If `heat` was active immediately before it, a catastrophic latch keeps the sprinkler on until `reset`. |
 | `mq2-fault` | MQ2 becomes unavailable and `mq2_sensor_fault` appears. |
+| `dht-fault` | Ambient temperature and humidity become unavailable without adding a safety trigger. |
+| `pms-fault` | PM1.0, PM2.5, and PM10 become unavailable without adding a safety trigger. |
 | `offline` | Authenticated requests return 503 and the app shows its disconnected state. The simulator retains readings and settings. |
 | `status` | Print the selected scenario. |
 | `reset` | Restore `normal`, clear safety latches and manual control, and restore 80.0 °C and 2.5 V thresholds. |
 | `help` | Print available commands. |
 | `quit` | Stop the server. |
+
+To demonstrate an attempt comparison, record a **Without filtration** attempt
+while `gas` is selected, stop it, then record a **With filtration** attempt
+while `normal` is selected. The app stores readings on the phone and compares
+descriptive summaries only. It does not determine whether filtration passed.
 
 The sprinkler state represents the commanded valve relay. The pump starts
 500 ms after the valve is commanded on. During shutdown, the pump turns off

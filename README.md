@@ -21,6 +21,8 @@ sprinkler control, threshold configuration, and active danger alerts.
 - MQ135 air-quality sensor
 - MQ2 smoke and gas sensor
 - K-type thermocouple
+- DHT-22 temperature and humidity sensor
+- PMS5003 particulate sensor
 - Filtration fan and driver
 - Water sprinkler solenoid and relay
 - Status LEDs and buzzer
@@ -47,6 +49,10 @@ The firmware does not advertise an `esp32.local` mDNS hostname.
 
 To try the app without an ESP32, run the local API simulator. See the
 [ESP32 simulator guide](docs/esp32-simulator.md) for setup and scenarios.
+
+The app can also save paired local filtration attempts and compare their sensor
+summaries. Comparisons describe recorded differences only and do not certify
+filtration performance. See the [mobile application guide](docs/mobile-app.md).
 
 ## How do I verify a change?
 

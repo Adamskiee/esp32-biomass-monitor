@@ -20,6 +20,26 @@ components:
           type: number
           format: float
           nullable: true
+        humidity_percent:
+          type: number
+          format: float
+          nullable: true
+          description: DHT-22 relative humidity in percent.
+        pm1_ug_m3:
+          type: number
+          format: float
+          nullable: true
+          description: PMS5003 environmental PM1.0 concentration in µg/m³.
+        pm25_ug_m3:
+          type: number
+          format: float
+          nullable: true
+          description: PMS5003 environmental PM2.5 concentration in µg/m³.
+        pm10_ug_m3:
+          type: number
+          format: float
+          nullable: true
+          description: PMS5003 environmental PM10 concentration in µg/m³.
         chamber_temp_c:
           type: number
           format: float

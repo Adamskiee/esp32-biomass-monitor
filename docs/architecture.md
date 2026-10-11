@@ -3,8 +3,9 @@
 ## What owns the safety state?
 
 The ESP32 firmware is the source of truth for sensor readings, actuator state,
-and safety triggers. Its polling loop reads the thermocouple, MQ2, MQ135, and
-temperature sensors, caches their values under a mutex, evaluates sprinkler
+and safety triggers. Its polling loop reads the thermocouple, MQ2, MQ135,
+DHT-22 temperature and humidity, and PMS5003 environmental particulate
+sensors, caches their values under a mutex, evaluates sprinkler
 safety, and drives the fan, status LEDs, and buzzer. The HTTP server reads this
 state and accepts bounded, authenticated control requests. The Flutter app
 shows reported state and cannot override automatic sprinkler safety.
@@ -29,6 +30,15 @@ shows reported state and cannot override automatic sprinkler safety.
 MQ135 is included in telemetry but does not currently trigger automatic
 actuation. The fan output is an on/off relay; variable PWM speed is not
 implemented.
+
+## Why does the phone own filtration attempts?
+
+The firmware remains responsible for live telemetry and safety, while the
+phone persists attempts and readings in its local SQLite database. This keeps
+recording scoped to an authenticated, connected app session and avoids cloud
+synchronization or ESP32 buffering. One active attempt is allowed; a
+disconnect finishes it as interrupted so stored readings remain available for
+descriptive comparison.
 
 ## How are the valve and pump sequenced?
 

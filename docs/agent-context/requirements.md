@@ -12,6 +12,8 @@ The system is built around an ESP32 microcontroller utilizing FreeRTOS.
 *   **MQ2:** Smoke and combustible gas sensor (Reads as Voltage).
 *   **Internal Temperature:** Board-level temperature monitoring (Celsius).
 *   **Thermocouple:** Measures the internal chamber temperature where burning occurs (Celsius).
+*   **DHT-22:** Measures ambient temperature (Celsius) and relative humidity (percent).
+*   **PMS5003:** Measures environmental PM1.0, PM2.5, and PM10 mass concentrations (µg/m³).
 
 **Actuators (Outputs):**
 *   **Filtration Fan:** Active ventilation and smoke filtration.
@@ -25,6 +27,7 @@ The system operates on a continuous, non-blocking evaluation loop.
 *   **Polling Interval:** Hardware sensors are read every `POLL_INTERVAL_MS`.
 *   **Concurrency & Data Access:** Hardware readings are safely cached into global state variables, protected by a FreeRTOS mutex (`stateMutex`). This allows the API server to serve data to the visualization dashboard rapidly without blocking the hardware control loop.
 *   **Threshold Persistence:** Dynamic safety limits (`safe_chamber_limit`, `safe_mq2_limit`) can be updated. To prevent flash memory wear, changes to these thresholds are saved to Non-Volatile Storage (NVS) with a hard rate limit of at most once every 60 seconds.
+*   **Attempt recording:** The mobile app may record one connected local attempt at a time as with or without filtration. It persists readings locally and presents descriptive comparisons without a success verdict.
 
 ## 4. Safety Rules & Automation Logic
 The core responsibility of the system is evaluating sensor data against safety thresholds and triggering the appropriate actuators.
