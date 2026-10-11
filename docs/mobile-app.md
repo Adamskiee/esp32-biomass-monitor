@@ -69,7 +69,10 @@ connection marks the active attempt interrupted while preserving its readings.
 App upgrades retain saved attempts and readings from the earlier local database
 schema.
 
-Select one saved attempt from each scenario and choose **Compare attempts**.
+Saved attempts appear in separate **Without filtration** and **With filtration**
+groups. Select one attempt from each group to enable **Compare attempts**.
+Deleting a saved attempt requires confirmation; deleting a selected attempt
+clears that selection and disables comparison until another is chosen.
 The app shows average, minimum, maximum, and elapsed-time series for MQ-2,
 MQ-135, DHT-22 temperature and humidity, and PM1.0, PM2.5, and PM10. A
 percentage is `(with filtration average - without filtration average) / without
