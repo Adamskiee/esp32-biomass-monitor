@@ -18,6 +18,7 @@ class SimulatorState:
     _LIMITS = {
         "threshold_chamber_temp_c": (20.0, 150.0),
         "threshold_mq2_v": (0.1, 5.0),
+        "threshold_mq2_response_ratio": (1.0000001, 100.0),
     }
 
     def __init__(self, clock: Callable[[], float] = time.monotonic):
@@ -40,6 +41,14 @@ class SimulatorState:
             self._mq2_v = 1.0
             self._threshold_chamber_temp_c = 80.0
             self._threshold_mq2_v = 2.5
+            self._threshold_mq2_response_ratio = None
+            self._mq2_baseline_v = None
+            self._mq135_baseline_v = None
+            self._mq2_calibration_id = None
+            self._mq135_calibration_id = None
+            self._next_calibration_id = 1
+            self._started_at = self._clock()
+            self._last_mq_write_at = None
             self._temp_danger = False
             self._gas_danger = False
             self._catastrophic_latch = False
@@ -74,9 +83,31 @@ class SimulatorState:
                 raise ValueError(f"Invalid {key}")
             validated[key] = float(value)
         with self._lock:
+            if "threshold_mq2_response_ratio" in validated and self._mq2_baseline_v is None:
+                raise ValueError("MQ-2 calibration required")
             for key, value in validated.items():
                 setattr(self, f"_{key}", value)
             self._evaluate_safety()
+
+    def capture_mq_calibration(self, sensor: str) -> dict[str, object]:
+        if sensor not in ("mq2", "mq135"):
+            raise ValueError("sensor must be mq2 or mq135")
+        with self._lock:
+            if self._clock() - self._started_at < 300:
+                raise ValueError("warming up")
+            if self._last_mq_write_at is not None and self._clock() - self._last_mq_write_at < 60:
+                raise RuntimeError("write cooldown")
+            value = self._mq2_v if sensor == "mq2" else self._mq135_v
+            if value is None or not 0.1 < value < 4.5 or (sensor == "mq2" and value >= 2.5):
+                raise ValueError("invalid calibration samples")
+            calibration_id = self._next_calibration_id
+            self._next_calibration_id += 1
+            self._last_mq_write_at = self._clock()
+            if sensor == "mq2":
+                self._mq2_baseline_v, self._mq2_calibration_id = value, calibration_id
+            else:
+                self._mq135_baseline_v, self._mq135_calibration_id = value, calibration_id
+            return {"calibration_id": calibration_id, "baseline_v": value, "circuit_supply_v": 5.0}
 
     def set_manual_sprinkler(self, enabled: bool) -> None:
         if type(enabled) is not bool:
@@ -98,6 +129,8 @@ class SimulatorState:
                 self._tick += 1
                 self._evaluate_safety()
             self._advance_actuators()
+            mq2_response = self._response(self._mq2_v, self._mq2_baseline_v)
+            mq135_response = self._response(self._mq135_v, self._mq135_baseline_v)
             triggers = []
             if self._catastrophic_latch:
                 triggers.append("catastrophic_latch")
@@ -114,6 +147,15 @@ class SimulatorState:
                 "chamber_temp_c": self._chamber_temp_c,
                 "mq135_v": self._mq135_v,
                 "mq2_v": self._mq2_v,
+                "mq2_response_ratio": mq2_response,
+                "mq135_response_ratio": mq135_response,
+                "mq2_calibration_id": self._mq2_calibration_id,
+                "mq135_calibration_id": self._mq135_calibration_id,
+                "mq2_calibration_status": "ready" if mq2_response is not None else ("uncalibrated" if self._mq2_baseline_v is None else "invalid"),
+                "mq135_calibration_status": "ready" if mq135_response is not None else ("uncalibrated" if self._mq135_baseline_v is None else "invalid"),
+                "mq2_threshold_mode": "response_ratio" if self._threshold_mq2_response_ratio is not None else "legacy_voltage",
+                "mq2_safety_mode": "response_ratio" if self._threshold_mq2_response_ratio is not None and mq2_response is not None else "legacy_voltage",
+                "threshold_mq2_response_ratio": self._threshold_mq2_response_ratio,
                 "pm1_0_ug_m3": 8,
                 "pm2_5_ug_m3": 12,
                 "pm10_ug_m3": 18,
@@ -134,10 +176,13 @@ class SimulatorState:
                 self._temp_danger = True
             elif self._chamber_temp_c <= self._threshold_chamber_temp_c * 0.95:
                 self._temp_danger = False
+        response = self._response(self._mq2_v, self._mq2_baseline_v)
+        gas_value = response if self._threshold_mq2_response_ratio is not None and response is not None else self._mq2_v
+        gas_limit = self._threshold_mq2_response_ratio if response is not None and self._threshold_mq2_response_ratio is not None else 2.5
         if not gas_fault:
-            if self._mq2_v >= 2.5:
+            if gas_value >= gas_limit:
                 self._gas_danger = True
-            elif self._mq2_v <= 2.5 * 0.95:
+            elif gas_value <= gas_limit * 0.95:
                 self._gas_danger = False
         if temp_fault and self._temp_danger:
             self._catastrophic_latch = True
@@ -146,6 +191,12 @@ class SimulatorState:
             self._request_sprinkler(True)
         else:
             self._request_sprinkler(self._manual_sprinkler)
+
+    @staticmethod
+    def _response(value, baseline):
+        if value is None or baseline is None or not 0.1 < value < 4.8 or not 0.1 < baseline < 4.8:
+            return None
+        return value * (5.0 - baseline) / (baseline * (5.0 - value))
 
     def _request_sprinkler(self, enabled: bool) -> None:
         self._sprinkler_requested = enabled
