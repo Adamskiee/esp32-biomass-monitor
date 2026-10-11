@@ -15,6 +15,7 @@ g++ \
   -I "$repo_dir/firmware/main" \
   -I "$repo_dir/firmware/shared/BiomassConfig/src" \
   "$repo_dir/firmware/main/Actuators.cpp" \
+  "$repo_dir/firmware/main/MqResponse.cpp" \
   "$repo_dir/firmware/main/SystemState.cpp" \
   "$script_dir/native_tests.cpp" \
   -o "$build_dir/native_firmware_tests"

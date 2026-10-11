@@ -1,4 +1,5 @@
 #include "Actuators.h"
+#include "MqResponse.h"
 #include "SystemState.h"
 
 #include <cmath>
@@ -504,6 +505,21 @@ void testPmsDoesNotAffectSafety() {
   EXPECT_FALSE(name, current_solenoid_state);
 }
 
+void testMqResponseRatio() {
+  const char *name = "MQ response ratio";
+  EXPECT_TRUE(name, calculateMqResponseRatio(1.0f, 1.0f, 5.0f) == 1.0f);
+  EXPECT_TRUE(name, calculateMqResponseRatio(2.5f, 1.0f, 5.0f) == 4.0f);
+  EXPECT_TRUE(name, calculateMqResponseRatio(0.5f, 1.0f, 5.0f) < 1.0f);
+}
+
+void testMqResponseRejectsInvalidInputs() {
+  const char *name = "MQ response rejects invalid inputs";
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(NAN, 1.0f, 5.0f)));
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(0.1f, 1.0f, 5.0f)));
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(4.8f, 1.0f, 5.0f)));
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(2.5f, 1.0f, 2.5f)));
+}
+
 void run(const char *name, const std::function<void()> &test) {
   ++test_count;
   const int failures_before = failure_count;
@@ -577,6 +593,8 @@ int main() {
   run("PMS reading freshness", testPmsReadingFreshness);
   run("PMS freshness across clock wrap", testPmsFreshnessAcrossClockWrap);
   run("PMS does not affect safety", testPmsDoesNotAffectSafety);
+  run("MQ response ratio", testMqResponseRatio);
+  run("MQ response rejects invalid inputs", testMqResponseRejectsInvalidInputs);
 
   if (failure_count != 0) {
     std::cerr << failure_count << " native firmware test assertion(s) failed\n";
