@@ -1,6 +1,8 @@
 #include "SystemState.h"
 #include "Actuators.h"
 #include "MqCalibration.h"
+#include "MqResponse.h"
+#include <BiomassConfig.h>
 #include <math.h>
 
 using std::isfinite;
@@ -13,6 +15,11 @@ float current_temp_c = NAN;
 float current_chamber_c = NAN;
 float current_mq135_v = NAN;
 float current_mq2_v = NAN;
+float current_mq2_response_ratio = NAN;
+float current_mq135_response_ratio = NAN;
+float threshold_mq2_response_ratio = NAN;
+Mq2ThresholdMode mq2_threshold_mode = Mq2ThresholdMode::LegacyVoltage;
+Mq2ThresholdMode mq2_safety_mode = Mq2ThresholdMode::LegacyVoltage;
 
 bool state_needs_save = false;
 
@@ -142,6 +149,16 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
   current_chamber_c = chamber_c;
   current_mq135_v = mq135_v;
   current_mq2_v = mq2_v;
+  const MqConfiguration &mq_config = currentMqConfiguration();
+#if MQ_RESPONSE_CIRCUIT_VERIFIED
+  current_mq2_response_ratio = calculateMqResponseRatio(
+      mq2_v, mq_config.mq2_baseline_v, mq_config.mq2_supply_v);
+  current_mq135_response_ratio = calculateMqResponseRatio(
+      mq135_v, mq_config.mq135_baseline_v, mq_config.mq135_supply_v);
+#else
+  current_mq2_response_ratio = NAN;
+  current_mq135_response_ratio = NAN;
+#endif
   recordMqCalibrationSamples(mq2_v, mq135_v, sampled_at_ms);
 
   evaluateSafetyLoop();
@@ -189,8 +206,18 @@ void evaluateSafetyLoop() {
 
   bool in_temp_danger =
       !is_temp_fault && (current_chamber_c >= threshold_chamber_temp_c);
-  bool in_mq2_danger =
-      !is_mq2_fault && (current_mq2_v >= MQ2_GAS_DANGER_V);
+  const bool response_is_usable = std::isfinite(current_mq2_response_ratio);
+  mq2_safety_mode = mq2_threshold_mode == Mq2ThresholdMode::ResponseRatio &&
+                            response_is_usable
+                        ? Mq2ThresholdMode::ResponseRatio
+                        : Mq2ThresholdMode::LegacyVoltage;
+  const float mq2_limit = mq2_safety_mode == Mq2ThresholdMode::ResponseRatio
+                              ? threshold_mq2_response_ratio
+                              : MQ2_GAS_DANGER_V;
+  const float mq2_value = mq2_safety_mode == Mq2ThresholdMode::ResponseRatio
+                              ? current_mq2_response_ratio
+                              : current_mq2_v;
+  bool in_mq2_danger = !is_mq2_fault && (mq2_value >= mq2_limit);
 
   if (in_temp_danger) {
     temp_latch_danger = true;
@@ -200,8 +227,7 @@ void evaluateSafetyLoop() {
   }
   if (in_mq2_danger) {
     mq2_latch_danger = true;
-  } else if (!is_mq2_fault &&
-             current_mq2_v <= MQ2_GAS_DANGER_V * 0.95f) {
+  } else if (!is_mq2_fault && mq2_value <= mq2_limit * 0.95f) {
     mq2_latch_danger = false;
   }
 

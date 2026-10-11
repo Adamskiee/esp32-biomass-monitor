@@ -24,6 +24,13 @@ extern float current_temp_c;
 extern float current_chamber_c;
 extern float current_mq135_v;
 extern float current_mq2_v;
+extern float current_mq2_response_ratio;
+extern float current_mq135_response_ratio;
+extern float threshold_mq2_response_ratio;
+
+enum class Mq2ThresholdMode { LegacyVoltage, ResponseRatio };
+extern Mq2ThresholdMode mq2_threshold_mode;
+extern Mq2ThresholdMode mq2_safety_mode;
 
 extern bool state_needs_save;
 extern SemaphoreHandle_t stateMutex;

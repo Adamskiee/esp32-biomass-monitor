@@ -591,6 +591,32 @@ void testMqWriteCooldown() {
                         MqCalibrationResult::Cooldown);
 }
 
+void testMqRatioAlarmHysteresis() {
+  const char *name = "MQ ratio alarm hysteresis";
+  resetSafetyState();
+  current_mq2_response_ratio = 4.0f;
+  threshold_mq2_response_ratio = 4.0f;
+  mq2_threshold_mode = Mq2ThresholdMode::ResponseRatio;
+  mq2_safety_mode = Mq2ThresholdMode::ResponseRatio;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  EXPECT_FALSE(name, current_solenoid_state);
+  current_mq2_response_ratio = 3.8f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testMqInvalidResponseFallback() {
+  const char *name = "MQ invalid response fallback";
+  resetSafetyState();
+  current_mq2_v = 0.0f;
+  current_mq2_response_ratio = NAN;
+  mq2_threshold_mode = Mq2ThresholdMode::ResponseRatio;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, mq2_safety_mode == Mq2ThresholdMode::LegacyVoltage);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
 void run(const char *name, const std::function<void()> &test) {
   ++test_count;
   const int failures_before = failure_count;
@@ -670,6 +696,8 @@ int main() {
   run("MQ capture rejects bad window", testMqCaptureRejectsBadWindow);
   run("MQ config write failure", testMqConfigWriteFailure);
   run("MQ write cooldown", testMqWriteCooldown);
+  run("MQ ratio alarm hysteresis", testMqRatioAlarmHysteresis);
+  run("MQ invalid response fallback", testMqInvalidResponseFallback);
 
   if (failure_count != 0) {
     std::cerr << failure_count << " native firmware test assertion(s) failed\n";
