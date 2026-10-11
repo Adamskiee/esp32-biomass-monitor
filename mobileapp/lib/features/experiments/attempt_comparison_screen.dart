@@ -58,10 +58,12 @@ class _MetricCard extends StatelessWidget {
     final percentage = item.percentageDifference;
     if (item.difference == null) return 'No data';
     if (percentage == null) return 'Not available';
-    if (percentage < 0)
+    if (percentage < 0) {
       return '${percentage.abs().toStringAsFixed(1)}% lower with filtration';
-    if (percentage > 0)
+    }
+    if (percentage > 0) {
       return '${percentage.toStringAsFixed(1)}% higher with filtration';
+    }
     return 'No difference';
   }
 }
