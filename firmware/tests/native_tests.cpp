@@ -1,5 +1,7 @@
 #include "Actuators.h"
 #include "MqResponse.h"
+#include "MqCalibration.h"
+#include "MqConfigStore.h"
 #include "SystemState.h"
 
 #include <cmath>
@@ -520,6 +522,75 @@ void testMqResponseRejectsInvalidInputs() {
   EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(2.5f, 1.0f, 2.5f)));
 }
 
+class FakeMqConfigStore final : public MqConfigStore {
+public:
+  bool should_fail = false;
+  MqConfiguration saved{};
+
+  bool load(MqConfiguration &) override { return false; }
+  bool save(const MqConfiguration &configuration) override {
+    if (should_fail) {
+      return false;
+    }
+    saved = configuration;
+    return true;
+  }
+};
+
+void addStableMqSamples(float mq2_v, float mq135_v) {
+  for (uint32_t i = 0; i < 30; ++i) {
+    recordMqCalibrationSamples(mq2_v, mq135_v, i * 2000);
+  }
+}
+
+void testMqBaselineCapture() {
+  const char *name = "MQ baseline capture";
+  FakeMqConfigStore store;
+  resetMqCalibrationState(&store);
+  addStableMqSamples(1.0f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::Accepted);
+  EXPECT_TRUE(name, currentMqConfiguration().mq2_baseline_v == 1.0f);
+  EXPECT_TRUE(name, currentMqConfiguration().mq2_calibration_id != 0);
+  EXPECT_TRUE(name, currentMqConfiguration().mq135_calibration_id == 0);
+}
+
+void testMqCaptureRejectsBadWindow() {
+  const char *name = "MQ capture rejects bad window";
+  FakeMqConfigStore store;
+  resetMqCalibrationState(&store);
+  for (uint32_t i = 0; i < 29; ++i) {
+    recordMqCalibrationSamples(1.0f, 1.5f, i * 2000);
+  }
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::InvalidSamples);
+  addStableMqSamples(2.5f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::InvalidSamples);
+}
+
+void testMqConfigWriteFailure() {
+  const char *name = "MQ config write failure";
+  FakeMqConfigStore store;
+  store.should_fail = true;
+  resetMqCalibrationState(&store);
+  addStableMqSamples(1.0f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::PersistenceFailed);
+  EXPECT_TRUE(name, currentMqConfiguration().mq2_calibration_id == 0);
+}
+
+void testMqWriteCooldown() {
+  const char *name = "MQ write cooldown";
+  FakeMqConfigStore store;
+  resetMqCalibrationState(&store);
+  addStableMqSamples(1.0f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::Accepted);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq135, 400000) ==
+                        MqCalibrationResult::Cooldown);
+}
+
 void run(const char *name, const std::function<void()> &test) {
   ++test_count;
   const int failures_before = failure_count;
@@ -595,6 +666,10 @@ int main() {
   run("PMS does not affect safety", testPmsDoesNotAffectSafety);
   run("MQ response ratio", testMqResponseRatio);
   run("MQ response rejects invalid inputs", testMqResponseRejectsInvalidInputs);
+  run("MQ baseline capture", testMqBaselineCapture);
+  run("MQ capture rejects bad window", testMqCaptureRejectsBadWindow);
+  run("MQ config write failure", testMqConfigWriteFailure);
+  run("MQ write cooldown", testMqWriteCooldown);
 
   if (failure_count != 0) {
     std::cerr << failure_count << " native firmware test assertion(s) failed\n";

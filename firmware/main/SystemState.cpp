@@ -1,5 +1,6 @@
 #include "SystemState.h"
 #include "Actuators.h"
+#include "MqCalibration.h"
 #include <math.h>
 
 using std::isfinite;
@@ -41,6 +42,9 @@ void initSystemState() {
 
   preferences.begin("biomass", false);
 
+  initMqConfigStore();
+  resetMqCalibrationState();
+
   resetPmsReadingCache();
 
   threshold_chamber_temp_c = preferences.getFloat("chamber_temp", 80.0);
@@ -53,7 +57,11 @@ void saveSystemState(float chamber_limit, float mq2_limit) {
 }
 #else
 SemaphoreHandle_t stateMutex = nullptr;
-void initSystemState() { resetPmsReadingCache(); }
+void initSystemState() {
+  initMqConfigStore();
+  resetMqCalibrationState();
+  resetPmsReadingCache();
+}
 void saveSystemState(float chamber_limit, float mq2_limit) {}
 #endif
 
@@ -121,6 +129,11 @@ ManualSprinklerResult applyManualSprinklerCommand(bool enabled) {
 
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
                            float mq2_v) {
+  processSensorReadings(temperature_c, chamber_c, mq135_v, mq2_v, 0);
+}
+
+void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
+                           float mq2_v, uint32_t sampled_at_ms) {
   if (stateMutex != nullptr) {
     xSemaphoreTake(stateMutex, portMAX_DELAY);
   }
@@ -129,6 +142,7 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
   current_chamber_c = chamber_c;
   current_mq135_v = mq135_v;
   current_mq2_v = mq2_v;
+  recordMqCalibrationSamples(mq2_v, mq135_v, sampled_at_ms);
 
   evaluateSafetyLoop();
 

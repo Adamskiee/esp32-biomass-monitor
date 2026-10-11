@@ -12,10 +12,13 @@ g++ \
   -Wextra \
   -Werror \
   -Wno-unused-parameter \
+  -DMQ_RESPONSE_CIRCUIT_VERIFIED=1 \
   -I "$repo_dir/firmware/main" \
   -I "$repo_dir/firmware/shared/BiomassConfig/src" \
   "$repo_dir/firmware/main/Actuators.cpp" \
   "$repo_dir/firmware/main/MqResponse.cpp" \
+  "$repo_dir/firmware/main/MqConfigStore.cpp" \
+  "$repo_dir/firmware/main/MqCalibration.cpp" \
   "$repo_dir/firmware/main/SystemState.cpp" \
   "$script_dir/native_tests.cpp" \
   -o "$build_dir/native_firmware_tests"
