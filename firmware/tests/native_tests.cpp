@@ -1,4 +1,7 @@
 #include "Actuators.h"
+#include "MqResponse.h"
+#include "MqCalibration.h"
+#include "MqConfigStore.h"
 #include "SystemState.h"
 
 #include <cmath>
@@ -504,6 +507,116 @@ void testPmsDoesNotAffectSafety() {
   EXPECT_FALSE(name, current_solenoid_state);
 }
 
+void testMqResponseRatio() {
+  const char *name = "MQ response ratio";
+  EXPECT_TRUE(name, calculateMqResponseRatio(1.0f, 1.0f, 5.0f) == 1.0f);
+  EXPECT_TRUE(name, calculateMqResponseRatio(2.5f, 1.0f, 5.0f) == 4.0f);
+  EXPECT_TRUE(name, calculateMqResponseRatio(0.5f, 1.0f, 5.0f) < 1.0f);
+}
+
+void testMqResponseRejectsInvalidInputs() {
+  const char *name = "MQ response rejects invalid inputs";
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(NAN, 1.0f, 5.0f)));
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(0.1f, 1.0f, 5.0f)));
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(4.8f, 1.0f, 5.0f)));
+  EXPECT_TRUE(name, std::isnan(calculateMqResponseRatio(2.5f, 1.0f, 2.5f)));
+}
+
+class FakeMqConfigStore final : public MqConfigStore {
+public:
+  bool should_fail = false;
+  MqConfiguration saved{};
+
+  bool load(MqConfiguration &) override { return false; }
+  bool save(const MqConfiguration &configuration) override {
+    if (should_fail) {
+      return false;
+    }
+    saved = configuration;
+    return true;
+  }
+};
+
+void addStableMqSamples(float mq2_v, float mq135_v) {
+  for (uint32_t i = 0; i < 30; ++i) {
+    recordMqCalibrationSamples(mq2_v, mq135_v, i * 2000);
+  }
+}
+
+void testMqBaselineCapture() {
+  const char *name = "MQ baseline capture";
+  FakeMqConfigStore store;
+  resetMqCalibrationState(&store);
+  addStableMqSamples(1.0f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::Accepted);
+  EXPECT_TRUE(name, currentMqConfiguration().mq2_baseline_v == 1.0f);
+  EXPECT_TRUE(name, currentMqConfiguration().mq2_calibration_id != 0);
+  EXPECT_TRUE(name, currentMqConfiguration().mq135_calibration_id == 0);
+}
+
+void testMqCaptureRejectsBadWindow() {
+  const char *name = "MQ capture rejects bad window";
+  FakeMqConfigStore store;
+  resetMqCalibrationState(&store);
+  for (uint32_t i = 0; i < 29; ++i) {
+    recordMqCalibrationSamples(1.0f, 1.5f, i * 2000);
+  }
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::InvalidSamples);
+  addStableMqSamples(2.5f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::InvalidSamples);
+}
+
+void testMqConfigWriteFailure() {
+  const char *name = "MQ config write failure";
+  FakeMqConfigStore store;
+  store.should_fail = true;
+  resetMqCalibrationState(&store);
+  addStableMqSamples(1.0f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::PersistenceFailed);
+  EXPECT_TRUE(name, currentMqConfiguration().mq2_calibration_id == 0);
+}
+
+void testMqWriteCooldown() {
+  const char *name = "MQ write cooldown";
+  FakeMqConfigStore store;
+  resetMqCalibrationState(&store);
+  addStableMqSamples(1.0f, 1.5f);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq2, 360000) ==
+                        MqCalibrationResult::Accepted);
+  EXPECT_TRUE(name, captureMqCalibration(MqSensor::Mq135, 400000) ==
+                        MqCalibrationResult::Cooldown);
+}
+
+void testMqRatioAlarmHysteresis() {
+  const char *name = "MQ ratio alarm hysteresis";
+  resetSafetyState();
+  current_mq2_response_ratio = 4.0f;
+  threshold_mq2_response_ratio = 4.0f;
+  mq2_threshold_mode = Mq2ThresholdMode::ResponseRatio;
+  mq2_safety_mode = Mq2ThresholdMode::ResponseRatio;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  EXPECT_FALSE(name, current_solenoid_state);
+  current_mq2_response_ratio = 3.8f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testMqInvalidResponseFallback() {
+  const char *name = "MQ invalid response fallback";
+  resetSafetyState();
+  current_mq2_v = 0.0f;
+  current_mq2_response_ratio = NAN;
+  mq2_threshold_mode = Mq2ThresholdMode::ResponseRatio;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, mq2_safety_mode == Mq2ThresholdMode::LegacyVoltage);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
 void run(const char *name, const std::function<void()> &test) {
   ++test_count;
   const int failures_before = failure_count;
@@ -577,6 +690,14 @@ int main() {
   run("PMS reading freshness", testPmsReadingFreshness);
   run("PMS freshness across clock wrap", testPmsFreshnessAcrossClockWrap);
   run("PMS does not affect safety", testPmsDoesNotAffectSafety);
+  run("MQ response ratio", testMqResponseRatio);
+  run("MQ response rejects invalid inputs", testMqResponseRejectsInvalidInputs);
+  run("MQ baseline capture", testMqBaselineCapture);
+  run("MQ capture rejects bad window", testMqCaptureRejectsBadWindow);
+  run("MQ config write failure", testMqConfigWriteFailure);
+  run("MQ write cooldown", testMqWriteCooldown);
+  run("MQ ratio alarm hysteresis", testMqRatioAlarmHysteresis);
+  run("MQ invalid response fallback", testMqInvalidResponseFallback);
 
   if (failure_count != 0) {
     std::cerr << failure_count << " native firmware test assertion(s) failed\n";

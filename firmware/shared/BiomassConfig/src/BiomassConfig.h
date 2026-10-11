@@ -30,3 +30,10 @@
 // Timing and Safety Thresholds
 #define POLL_INTERVAL_MS 2000
 #define SPRINKLER_TRANSITION_MS 500UL
+
+constexpr uint32_t MQ_STARTUP_WARMUP_MS = 300000;
+constexpr float MQ_CIRCUIT_SUPPLY_V = 5.0f;
+
+#ifndef MQ_RESPONSE_CIRCUIT_VERIFIED
+#define MQ_RESPONSE_CIRCUIT_VERIFIED 0
+#endif

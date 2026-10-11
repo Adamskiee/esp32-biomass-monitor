@@ -24,6 +24,13 @@ extern float current_temp_c;
 extern float current_chamber_c;
 extern float current_mq135_v;
 extern float current_mq2_v;
+extern float current_mq2_response_ratio;
+extern float current_mq135_response_ratio;
+extern float threshold_mq2_response_ratio;
+
+enum class Mq2ThresholdMode { LegacyVoltage, ResponseRatio };
+extern Mq2ThresholdMode mq2_threshold_mode;
+extern Mq2ThresholdMode mq2_safety_mode;
 
 extern bool state_needs_save;
 extern SemaphoreHandle_t stateMutex;
@@ -36,6 +43,9 @@ enum class ThresholdUpdateResult {
   Accepted,
   Invalid,
   Busy,
+  MissingCalibration,
+  Cooldown,
+  PersistenceFailed,
 };
 
 enum class ManualSprinklerResult {
@@ -47,9 +57,17 @@ enum class ManualSprinklerResult {
 ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit, float mq2_limit);
+ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
+                                           float chamber_limit,
+                                           bool has_mq2_limit, float mq2_limit,
+                                           bool has_response_limit,
+                                           float response_limit,
+                                           bool use_legacy_mode);
 ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
                            float mq2_v);
+void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
+                           float mq2_v, uint32_t sampled_at_ms);
 void recordPmsReading(const PmsReading &reading, uint32_t sampled_at_ms);
 void resetPmsReadingCache();
 // The caller holds stateMutex while copying the sample.

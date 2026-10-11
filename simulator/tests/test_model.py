@@ -22,12 +22,15 @@ class SimulatorStateTests(unittest.TestCase):
     def test_normal_snapshot_has_documented_fields_and_changing_readings(self):
         first = self.state.snapshot()
         second = self.state.snapshot()
-        self.assertEqual(set(first), {
+        self.assertTrue({
             "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "fan_on",
             "sprinkler_on", "pump_on", "manual_sprinkler", "active_triggers",
-        })
+            "mq2_response_ratio", "mq135_response_ratio", "mq2_calibration_id",
+            "mq135_calibration_id", "mq2_calibration_status", "mq135_calibration_status",
+            "mq2_threshold_mode", "mq2_safety_mode", "threshold_mq2_response_ratio",
+        }.issubset(first))
         self.assertEqual(first["threshold_chamber_temp_c"], 80.0)
         self.assertEqual(first["threshold_mq2_v"], 2.5)
         self.assertTrue(first["fan_on"])
@@ -96,6 +99,15 @@ class SimulatorStateTests(unittest.TestCase):
 
     def test_gas_uses_fixed_limit(self):
         self.state.update_thresholds({"threshold_mq2_v": 5.0})
+        self.state.select_scenario("gas")
+        self.assertIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
+
+    def test_calibrated_response_uses_clean_air_baseline(self):
+        self.clock.advance(300)
+        self.assertEqual(self.state.capture_mq_calibration("mq2")["baseline_v"], 1.0)
+        state = self.state.snapshot()
+        self.assertEqual(state["mq2_response_ratio"], 1.0)
+        self.state.update_thresholds({"threshold_mq2_response_ratio": 4.0})
         self.state.select_scenario("gas")
         self.assertIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
 

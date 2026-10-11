@@ -1,5 +1,8 @@
 #include "SystemState.h"
 #include "Actuators.h"
+#include "MqCalibration.h"
+#include "MqResponse.h"
+#include <BiomassConfig.h>
 #include <math.h>
 
 using std::isfinite;
@@ -12,6 +15,11 @@ float current_temp_c = NAN;
 float current_chamber_c = NAN;
 float current_mq135_v = NAN;
 float current_mq2_v = NAN;
+float current_mq2_response_ratio = NAN;
+float current_mq135_response_ratio = NAN;
+float threshold_mq2_response_ratio = NAN;
+Mq2ThresholdMode mq2_threshold_mode = Mq2ThresholdMode::LegacyVoltage;
+Mq2ThresholdMode mq2_safety_mode = Mq2ThresholdMode::LegacyVoltage;
 
 bool state_needs_save = false;
 
@@ -41,6 +49,13 @@ void initSystemState() {
 
   preferences.begin("biomass", false);
 
+  initMqConfigStore();
+  resetMqCalibrationState();
+  threshold_mq2_response_ratio = currentMqConfiguration().mq2_response_threshold;
+  mq2_threshold_mode = currentMqConfiguration().mq2_relative_mode
+                           ? Mq2ThresholdMode::ResponseRatio
+                           : Mq2ThresholdMode::LegacyVoltage;
+
   resetPmsReadingCache();
 
   threshold_chamber_temp_c = preferences.getFloat("chamber_temp", 80.0);
@@ -53,7 +68,15 @@ void saveSystemState(float chamber_limit, float mq2_limit) {
 }
 #else
 SemaphoreHandle_t stateMutex = nullptr;
-void initSystemState() { resetPmsReadingCache(); }
+void initSystemState() {
+  initMqConfigStore();
+  resetMqCalibrationState();
+  threshold_mq2_response_ratio = currentMqConfiguration().mq2_response_threshold;
+  mq2_threshold_mode = currentMqConfiguration().mq2_relative_mode
+                           ? Mq2ThresholdMode::ResponseRatio
+                           : Mq2ThresholdMode::LegacyVoltage;
+  resetPmsReadingCache();
+}
 void saveSystemState(float chamber_limit, float mq2_limit) {}
 #endif
 
@@ -61,13 +84,34 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit,
                                            float mq2_limit) {
-  if ((!has_chamber_limit && !has_mq2_limit) ||
+  return applyThresholdUpdate(has_chamber_limit, chamber_limit, has_mq2_limit,
+                              mq2_limit, false, 0.0f, false);
+}
+
+ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
+                                           float chamber_limit,
+                                           bool has_mq2_limit,
+                                           float mq2_limit,
+                                           bool has_response_limit,
+                                           float response_limit,
+                                           bool use_legacy_mode) {
+  if ((!has_chamber_limit && !has_mq2_limit && !has_response_limit &&
+       !use_legacy_mode) ||
+      (has_response_limit && use_legacy_mode) ||
       (has_chamber_limit &&
        (!isfinite(chamber_limit) || chamber_limit < 20.0f ||
         chamber_limit > 150.0f)) ||
       (has_mq2_limit &&
        (!isfinite(mq2_limit) || mq2_limit < 0.1f || mq2_limit > 5.0f))) {
     return ThresholdUpdateResult::Invalid;
+  }
+  if (has_response_limit &&
+      (!isfinite(response_limit) || response_limit <= 1.0f ||
+       response_limit > 100.0f)) {
+    return ThresholdUpdateResult::Invalid;
+  }
+  if (has_response_limit && !hasMqCalibration(MqSensor::Mq2)) {
+    return ThresholdUpdateResult::MissingCalibration;
   }
 
 #ifdef ARDUINO
@@ -77,6 +121,38 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
 #endif
 
   bool changed = false;
+  if (has_response_limit || use_legacy_mode) {
+    MqConfiguration updated = currentMqConfiguration();
+    updated.mq2_relative_mode = has_response_limit;
+    if (has_response_limit) {
+      updated.mq2_response_threshold = response_limit;
+    }
+#ifdef ARDUINO
+    const uint32_t now_ms = millis();
+#else
+    const uint32_t now_ms = 0;
+#endif
+    const MqConfigurationSaveResult save_result =
+        saveMqConfiguration(updated, now_ms);
+    if (save_result == MqConfigurationSaveResult::Cooldown) {
+#ifdef ARDUINO
+      xSemaphoreGive(stateMutex);
+#endif
+      return ThresholdUpdateResult::Cooldown;
+    }
+    if (save_result == MqConfigurationSaveResult::PersistenceFailed) {
+#ifdef ARDUINO
+      xSemaphoreGive(stateMutex);
+#endif
+      return ThresholdUpdateResult::PersistenceFailed;
+    }
+    threshold_mq2_response_ratio = updated.mq2_response_threshold;
+    mq2_threshold_mode = updated.mq2_relative_mode
+                             ? Mq2ThresholdMode::ResponseRatio
+                             : Mq2ThresholdMode::LegacyVoltage;
+    mq2_latch_danger = false;
+    changed = true;
+  }
   if (has_chamber_limit && threshold_chamber_temp_c != chamber_limit) {
     threshold_chamber_temp_c = chamber_limit;
     changed = true;
@@ -121,6 +197,11 @@ ManualSprinklerResult applyManualSprinklerCommand(bool enabled) {
 
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
                            float mq2_v) {
+  processSensorReadings(temperature_c, chamber_c, mq135_v, mq2_v, 0);
+}
+
+void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
+                           float mq2_v, uint32_t sampled_at_ms) {
   if (stateMutex != nullptr) {
     xSemaphoreTake(stateMutex, portMAX_DELAY);
   }
@@ -129,6 +210,17 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
   current_chamber_c = chamber_c;
   current_mq135_v = mq135_v;
   current_mq2_v = mq2_v;
+  const MqConfiguration &mq_config = currentMqConfiguration();
+#if MQ_RESPONSE_CIRCUIT_VERIFIED
+  current_mq2_response_ratio = calculateMqResponseRatio(
+      mq2_v, mq_config.mq2_baseline_v, mq_config.mq2_supply_v);
+  current_mq135_response_ratio = calculateMqResponseRatio(
+      mq135_v, mq_config.mq135_baseline_v, mq_config.mq135_supply_v);
+#else
+  current_mq2_response_ratio = NAN;
+  current_mq135_response_ratio = NAN;
+#endif
+  recordMqCalibrationSamples(mq2_v, mq135_v, sampled_at_ms);
 
   evaluateSafetyLoop();
 
@@ -175,8 +267,18 @@ void evaluateSafetyLoop() {
 
   bool in_temp_danger =
       !is_temp_fault && (current_chamber_c >= threshold_chamber_temp_c);
-  bool in_mq2_danger =
-      !is_mq2_fault && (current_mq2_v >= MQ2_GAS_DANGER_V);
+  const bool response_is_usable = std::isfinite(current_mq2_response_ratio);
+  mq2_safety_mode = mq2_threshold_mode == Mq2ThresholdMode::ResponseRatio &&
+                            response_is_usable
+                        ? Mq2ThresholdMode::ResponseRatio
+                        : Mq2ThresholdMode::LegacyVoltage;
+  const float mq2_limit = mq2_safety_mode == Mq2ThresholdMode::ResponseRatio
+                              ? threshold_mq2_response_ratio
+                              : MQ2_GAS_DANGER_V;
+  const float mq2_value = mq2_safety_mode == Mq2ThresholdMode::ResponseRatio
+                              ? current_mq2_response_ratio
+                              : current_mq2_v;
+  bool in_mq2_danger = !is_mq2_fault && (mq2_value >= mq2_limit);
 
   if (in_temp_danger) {
     temp_latch_danger = true;
@@ -186,8 +288,7 @@ void evaluateSafetyLoop() {
   }
   if (in_mq2_danger) {
     mq2_latch_danger = true;
-  } else if (!is_mq2_fault &&
-             current_mq2_v <= MQ2_GAS_DANGER_V * 0.95f) {
+  } else if (!is_mq2_fault && mq2_value <= mq2_limit * 0.95f) {
     mq2_latch_danger = false;
   }
 

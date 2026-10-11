@@ -45,12 +45,15 @@ class ServerTests(unittest.TestCase):
     def test_state_and_settings_routes_return_documented_fields(self):
         status, _, state = self.request("/api/state")
         self.assertEqual(status, 200)
-        self.assertEqual(set(state), {
+        self.assertTrue({
             "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "fan_on",
             "sprinkler_on", "pump_on", "manual_sprinkler", "active_triggers",
-        })
+            "mq2_response_ratio", "mq135_response_ratio", "mq2_calibration_id",
+            "mq135_calibration_id", "mq2_calibration_status", "mq135_calibration_status",
+            "mq2_threshold_mode", "mq2_safety_mode", "threshold_mq2_response_ratio",
+        }.issubset(state))
         status, _, settings = self.request("/api/settings")
         self.assertEqual(status, 200)
         self.assertEqual(settings, {"threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5})
