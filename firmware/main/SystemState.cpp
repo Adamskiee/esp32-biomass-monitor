@@ -51,6 +51,10 @@ void initSystemState() {
 
   initMqConfigStore();
   resetMqCalibrationState();
+  threshold_mq2_response_ratio = currentMqConfiguration().mq2_response_threshold;
+  mq2_threshold_mode = currentMqConfiguration().mq2_relative_mode
+                           ? Mq2ThresholdMode::ResponseRatio
+                           : Mq2ThresholdMode::LegacyVoltage;
 
   resetPmsReadingCache();
 
@@ -67,6 +71,10 @@ SemaphoreHandle_t stateMutex = nullptr;
 void initSystemState() {
   initMqConfigStore();
   resetMqCalibrationState();
+  threshold_mq2_response_ratio = currentMqConfiguration().mq2_response_threshold;
+  mq2_threshold_mode = currentMqConfiguration().mq2_relative_mode
+                           ? Mq2ThresholdMode::ResponseRatio
+                           : Mq2ThresholdMode::LegacyVoltage;
   resetPmsReadingCache();
 }
 void saveSystemState(float chamber_limit, float mq2_limit) {}
@@ -76,13 +84,34 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit,
                                            float mq2_limit) {
-  if ((!has_chamber_limit && !has_mq2_limit) ||
+  return applyThresholdUpdate(has_chamber_limit, chamber_limit, has_mq2_limit,
+                              mq2_limit, false, 0.0f, false);
+}
+
+ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
+                                           float chamber_limit,
+                                           bool has_mq2_limit,
+                                           float mq2_limit,
+                                           bool has_response_limit,
+                                           float response_limit,
+                                           bool use_legacy_mode) {
+  if ((!has_chamber_limit && !has_mq2_limit && !has_response_limit &&
+       !use_legacy_mode) ||
+      (has_response_limit && use_legacy_mode) ||
       (has_chamber_limit &&
        (!isfinite(chamber_limit) || chamber_limit < 20.0f ||
         chamber_limit > 150.0f)) ||
       (has_mq2_limit &&
        (!isfinite(mq2_limit) || mq2_limit < 0.1f || mq2_limit > 5.0f))) {
     return ThresholdUpdateResult::Invalid;
+  }
+  if (has_response_limit &&
+      (!isfinite(response_limit) || response_limit <= 1.0f ||
+       response_limit > 100.0f)) {
+    return ThresholdUpdateResult::Invalid;
+  }
+  if (has_response_limit && !hasMqCalibration(MqSensor::Mq2)) {
+    return ThresholdUpdateResult::MissingCalibration;
   }
 
 #ifdef ARDUINO
@@ -92,6 +121,38 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
 #endif
 
   bool changed = false;
+  if (has_response_limit || use_legacy_mode) {
+    MqConfiguration updated = currentMqConfiguration();
+    updated.mq2_relative_mode = has_response_limit;
+    if (has_response_limit) {
+      updated.mq2_response_threshold = response_limit;
+    }
+#ifdef ARDUINO
+    const uint32_t now_ms = millis();
+#else
+    const uint32_t now_ms = 0;
+#endif
+    const MqConfigurationSaveResult save_result =
+        saveMqConfiguration(updated, now_ms);
+    if (save_result == MqConfigurationSaveResult::Cooldown) {
+#ifdef ARDUINO
+      xSemaphoreGive(stateMutex);
+#endif
+      return ThresholdUpdateResult::Cooldown;
+    }
+    if (save_result == MqConfigurationSaveResult::PersistenceFailed) {
+#ifdef ARDUINO
+      xSemaphoreGive(stateMutex);
+#endif
+      return ThresholdUpdateResult::PersistenceFailed;
+    }
+    threshold_mq2_response_ratio = updated.mq2_response_threshold;
+    mq2_threshold_mode = updated.mq2_relative_mode
+                             ? Mq2ThresholdMode::ResponseRatio
+                             : Mq2ThresholdMode::LegacyVoltage;
+    mq2_latch_danger = false;
+    changed = true;
+  }
   if (has_chamber_limit && threshold_chamber_temp_c != chamber_limit) {
     threshold_chamber_temp_c = chamber_limit;
     changed = true;

@@ -43,6 +43,9 @@ enum class ThresholdUpdateResult {
   Accepted,
   Invalid,
   Busy,
+  MissingCalibration,
+  Cooldown,
+  PersistenceFailed,
 };
 
 enum class ManualSprinklerResult {
@@ -54,6 +57,12 @@ enum class ManualSprinklerResult {
 ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit, float mq2_limit);
+ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
+                                           float chamber_limit,
+                                           bool has_mq2_limit, float mq2_limit,
+                                           bool has_response_limit,
+                                           float response_limit,
+                                           bool use_legacy_mode);
 ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
                            float mq2_v);

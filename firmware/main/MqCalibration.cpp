@@ -129,15 +129,34 @@ MqCalibrationResult captureMqCalibration(MqSensor sensor, uint32_t now_ms) {
     updated.mq135_supply_v = MQ_CIRCUIT_SUPPLY_V;
     updated.mq135_calibration_id = next_calibration_id;
   }
-  if (!config_store || !config_store->save(updated)) {
+  const MqConfigurationSaveResult save_result = saveMqConfiguration(updated, now_ms);
+  if (save_result == MqConfigurationSaveResult::Cooldown) {
+    return MqCalibrationResult::Cooldown;
+  }
+  if (save_result == MqConfigurationSaveResult::PersistenceFailed) {
     return MqCalibrationResult::PersistenceFailed;
   }
-
-  configuration = updated;
   ++next_calibration_id;
-  recordSettingsWrite(now_ms);
   return MqCalibrationResult::Accepted;
 #endif
 }
 
 const MqConfiguration &currentMqConfiguration() { return configuration; }
+
+MqConfigurationSaveResult saveMqConfiguration(const MqConfiguration &updated,
+                                              uint32_t now_ms) {
+  if (!canWriteSettings(now_ms)) {
+    return MqConfigurationSaveResult::Cooldown;
+  }
+  if (!config_store || !config_store->save(updated)) {
+    return MqConfigurationSaveResult::PersistenceFailed;
+  }
+  configuration = updated;
+  recordSettingsWrite(now_ms);
+  return MqConfigurationSaveResult::Accepted;
+}
+
+bool hasMqCalibration(MqSensor sensor) {
+  return sensor == MqSensor::Mq2 ? configuration.mq2_calibration_id != 0
+                                 : configuration.mq135_calibration_id != 0;
+}

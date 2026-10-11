@@ -16,7 +16,12 @@ enum class MqCalibrationResult {
   Busy,
 };
 
+enum class MqConfigurationSaveResult { Accepted, Cooldown, PersistenceFailed };
+
 void resetMqCalibrationState(MqConfigStore *store = nullptr);
 void recordMqCalibrationSamples(float mq2_v, float mq135_v, uint32_t now_ms);
 MqCalibrationResult captureMqCalibration(MqSensor sensor, uint32_t now_ms);
 const MqConfiguration &currentMqConfiguration();
+MqConfigurationSaveResult saveMqConfiguration(const MqConfiguration &updated,
+                                              uint32_t now_ms);
+bool hasMqCalibration(MqSensor sensor);
