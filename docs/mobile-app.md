@@ -66,6 +66,8 @@ The **Attempts** segment records local snapshots while the app remains open,
 authenticated, and connected to the ESP32. Start one attempt as **Without
 filtration** and another as **With filtration**, then stop each one. A lost
 connection marks the active attempt interrupted while preserving its readings.
+App upgrades retain saved attempts and readings from the earlier local database
+schema.
 
 Select one saved attempt from each scenario and choose **Compare attempts**.
 The app shows average, minimum, maximum, and elapsed-time series for MQ-2,
