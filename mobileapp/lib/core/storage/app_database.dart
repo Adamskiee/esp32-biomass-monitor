@@ -51,7 +51,10 @@ class AppDatabase implements DatabaseProvider {
       await db.execute('ALTER TABLE sensor_data ADD COLUMN pm2_5_ug_m3 REAL');
       await db.execute('ALTER TABLE sensor_data ADD COLUMN pm10_ug_m3 REAL');
     }
-    if (oldVersion < 4) await _createAttemptTables(db);
+    if (oldVersion < 4) {
+      await _migrateSensorColumns(db);
+      await _createAttemptTables(db);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -90,9 +93,29 @@ class AppDatabase implements DatabaseProvider {
     )
   ''');
 
+  Future<void> _migrateSensorColumns(Database db) async {
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(sensor_data)',
+    )).map((column) => column['name'] as String).toSet();
+    const renamedColumns = {
+      'pm1_0_ug_m3': 'pm1_ug_m3',
+      'pm2_5_ug_m3': 'pm25_ug_m3',
+      'pm10_ug_m3': 'pm10_ug_m3',
+    };
+    for (final entry in renamedColumns.entries) {
+      if (columns.contains(entry.key)) continue;
+      await db.execute('ALTER TABLE sensor_data ADD COLUMN ${entry.key} REAL');
+      if (columns.contains(entry.value)) {
+        await db.execute(
+          'UPDATE sensor_data SET ${entry.key} = ${entry.value}',
+        );
+      }
+    }
+  }
+
   Future<void> _createAttemptTables(Database db) async {
     await db.execute('''
-      CREATE TABLE attempts (
+      CREATE TABLE IF NOT EXISTS attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         scenario TEXT NOT NULL,
         sequence_number INTEGER NOT NULL,
@@ -103,7 +126,7 @@ class AppDatabase implements DatabaseProvider {
       )
     ''');
     await db.execute('''
-      CREATE TABLE attempt_readings (
+      CREATE TABLE IF NOT EXISTS attempt_readings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         attempt_id INTEGER NOT NULL REFERENCES attempts(id) ON DELETE CASCADE,
         recorded_at TEXT NOT NULL,
@@ -118,10 +141,10 @@ class AppDatabase implements DatabaseProvider {
       )
     ''');
     await db.execute(
-      'CREATE INDEX attempt_readings_attempt_elapsed ON attempt_readings(attempt_id, elapsed_ms)',
+      'CREATE INDEX IF NOT EXISTS attempt_readings_attempt_elapsed ON attempt_readings(attempt_id, elapsed_ms)',
     );
     await db.execute(
-      "CREATE UNIQUE INDEX one_active_attempt ON attempts(status) WHERE status = 'active'",
+      "CREATE UNIQUE INDEX IF NOT EXISTS one_active_attempt ON attempts(status) WHERE status = 'active'",
     );
   }
 }
