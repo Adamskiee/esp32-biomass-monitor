@@ -20,6 +20,21 @@ class AttemptComparisonService {
     List<AttemptReading> unfiltered,
     List<AttemptReading> filtered,
   ) {
+    final unavailableReason = _mqUnavailableReason(
+      metric,
+      unfiltered,
+      filtered,
+    );
+    if (unavailableReason != null) {
+      return MetricComparison(
+        metric: metric,
+        unfiltered: const ReadingSummary(),
+        filtered: const ReadingSummary(),
+        unfilteredSeries: const [],
+        filteredSeries: const [],
+        unavailableReason: unavailableReason,
+      );
+    }
     final unfilteredSeries = _series(metric, unfiltered);
     final filteredSeries = _series(metric, filtered);
     final before = _summary(unfilteredSeries);
@@ -38,6 +53,25 @@ class AttemptComparisonService {
           ? null
           : difference / before.average! * 100,
     );
+  }
+
+  String? _mqUnavailableReason(
+    ComparisonMetric metric,
+    List<AttemptReading> unfiltered,
+    List<AttemptReading> filtered,
+  ) {
+    if (metric != ComparisonMetric.mq2 && metric != ComparisonMetric.mq135) {
+      return null;
+    }
+    final ids = [...unfiltered, ...filtered]
+        .map(
+          (reading) => metric == ComparisonMetric.mq2
+              ? reading.data.mq2CalibrationId
+              : reading.data.mq135CalibrationId,
+        )
+        .toSet();
+    if (ids.contains(null) || ids.isEmpty) return 'No calibrated readings';
+    return ids.length == 1 ? null : 'Different calibration';
   }
 
   List<SeriesPoint> _series(

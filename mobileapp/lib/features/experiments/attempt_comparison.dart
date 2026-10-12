@@ -4,8 +4,8 @@ enum ComparisonMetric { mq2, mq135, temperature, humidity, pm1, pm25, pm10 }
 
 extension ComparisonMetricDetails on ComparisonMetric {
   String get label => switch (this) {
-    ComparisonMetric.mq2 => 'MQ-2',
-    ComparisonMetric.mq135 => 'MQ-135',
+    ComparisonMetric.mq2 => 'MQ-2 response',
+    ComparisonMetric.mq135 => 'MQ-135 response',
     ComparisonMetric.temperature => 'DHT-22 temperature',
     ComparisonMetric.humidity => 'DHT-22 humidity',
     ComparisonMetric.pm1 => 'PM1.0',
@@ -13,7 +13,7 @@ extension ComparisonMetricDetails on ComparisonMetric {
     ComparisonMetric.pm10 => 'PM10',
   };
   String get unit => switch (this) {
-    ComparisonMetric.mq2 || ComparisonMetric.mq135 => 'V',
+    ComparisonMetric.mq2 || ComparisonMetric.mq135 => '× baseline',
     ComparisonMetric.temperature => '°C',
     ComparisonMetric.humidity => '%',
     _ => 'µg/m³',
@@ -24,8 +24,8 @@ extension ComparisonMetricDetails on ComparisonMetric {
     _ => 0,
   };
   double? valueOf(AttemptReading reading) => switch (this) {
-    ComparisonMetric.mq2 => reading.data.mq2V,
-    ComparisonMetric.mq135 => reading.data.mq135V,
+    ComparisonMetric.mq2 => reading.data.mq2ResponseRatio,
+    ComparisonMetric.mq135 => reading.data.mq135ResponseRatio,
     ComparisonMetric.temperature => reading.data.temperatureC,
     ComparisonMetric.humidity => reading.data.humidityPercent,
     ComparisonMetric.pm1 => reading.data.pm1UgM3,
@@ -64,6 +64,7 @@ class MetricComparison {
     required this.filteredSeries,
     this.difference,
     this.percentageDifference,
+    this.unavailableReason,
   });
   final ComparisonMetric metric;
   final ReadingSummary unfiltered;
@@ -72,6 +73,7 @@ class MetricComparison {
   final List<SeriesPoint> filteredSeries;
   final double? difference;
   final double? percentageDifference;
+  final String? unavailableReason;
 }
 
 class AttemptComparison {
