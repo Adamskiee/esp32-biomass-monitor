@@ -50,6 +50,16 @@ confirm that the valve moved, the pump ran, or water flowed.
   are invalid only when they are `NaN` or above 4.8 V. A 0 V MQ2 reading is
   valid. Check sensor wiring and power. A thermocouple failure during a
   temperature alarm latches the sprinkler on until restart.
+
+## Commission MQ response readings
+
+After the sensor has completed its manufacturer-recommended 48-hour initial
+preheat, place it in verified clean air and capture each baseline through the
+authenticated API or mobile app. The device retains 30 samples and rejects an
+unstable capture. It reports `× baseline` only after its five-minute restart
+warmup and only when the circuit divider, analog conversion, and 5 V supply
+have been validated. Do not treat an MQ response as ppm, carbon monoxide,
+carbon dioxide, or a certified air-quality value.
 - The buzzer indicates a valid chamber reading above the configured limit.
 - A rejected manual sprinkler command can mean automatic temperature safety
   is active. The app refreshes the reported output state after rejection.

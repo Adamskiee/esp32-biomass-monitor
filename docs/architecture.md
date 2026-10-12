@@ -26,7 +26,12 @@ shows reported state and cannot override automatic sprinkler safety.
 - A manual sprinkler request is accepted only while temperature safety and the
   catastrophic latch are inactive. The API reports the actual output state.
 
-MQ135 is included in telemetry but does not currently trigger automatic
+MQ-2 and MQ-135 can also report a response relative to a separately captured
+clean-air baseline. The response is `R0 / Rs`, displayed as `× baseline`; it
+is not a gas concentration or air-quality index. Hardware keeps the fixed
+2.5 V MQ-2 rule until an operator captures a validated baseline and explicitly
+activates a response threshold. During startup warmup or an invalid response,
+the fixed-voltage rule remains the effective safety mode. MQ135 is included in telemetry but does not currently trigger automatic
 actuation. The fan output is an on/off relay; variable PWM speed is not
 implemented.
 

@@ -8,8 +8,8 @@
 The system is built around an ESP32 microcontroller utilizing FreeRTOS.
 
 **Sensors (Inputs):**
-*   **MQ135:** Air quality sensor (Reads as Voltage).
-*   **MQ2:** Smoke and combustible gas sensor (Reads as Voltage).
+*   **MQ135:** Pollutant-sensitive sensor. Raw voltage remains available for diagnostics; a calibrated response is displayed as `× baseline`.
+*   **MQ2:** Smoke and combustible-gas-sensitive sensor. Raw voltage remains available for diagnostics; a calibrated response can drive an explicitly commissioned alert threshold.
 *   **Internal Temperature:** Board-level temperature monitoring (Celsius).
 *   **Thermocouple:** Measures the internal chamber temperature where burning occurs (Celsius).
 *   **DHT-22:** Measures ambient temperature (Celsius) and relative humidity (percent).
