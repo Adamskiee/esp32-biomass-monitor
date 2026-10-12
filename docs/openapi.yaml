@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Biomass Monitor API
   description: Authenticated local API for ESP32 telemetry and safety control.
-  version: 1.1.0
+  version: 2.0.0
 servers:
   - url: /
 components:
@@ -73,14 +73,9 @@ components:
         threshold_mq2_v:
           type: number
           format: float
-        fan_on:
-          type: boolean
-        sprinkler_on:
-          type: boolean
-          description: Commanded solenoid relay output. It can be true while the pump waits during startup.
         pump_on:
           type: boolean
-          description: Commanded pump relay output. This reports the relay command, not verified water flow.
+          description: Commanded pump relay output. This reports the relay command, not verified pump operation or water flow.
         manual_sprinkler:
           type: boolean
         active_triggers:

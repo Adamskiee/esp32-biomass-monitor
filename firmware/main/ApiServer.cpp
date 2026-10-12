@@ -69,8 +69,6 @@ void initApiServer() {
     }
     doc["threshold_chamber_temp_c"] = threshold_chamber_temp_c;
     doc["threshold_mq2_v"] = threshold_mq2_v;
-    doc["fan_on"] = current_fan_state;
-    doc["sprinkler_on"] = current_solenoid_state;
     doc["pump_on"] = current_pump_state;
     doc["manual_sprinkler"] = manual_sprinkler;
     deserializeJson(doc["active_triggers"], active_triggers_json);

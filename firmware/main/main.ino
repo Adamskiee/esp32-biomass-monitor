@@ -14,15 +14,12 @@ void setup() {
   initActuators();
   initAnalogSensors();
   initDigitalSensors();
-  setFan(true);
   setLedStatus(false, true, false);
   initApiServer();
   Serial.println("System Ready.");
 }
 
 void loop() {
-  updateActuatorTransitions();
-
   if (millis() - lastRead >= POLL_INTERVAL_MS) {
     lastRead = millis();
 
