@@ -65,4 +65,37 @@ class ApiService {
       throw Exception('Failed to set thresholds: ${response.statusCode}');
     }
   }
+
+  Future<Map<String, dynamic>> captureMqCalibration(String sensor) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/mq/calibration'),
+          headers: headers,
+          body: jsonEncode({'sensor': sensor}),
+        )
+        .timeout(const Duration(milliseconds: 2000));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to capture MQ calibration: ${response.statusCode}');
+  }
+
+  Future<void> setMq2ResponseThreshold(double ratio) =>
+      _setMq2Mode({'threshold_mq2_response_ratio': ratio});
+
+  Future<void> useLegacyMq2Threshold() =>
+      _setMq2Mode({'mq2_threshold_mode': 'legacy_voltage'});
+
+  Future<void> _setMq2Mode(Map<String, dynamic> body) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/thresholds'),
+          headers: headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(milliseconds: 2000));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to set MQ-2 threshold: ${response.statusCode}');
+    }
+  }
 }

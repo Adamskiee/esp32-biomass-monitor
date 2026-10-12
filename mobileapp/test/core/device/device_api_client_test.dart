@@ -138,4 +138,29 @@ void main() {
       expect(() => service.setThresholds(1000.0, 2.0), throwsException);
     });
   });
+
+  group('MQ commissioning', () {
+    test('posts capture and response threshold bodies', () async {
+      final requests = <http.Request>[];
+      final service = createService(
+        MockClient((request) async {
+          requests.add(request);
+          return http.Response(jsonEncode({'calibration_id': 1}), 200);
+        }),
+      );
+
+      await service.captureMqCalibration('mq2');
+      await service.setMq2ResponseThreshold(4.0);
+      await service.useLegacyMq2Threshold();
+
+      expect(requests[0].url.path, '/api/mq/calibration');
+      expect(jsonDecode(requests[0].body), {'sensor': 'mq2'});
+      expect(jsonDecode(requests[1].body), {
+        'threshold_mq2_response_ratio': 4.0,
+      });
+      expect(jsonDecode(requests[2].body), {
+        'mq2_threshold_mode': 'legacy_voltage',
+      });
+    });
+  });
 }
