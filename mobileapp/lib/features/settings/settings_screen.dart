@@ -4,12 +4,16 @@ import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/features/settings/settings_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  void _showAboutDialog(BuildContext context, ThemeData theme) {
+  Future<void> _showAboutDialog(BuildContext context, ThemeData theme) async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (!context.mounted) return;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -70,6 +74,11 @@ class SettingsScreen extends StatelessWidget {
                 color: theme.textTheme.bodyLarge?.color,
                 fontSize: 13,
               ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Version ${packageInfo.version} (${packageInfo.buildNumber})",
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
           ],
         ),
