@@ -1,7 +1,6 @@
 import math
 import threading
-import time
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 
 class SafetyOverrideError(Exception):
@@ -20,8 +19,7 @@ class SimulatorState:
         "threshold_mq2_v": (0.1, 5.0),
     }
 
-    def __init__(self, clock: Callable[[], float] = time.monotonic):
-        self._clock = clock
+    def __init__(self):
         self._lock = threading.RLock()
         self.reset()
 
@@ -44,11 +42,7 @@ class SimulatorState:
             self._gas_danger = False
             self._catastrophic_latch = False
             self._manual_sprinkler = False
-            self._sprinkler_on = False
             self._pump_on = False
-            self._sprinkler_requested = False
-            self._phase = "off"
-            self._transition_started_at = self._clock()
 
     def select_scenario(self, name: str) -> None:
         if name not in (*self._READINGS, "normal", "offline"):
@@ -97,7 +91,6 @@ class SimulatorState:
                 self._mq2_v = 1.0 + drift / 10
                 self._tick += 1
                 self._evaluate_safety()
-            self._advance_actuators()
             triggers = []
             if self._catastrophic_latch:
                 triggers.append("catastrophic_latch")
@@ -119,8 +112,6 @@ class SimulatorState:
                 "pm10_ug_m3": 18,
                 "threshold_chamber_temp_c": self._threshold_chamber_temp_c,
                 "threshold_mq2_v": self._threshold_mq2_v,
-                "fan_on": True,
-                "sprinkler_on": self._sprinkler_on,
                 "pump_on": self._pump_on,
                 "manual_sprinkler": self._manual_sprinkler,
                 "active_triggers": triggers,
@@ -148,23 +139,4 @@ class SimulatorState:
             self._request_sprinkler(self._manual_sprinkler)
 
     def _request_sprinkler(self, enabled: bool) -> None:
-        self._sprinkler_requested = enabled
-        if enabled and self._phase in ("off", "stopping_valve"):
-            self._pump_on = False
-            self._sprinkler_on = True
-            self._transition_started_at = self._clock()
-            self._phase = "starting_pump"
-        elif not enabled and self._phase in ("on", "starting_pump"):
-            self._pump_on = False
-            self._transition_started_at = self._clock()
-            self._phase = "stopping_valve"
-
-    def _advance_actuators(self) -> None:
-        if self._clock() - self._transition_started_at < 0.5:
-            return
-        if self._phase == "starting_pump" and self._sprinkler_requested and self._sprinkler_on:
-            self._pump_on = True
-            self._phase = "on"
-        elif self._phase == "stopping_valve" and not self._sprinkler_requested:
-            self._sprinkler_on = False
-            self._phase = "off"
+        self._pump_on = enabled

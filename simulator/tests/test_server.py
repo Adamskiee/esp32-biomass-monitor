@@ -48,8 +48,8 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(set(state), {
             "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
-            "threshold_chamber_temp_c", "threshold_mq2_v", "fan_on",
-            "sprinkler_on", "pump_on", "manual_sprinkler", "active_triggers",
+            "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
+            "manual_sprinkler", "active_triggers",
         })
         status, _, settings = self.request("/api/settings")
         self.assertEqual(status, 200)
@@ -123,14 +123,26 @@ class ServerTests(unittest.TestCase):
         for body in ({"sprinkler": 1}, {}, [], {"sprinkler": None}):
             with self.subTest(body=body):
                 self.assertEqual(self.request("/api/control", "POST", body)[0], 400)
-                self.assertFalse(self.state.snapshot()["sprinkler_on"])
+                self.assertFalse(self.state.snapshot()["pump_on"])
 
     def test_safety_block_returns_conflict(self):
         self.state.select_scenario("heat")
         status, _, body = self.request("/api/control", "POST", {"sprinkler": False})
         self.assertEqual(status, 409)
         self.assertEqual(body["status"], "error")
-        self.assertTrue(self.state.snapshot()["sprinkler_on"])
+        self.assertTrue(self.state.snapshot()["pump_on"])
+
+    def test_control_reports_immediate_pump_state(self):
+        for enabled in (True, False):
+            self.assertEqual(self.request("/api/control", "POST", {"sprinkler": enabled})[0], 200)
+            status, _, state = self.request("/api/state")
+            self.assertEqual(status, 200)
+            self.assertIs(state["pump_on"], enabled)
+            self.assertNotIn("fan_on", state)
+            self.assertNotIn("sprinkler_on", state)
+        self.state.select_scenario("heat")
+        self.assertEqual(self.request("/api/control", "POST", {"sprinkler": False})[0], 409)
+        self.assertTrue(self.request("/api/state")[2]["pump_on"])
 
     def test_offline_requires_auth_then_returns_503(self):
         self.state.select_scenario("offline")

@@ -5,7 +5,7 @@
 The simulator lets the Flutter app connect to a local ESP32-style API when no
 board is available. It exercises the app's existing login, polling, alerts,
 sprinkler controls, and threshold settings. Its readings and relay states are
-simulated; they do not prove physical sensor, pump, or valve behavior.
+simulated; they do not prove physical sensor, pump, or water-flow behavior.
 
 ## How do I start it?
 
@@ -79,10 +79,9 @@ Every online scenario also returns stable PMS telemetry: PM1.0 is 8 µg/m³,
 PM2.5 is 12 µg/m³, and PM10 is 18 µg/m³. These values exercise the same
 device-state fields as the firmware without affecting simulated safety rules.
 
-The sprinkler state represents the commanded valve relay. The pump starts
-500 ms after the valve is commanded on. During shutdown, the pump turns off
-first and the valve closes 500 ms later. The app may briefly show different
-sprinkler and pump states during those transitions.
+`pump_on` represents the commanded pump relay and changes immediately when a
+manual or safety sprinkler request is accepted. It does not confirm pump
+operation or water flow.
 
 The stored MQ2 threshold can be edited and displayed, but the gas alarm still
 uses a fixed 2.5 V trigger, matching the firmware. Thresholds and latches are
