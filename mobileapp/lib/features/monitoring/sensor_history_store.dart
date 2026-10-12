@@ -26,6 +26,10 @@ class SensorHistoryStore implements SensorHistoryReader {
       'chamber_temp_c': data.chamberTempC,
       'mq135_v': data.mq135V,
       'mq2_v': data.mq2V,
+      'mq135_response_ratio': data.mq135ResponseRatio,
+      'mq2_response_ratio': data.mq2ResponseRatio,
+      'mq135_calibration_id': data.mq135CalibrationId,
+      'mq2_calibration_id': data.mq2CalibrationId,
       'pm1_0_ug_m3': data.pm1_0UgM3,
       'pm2_5_ug_m3': data.pm2_5UgM3,
       'pm10_ug_m3': data.pm10UgM3,
@@ -91,12 +95,28 @@ class SensorHistoryStore implements SensorHistoryReader {
     for (var index = 0; index < rows.length; index += step) {
       final end = index + step < rows.length ? index + step : rows.length;
       final chunk = rows.sublist(index, end);
+      final mq2CalibrationId = _singleCalibrationId(
+        chunk,
+        'mq2_calibration_id',
+      );
+      final mq135CalibrationId = _singleCalibrationId(
+        chunk,
+        'mq135_calibration_id',
+      );
       data.add(
         SensorData(
           temperatureC: _average(chunk, 'temperature_c'),
           chamberTempC: _average(chunk, 'chamber_temp_c'),
           mq135V: _average(chunk, 'mq135_v'),
           mq2V: _average(chunk, 'mq2_v'),
+          mq2ResponseRatio: mq2CalibrationId == null
+              ? null
+              : _average(chunk, 'mq2_response_ratio'),
+          mq135ResponseRatio: mq135CalibrationId == null
+              ? null
+              : _average(chunk, 'mq135_response_ratio'),
+          mq2CalibrationId: mq2CalibrationId,
+          mq135CalibrationId: mq135CalibrationId,
           pm1_0UgM3: _average(chunk, 'pm1_0_ug_m3'),
           pm2_5UgM3: _average(chunk, 'pm2_5_ug_m3'),
           pm10UgM3: _average(chunk, 'pm10_ug_m3'),
@@ -112,6 +132,10 @@ class SensorHistoryStore implements SensorHistoryReader {
     chamberTempC: (row['chamber_temp_c'] as num?)?.toDouble(),
     mq135V: (row['mq135_v'] as num?)?.toDouble(),
     mq2V: (row['mq2_v'] as num?)?.toDouble(),
+    mq135ResponseRatio: (row['mq135_response_ratio'] as num?)?.toDouble(),
+    mq2ResponseRatio: (row['mq2_response_ratio'] as num?)?.toDouble(),
+    mq135CalibrationId: row['mq135_calibration_id'] as String?,
+    mq2CalibrationId: row['mq2_calibration_id'] as String?,
     pm1_0UgM3: (row['pm1_0_ug_m3'] as num?)?.toDouble(),
     pm2_5UgM3: (row['pm2_5_ug_m3'] as num?)?.toDouble(),
     pm10UgM3: (row['pm10_ug_m3'] as num?)?.toDouble(),
@@ -126,5 +150,10 @@ class SensorHistoryStore implements SensorHistoryReader {
         .toList();
     if (values.isEmpty) return null;
     return values.reduce((total, value) => total + value) / values.length;
+  }
+
+  String? _singleCalibrationId(List<Map<String, Object?>> rows, String column) {
+    final ids = rows.map((row) => row[column] as String?).toSet();
+    return ids.length == 1 ? ids.single : null;
   }
 }

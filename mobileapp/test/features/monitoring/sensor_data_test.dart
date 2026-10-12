@@ -29,4 +29,18 @@ void main() {
       expect(reading.pm10UgM3, isNull);
     }
   });
+
+  test('parses nullable MQ responses and calibration identifiers', () {
+    final reading = SensorData.fromJson({
+      'mq2_response_ratio': 4,
+      'mq135_response_ratio': null,
+      'mq2_calibration_id': 12,
+      'mq135_calibration_id': null,
+    });
+
+    expect(reading.mq2ResponseRatio, 4.0);
+    expect(reading.mq135ResponseRatio, isNull);
+    expect(reading.mq2CalibrationId, '12');
+    expect(reading.mq135CalibrationId, isNull);
+  });
 }

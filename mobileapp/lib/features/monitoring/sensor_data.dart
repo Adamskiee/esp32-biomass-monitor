@@ -1,5 +1,7 @@
 class SensorData {
   final double? temperatureC, humidityPercent, chamberTempC, mq135V, mq2V;
+  final double? mq135ResponseRatio, mq2ResponseRatio;
+  final String? mq135CalibrationId, mq2CalibrationId;
   final double? pm1_0UgM3, pm2_5UgM3, pm10UgM3;
   final DateTime timestamp;
 
@@ -9,6 +11,10 @@ class SensorData {
     this.chamberTempC,
     this.mq135V,
     this.mq2V,
+    this.mq135ResponseRatio,
+    this.mq2ResponseRatio,
+    this.mq135CalibrationId,
+    this.mq2CalibrationId,
     double? pm1_0UgM3,
     double? pm2_5UgM3,
     double? pm1UgM3,
@@ -35,6 +41,10 @@ class SensorData {
         ? (json['mq135_v'] as num).toDouble()
         : null,
     mq2V: json['mq2_v'] != null ? (json['mq2_v'] as num).toDouble() : null,
+    mq135ResponseRatio: (json['mq135_response_ratio'] as num?)?.toDouble(),
+    mq2ResponseRatio: (json['mq2_response_ratio'] as num?)?.toDouble(),
+    mq135CalibrationId: json['mq135_calibration_id']?.toString(),
+    mq2CalibrationId: json['mq2_calibration_id']?.toString(),
     pm1_0UgM3: (json['pm1_0_ug_m3'] ?? json['pm1_ug_m3']) != null
         ? ((json['pm1_0_ug_m3'] ?? json['pm1_ug_m3']) as num).toDouble()
         : null,

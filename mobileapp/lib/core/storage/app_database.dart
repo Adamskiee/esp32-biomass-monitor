@@ -22,7 +22,7 @@ class AppDatabase implements DatabaseProvider {
     _database = await _databaseFactory.openDatabase(
       _databasePath ?? await _defaultPath(),
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
@@ -55,6 +55,22 @@ class AppDatabase implements DatabaseProvider {
       await _migrateSensorColumns(db);
       await _createAttemptTables(db);
     }
+    if (oldVersion < 5) {
+      for (final table in ['sensor_data', 'attempt_readings']) {
+        await db.execute(
+          'ALTER TABLE $table ADD COLUMN mq135_response_ratio REAL',
+        );
+        await db.execute(
+          'ALTER TABLE $table ADD COLUMN mq2_response_ratio REAL',
+        );
+        await db.execute(
+          'ALTER TABLE $table ADD COLUMN mq135_calibration_id TEXT',
+        );
+        await db.execute(
+          'ALTER TABLE $table ADD COLUMN mq2_calibration_id TEXT',
+        );
+      }
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -86,6 +102,10 @@ class AppDatabase implements DatabaseProvider {
       chamber_temp_c REAL,
       mq135_v REAL,
       mq2_v REAL,
+      mq135_response_ratio REAL,
+      mq2_response_ratio REAL,
+      mq135_calibration_id TEXT,
+      mq2_calibration_id TEXT,
       pm1_0_ug_m3 REAL,
       pm2_5_ug_m3 REAL,
       pm10_ug_m3 REAL,
@@ -135,6 +155,10 @@ class AppDatabase implements DatabaseProvider {
         humidity_percent REAL,
         mq135_v REAL,
         mq2_v REAL,
+        mq135_response_ratio REAL,
+        mq2_response_ratio REAL,
+        mq135_calibration_id TEXT,
+        mq2_calibration_id TEXT,
         pm1_ug_m3 REAL,
         pm25_ug_m3 REAL,
         pm10_ug_m3 REAL
