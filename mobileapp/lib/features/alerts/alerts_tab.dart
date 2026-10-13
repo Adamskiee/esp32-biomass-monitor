@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
-import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
-import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -34,9 +32,9 @@ class _AlertsTabState extends State<AlertsTab> {
   @override
   void initState() {
     super.initState();
-    _ownsController = widget.controller == null;
+    _ownsController = false;
     _controller =
-        widget.controller ?? AlertsController(AlertsStore(AppDatabase()));
+        widget.controller ?? context.read<AppStateProvider>().alertsController;
     _controller.addListener(_onAlertsChanged);
     _scrollController.addListener(_loadMoreWhenNeeded);
     unawaited(_controller.load());
@@ -116,10 +114,8 @@ class _AlertsTabState extends State<AlertsTab> {
                           foregroundColor: AppTheme.neonRed,
                           elevation: 0,
                         ),
-                        onPressed: () {
-                          unawaited(_controller.clearAllAlerts());
-                          context.read<AppStateProvider>().clearAllAlerts();
-                        },
+                        onPressed: () =>
+                            unawaited(_controller.clearAllAlerts()),
                         icon: const Icon(CupertinoIcons.trash, size: 18),
                         label: const Text(
                           "Clear All",
@@ -247,9 +243,6 @@ class _AlertsTabState extends State<AlertsTab> {
                             direction: DismissDirection.endToStart,
                             onDismissed: (_) {
                               unawaited(_controller.removeAlert(alert.id));
-                              context.read<AppStateProvider>().removeAlert(
-                                alert.id,
-                              );
                             },
                             background: Container(
                               alignment: Alignment.centerRight,
@@ -345,7 +338,3 @@ class _AlertsTabState extends State<AlertsTab> {
     );
   }
 }
-
-// ==========================================
-// TAB 5: MORE (SETTINGS & ABOUT CAPSTONE)
-// ==========================================

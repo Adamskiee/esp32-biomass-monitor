@@ -122,7 +122,27 @@ class AlertsStore {
 
   Future<void> clearAlerts() async {
     if (kIsWeb) return;
-    await (await _database.database).delete('alerts');
+    final database = await _database.database;
+    await database.delete('alerts');
+    await database.delete('alert_states');
+  }
+
+  Future<Set<String>> getActiveAlertStates() async {
+    if (kIsWeb) return {};
+    final rows = await (await _database.database).query(
+      'alert_states',
+      where: 'active = ?',
+      whereArgs: [1],
+    );
+    return rows.map((row) => row['key']! as String).toSet();
+  }
+
+  Future<void> setAlertState(String key, bool active) async {
+    if (kIsWeb) return;
+    await (await _database.database).insert('alert_states', {
+      'key': key,
+      'active': active ? 1 : 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   AlertItem _alertFromRow(Map<String, Object?> row) => AlertItem(

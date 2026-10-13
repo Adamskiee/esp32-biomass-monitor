@@ -2,6 +2,7 @@ class SensorData {
   final double? temperatureC, humidityPercent, chamberTempC, mq135V, mq2V;
   final double? pm1_0UgM3, pm2_5UgM3, pm10UgM3;
   final DateTime timestamp;
+  final Set<String> _reportedFields;
 
   SensorData({
     this.temperatureC,
@@ -14,12 +15,16 @@ class SensorData {
     double? pm1UgM3,
     double? pm25UgM3,
     this.pm10UgM3,
+    Set<String> reportedFields = const {},
     required this.timestamp,
   }) : pm1_0UgM3 = pm1_0UgM3 ?? pm1UgM3,
-       pm2_5UgM3 = pm2_5UgM3 ?? pm25UgM3;
+       pm2_5UgM3 = pm2_5UgM3 ?? pm25UgM3,
+       _reportedFields = reportedFields;
 
   double? get pm1UgM3 => pm1_0UgM3;
   double? get pm25UgM3 => pm2_5UgM3;
+
+  bool reportsField(String field) => _reportedFields.contains(field);
 
   factory SensorData.fromJson(Map<String, dynamic> json) => SensorData(
     temperatureC: json['temperature_c'] != null
@@ -44,6 +49,7 @@ class SensorData {
     pm10UgM3: json['pm10_ug_m3'] != null
         ? (json['pm10_ug_m3'] as num).toDouble()
         : null,
+    reportedFields: json.keys.toSet(),
     timestamp: DateTime.now(),
   );
 }
