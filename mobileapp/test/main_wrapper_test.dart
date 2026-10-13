@@ -174,8 +174,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1850));
       await tester.tap(find.text('Monitor'));
       await tester.pump();
-      await tester.tap(find.text('Air Quality'));
-      await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pump();
       expect(state.telemetryRevision, 1);

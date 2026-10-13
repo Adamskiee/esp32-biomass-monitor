@@ -69,30 +69,63 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
         "avgT": "0.0",
         "maxMq2": "0.0",
         "avgMq2": "0.0",
+        "maxAmbientTemp": "0.0",
+        "avgAmbientTemp": "0.0",
+        "maxMq135": "0.0",
+        "avgMq135": "0.0",
+        "maxPm1_0": "0.0",
+        "avgPm1_0": "0.0",
+        "maxPm2_5": "0.0",
+        "avgPm2_5": "0.0",
+        "maxPm10": "0.0",
+        "avgPm10": "0.0",
       };
     }
 
-    var validTemps = _history
-        .where((e) => e.chamberTempC != null)
-        .map((e) => e.chamberTempC!);
-    double minT = validTemps.isEmpty ? 0.0 : validTemps.reduce(min);
-    double maxT = validTemps.isEmpty ? 0.0 : validTemps.reduce(max);
-    double avgT = validTemps.isEmpty
-        ? 0.0
-        : validTemps.reduce((a, b) => a + b) / validTemps.length;
+    Map<String, String> summarise(Iterable<double?> readings, int decimals) {
+      final values = readings.whereType<double>().toList();
+      final minimum = values.isEmpty ? 0.0 : values.reduce(min);
+      final peak = values.isEmpty ? 0.0 : values.reduce(max);
+      final average = values.isEmpty
+          ? 0.0
+          : values.reduce((total, value) => total + value) / values.length;
+      return {
+        'min': minimum.toStringAsFixed(decimals),
+        'max': peak.toStringAsFixed(decimals),
+        'avg': average.toStringAsFixed(decimals),
+      };
+    }
 
-    var validMq2 = _history.where((e) => e.mq2V != null).map((e) => e.mq2V!);
-    double maxMq2 = validMq2.isEmpty ? 0.0 : validMq2.reduce(max);
-    double avgMq2 = validMq2.isEmpty
-        ? 0.0
-        : validMq2.reduce((a, b) => a + b) / validMq2.length;
+    final chamber = summarise(
+      _history.map((reading) => reading.chamberTempC),
+      1,
+    );
+    final ambient = summarise(
+      _history.map((reading) => reading.temperatureC),
+      1,
+    );
+    final mq2 = summarise(_history.map((reading) => reading.mq2V), 2);
+    final mq135 = summarise(_history.map((reading) => reading.mq135V), 2);
+    final pm1_0 = summarise(_history.map((reading) => reading.pm1_0UgM3), 1);
+    final pm2_5 = summarise(_history.map((reading) => reading.pm2_5UgM3), 1);
+    final pm10 = summarise(_history.map((reading) => reading.pm10UgM3), 1);
 
     return {
-      "minT": minT.toStringAsFixed(1),
-      "maxT": maxT.toStringAsFixed(1),
-      "avgT": avgT.toStringAsFixed(1),
-      "maxMq2": maxMq2.toStringAsFixed(2),
-      "avgMq2": avgMq2.toStringAsFixed(2),
+      "minT": chamber['min']!,
+      "maxT": chamber['max']!,
+      "avgT": chamber['avg']!,
+      "maxMq2": mq2['max']!,
+      "avgMq2": mq2['avg']!,
+      "maxAmbientTemp": ambient['max']!,
+      "avgAmbientTemp": ambient['avg']!,
+      "maxMq135": mq135['max']!,
+      "avgMq135": mq135['avg']!,
+      "maxPm1_0": pm1_0['max']!,
+      "avgPm1_0": pm1_0['avg']!,
+      "maxPm2_5": pm2_5['max']!,
+      "avgPm2_5": pm2_5['avg']!,
+      "maxPm10": pm10['max']!,
+      "avgPm10": pm10['avg']!,
     };
   }
 
