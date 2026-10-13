@@ -8,7 +8,7 @@ from simulator.server import make_handler
 
 
 SCENARIOS = ("normal", "gas", "heat", "temp-fault", "mq2-fault", "offline")
-COMMANDS = (*SCENARIOS, "status", "reset", "help", "quit")
+COMMANDS = (*SCENARIOS, "warmup", "status", "reset", "help", "quit")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,6 +28,9 @@ def process_command(state: SimulatorState, command: str) -> str:
     if name == "reset":
         state.reset()
         return "Reset complete. Scenario: normal"
+    if name == "warmup":
+        state.start_mq_warmup()
+        return "MQ warm-up started"
     if name == "status":
         return f"Scenario: {state.scenario}"
     if name == "quit":

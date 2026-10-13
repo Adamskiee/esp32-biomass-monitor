@@ -5,13 +5,55 @@ from simulator.model import SafetyOverrideError, SimulatorState
 
 class SimulatorStateTests(unittest.TestCase):
     def setUp(self):
-        self.state = SimulatorState()
+        self.now = 0.0
+        self.state = SimulatorState(clock=lambda: self.now)
+        self.now = 301.0
+
+    def test_startup_warmup_hides_mq_readings_and_suppresses_gas_alerts(self):
+        now = 0.0
+        state = SimulatorState(clock=lambda: now)
+        state.select_scenario("gas")
+
+        snapshot = state.snapshot()
+
+        self.assertTrue(snapshot["mq_warming_up"])
+        self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 300)
+        self.assertIsNone(snapshot["mq135_v"])
+        self.assertIsNone(snapshot["mq2_v"])
+        self.assertNotIn("high_mq2_gas", snapshot["active_triggers"])
+        self.assertNotIn("mq2_sensor_fault", snapshot["active_triggers"])
+
+    def test_mq_readings_and_gas_alerts_resume_when_warmup_expires(self):
+        now = 0.0
+        state = SimulatorState(clock=lambda: now)
+        state.select_scenario("gas")
+        now = 300.0
+
+        snapshot = state.snapshot()
+
+        self.assertFalse(snapshot["mq_warming_up"])
+        self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 0)
+        self.assertEqual(snapshot["mq2_v"], 2.8)
+        self.assertIn("high_mq2_gas", snapshot["active_triggers"])
+
+    def test_snapshot_keeps_safety_and_warmup_status_consistent_at_expiry(self):
+        times = iter((0.0, 0.0, 299.999, 300.0))
+        state = SimulatorState(clock=lambda: next(times))
+        state.select_scenario("gas")
+
+        snapshot = state.snapshot()
+
+        self.assertTrue(snapshot["mq_warming_up"])
+        self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 1)
+        self.assertIsNone(snapshot["mq2_v"])
+        self.assertNotIn("high_mq2_gas", snapshot["active_triggers"])
 
     def test_normal_snapshot_has_documented_fields_and_changing_readings(self):
         first = self.state.snapshot()
         second = self.state.snapshot()
         self.assertEqual(set(first), {
             "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
+            "mq_warming_up", "mq_warmup_remaining_seconds",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
             "manual_sprinkler", "active_triggers",

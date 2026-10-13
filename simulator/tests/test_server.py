@@ -12,7 +12,9 @@ from simulator.server import make_handler
 
 class ServerTests(unittest.TestCase):
     def setUp(self):
-        self.state = SimulatorState()
+        self.now = 0.0
+        self.state = SimulatorState(clock=lambda: self.now)
+        self.now = 301.0
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.state, "demo", "demo"))
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -47,6 +49,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(set(state), {
             "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
+            "mq_warming_up", "mq_warmup_remaining_seconds",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
             "manual_sprinkler", "active_triggers",
