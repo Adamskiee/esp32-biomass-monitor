@@ -97,7 +97,6 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.select<AppStateProvider, bool>((s) => s.isAdmin);
     final settings = context.watch<SettingsController>();
     final theme = Theme.of(context);
 
@@ -202,51 +201,6 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-
-              if (isAdmin) ...[
-                Text(
-                  "Admin Security & Access",
-                  style: TextStyle(
-                    color: theme.textTheme.bodyLarge?.color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GlowingCard(
-                  glowColor: AppTheme.cardBorder,
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      _switchRow(
-                        "Biometric Login (Face ID)",
-                        settings.biometricLogin,
-                        theme,
-                        (val) => settings.toggleBiometric(val),
-                      ),
-                      const Divider(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Session Timeout",
-                            style: TextStyle(
-                              color: theme.textTheme.bodyLarge?.color,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Text(
-                            "30 mins",
-                            style: TextStyle(color: Colors.grey, fontSize: 15),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
 
               GlowingCard(
                 glowColor: AppTheme.cardBorder,

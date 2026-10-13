@@ -210,6 +210,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('26.5 °C'), findsOneWidget);
+    expect(find.text('PM1.0'), findsNWidgets(2));
+    expect(find.text('8.0 µg/m³'), findsOneWidget);
+    expect(find.text('PM2.5'), findsNWidgets(2));
+    expect(find.text('12.0 µg/m³'), findsOneWidget);
+    expect(find.text('PM10'), findsNWidgets(2));
+    expect(find.text('18.0 µg/m³'), findsOneWidget);
     temperature = 29.5;
     mq135 = 0.95;
     mq2 = 1.55;

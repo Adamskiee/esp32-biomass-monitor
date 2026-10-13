@@ -157,11 +157,11 @@ class DatabaseHelper implements DatabaseProvider {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<AlertItem>> getAlerts() async {
+  Future<List<AlertItem>> getAlerts({int limit = 20}) async {
     if (kIsWeb) return [];
     Database db = await database;
-    final maps = await db.query('alerts');
-    final alerts = maps
+    final maps = await db.query('alerts', orderBy: 'rowid DESC', limit: limit);
+    return maps
         .map(
           (map) => AlertItem(
             id: map['id'] as String,
@@ -172,12 +172,15 @@ class DatabaseHelper implements DatabaseProvider {
           ),
         )
         .toList();
-    alerts.sort(
-      (first, second) => (second.timestamp ?? DateTime(0)).compareTo(
-        first.timestamp ?? DateTime(0),
-      ),
+  }
+
+  Future<int> getAlertCount() async {
+    if (kIsWeb) return 0;
+    final rows = await (await database).rawQuery(
+      'SELECT COUNT(*) AS alert_count FROM alerts',
     );
-    return alerts;
+    if (rows.isEmpty) return 0;
+    return (rows.single['alert_count'] as num).toInt();
   }
 
   // --- Audit Logs CRUD ---

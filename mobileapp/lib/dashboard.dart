@@ -166,6 +166,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  String _formatParticulateReading(dynamic reading) {
+    if (reading is! num) return '--';
+
+    final value = reading.toDouble();
+    final decimals = value == value.roundToDouble() ? 0 : 1;
+    return '${value.toStringAsFixed(decimals)} µg/m³';
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -287,6 +295,39 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          const Text(
+            'Particulate Matter',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.grain, color: Colors.blueGrey),
+                  title: Text(
+                    'PM1.0: ${_formatParticulateReading(_state['pm1_0_ug_m3'] ?? _state['pm1_ug_m3'])}',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.grain, color: Colors.blueGrey),
+                  title: Text(
+                    'PM2.5: ${_formatParticulateReading(_state['pm2_5_ug_m3'] ?? _state['pm25_ug_m3'])}',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.grain, color: Colors.blueGrey),
+                  title: Text(
+                    'PM10: ${_formatParticulateReading(_state['pm10_ug_m3'])}',
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
