@@ -45,7 +45,9 @@ screen opening. The displayed total covers the full filtered snapshot; alerts
 created after it opened appear after a refresh. On phones, the end of the list
 stays above the floating navigation bar so the final alert and load state are
 fully visible. The app keeps one saved device IP; it does not keep a node list
-or save credentials. MQ sensor values are voltages; the app does not calculate
+or save credentials. After an ESP32 restart, the MQ-135 and MQ-2 cards show a
+five-minute warm-up countdown. Their readings and MQ-2 gas alerts become active
+when it reaches zero. MQ sensor values are voltages; the app does not calculate
 a certified air quality index or carbon monoxide concentration from them.
 
 The Air Quality tab also shows PM1.0, PM2.5, and PM10 mass concentrations in

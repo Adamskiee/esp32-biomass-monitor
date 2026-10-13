@@ -41,6 +41,9 @@ confirm that the pump ran or water flowed.
 
 - A green LED indicates the current readings are safe. The LED starts yellow
   until the first poll.
+- MQ-135 and MQ-2 heaters warm up for five minutes after every ESP32 restart.
+  During this interval, the app displays a countdown and the firmware does not
+  issue MQ2 gas or MQ2 sensor-fault triggers.
 - A red LED indicates chamber temperature at or above its configured limit.
   It also means the sprinkler has opened automatically. An MQ2 gas alert does
   not change the green LED or open the sprinkler. Check `active_triggers` and

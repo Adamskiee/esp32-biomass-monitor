@@ -14,14 +14,18 @@ void setup() {
   initActuators();
   initAnalogSensors();
   initDigitalSensors();
+  startMqWarmup(millis());
   setLedStatus(false, true, false);
   initApiServer();
   Serial.println("System Ready.");
 }
 
 void loop() {
-  if (millis() - lastRead >= POLL_INTERVAL_MS) {
-    lastRead = millis();
+  const unsigned long now = millis();
+  const bool mq_warmup_just_finished =
+      mqSensorsAreWarmingUp() && mqWarmupRemainingSeconds(now) == 0;
+  if (now - lastRead >= POLL_INTERVAL_MS || mq_warmup_just_finished) {
+    lastRead = now;
 
     // Block main loop to read hardware sensors
     float t_mq135 = readMQ135Voltage();
@@ -43,7 +47,9 @@ void loop() {
     static float safe_chamber_limit = 80.0;
     static float safe_mq2_limit = 2.5;
 
-    processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2);
+    const bool mq_sensors_warming_up = mqWarmupRemainingSeconds(now) > 0;
+    processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2,
+                          mq_sensors_warming_up);
 
     PmsReading pms_reading{};
     if (readPmsReading(pms_reading)) {

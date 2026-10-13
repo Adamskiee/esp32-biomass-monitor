@@ -124,6 +124,7 @@ class _HomeTabState extends State<HomeTab> {
                         decimals: 2,
                         isCompact: isCompact,
                         maxVal: 5.0,
+                        statusText: _mqWarmupStatus(data),
                       ),
                       _metricCard(
                         "MQ2 Smoke",
@@ -135,6 +136,7 @@ class _HomeTabState extends State<HomeTab> {
                         decimals: 2,
                         isCompact: isCompact,
                         maxVal: 5.0,
+                        statusText: _mqWarmupStatus(data),
                       ),
                       _metricCard(
                         "PM1.0",
@@ -412,6 +414,7 @@ class _HomeTabState extends State<HomeTab> {
     int decimals = 0,
     bool isCompact = false,
     double maxVal = 100.0,
+    String? statusText,
   }) {
     return SensorMetricCard(
       title: title,
@@ -423,7 +426,17 @@ class _HomeTabState extends State<HomeTab> {
       decimals: decimals,
       isCompact: isCompact,
       maxVal: maxVal,
+      statusText: statusText,
     );
+  }
+
+  String? _mqWarmupStatus(SensorData data) {
+    if (!data.isMqWarmingUp) return null;
+    if (data.mqWarmupRemainingSeconds == 0) {
+      return 'Warming up: finishing...';
+    }
+    final minutes = (data.mqWarmupRemainingSeconds / 60).ceil();
+    return 'Warming up: $minutes min remaining';
   }
 
   Widget _buildTrendChart({
