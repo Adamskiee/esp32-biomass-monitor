@@ -227,7 +227,7 @@ class _HomeTabState extends State<HomeTab> {
                       const SizedBox(height: 6),
                       Text(
                         _chartTimeframe == 0
-                            ? "Temperature and MQ2 voltage from recent readings. Tap chart for details."
+                            ? "Recent readings. Tap a chart for values."
                             : "Historical average trends.",
                         style: const TextStyle(
                           color: Colors.grey,
@@ -259,9 +259,76 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             );
                           }
-                          return SizedBox(
-                            height: constraints.maxWidth < 600 ? 200 : 350,
-                            child: LineChart(_buildChartData(chartData, theme)),
+                          final chartHeight = constraints.maxWidth < 600
+                              ? 200.0
+                              : 250.0;
+                          return Column(
+                            children: [
+                              _buildTrendChart(
+                                title: 'Temperature',
+                                unit: '°C',
+                                history: chartData,
+                                theme: theme,
+                                height: chartHeight,
+                                series: [
+                                  _TrendSeries(
+                                    label: 'Ambient',
+                                    color: AppTheme.neonOrange,
+                                    valueFor: (data) => data.temperatureC,
+                                  ),
+                                  _TrendSeries(
+                                    label: 'Chamber',
+                                    color: AppTheme.neonRed,
+                                    valueFor: (data) => data.chamberTempC,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              _buildTrendChart(
+                                title: 'Gas Sensors',
+                                unit: 'V',
+                                history: chartData,
+                                theme: theme,
+                                height: chartHeight,
+                                series: [
+                                  _TrendSeries(
+                                    label: 'MQ2',
+                                    color: AppTheme.neonPurple,
+                                    valueFor: (data) => data.mq2V,
+                                  ),
+                                  _TrendSeries(
+                                    label: 'MQ135',
+                                    color: AppTheme.neonBlue,
+                                    valueFor: (data) => data.mq135V,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              _buildTrendChart(
+                                title: 'Particulate Matter',
+                                unit: 'µg/m³',
+                                history: chartData,
+                                theme: theme,
+                                height: chartHeight,
+                                series: [
+                                  _TrendSeries(
+                                    label: 'PM1.0',
+                                    color: AppTheme.neonGreen,
+                                    valueFor: (data) => data.pm1_0UgM3,
+                                  ),
+                                  _TrendSeries(
+                                    label: 'PM2.5',
+                                    color: AppTheme.neonBlue,
+                                    valueFor: (data) => data.pm2_5UgM3,
+                                  ),
+                                  _TrendSeries(
+                                    label: 'PM10',
+                                    color: AppTheme.neonOrange,
+                                    valueFor: (data) => data.pm10UgM3,
+                                  ),
+                                ],
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -359,28 +426,67 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  LineChartData _buildChartData(List<SensorData> history, ThemeData theme) {
-    List<FlSpot> tempSpots = [], coSpots = [];
-    for (int i = 0; i < history.length; i++) {
-      tempSpots.add(FlSpot(i.toDouble(), history[i].temperatureC ?? 0.0));
-      coSpots.add(FlSpot(i.toDouble(), (history[i].mq2V ?? 0.0) * 10));
-    }
+  Widget _buildTrendChart({
+    required String title,
+    required String unit,
+    required List<SensorData> history,
+    required ThemeData theme,
+    required double height,
+    required List<_TrendSeries> series,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          children: series
+              .map(
+                (item) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: item.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(item.label, style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: height,
+          child: LineChart(_buildChartData(history, theme, unit, series)),
+        ),
+      ],
+    );
+  }
+
+  LineChartData _buildChartData(
+    List<SensorData> history,
+    ThemeData theme,
+    String unit,
+    List<_TrendSeries> series,
+  ) {
     return LineChartData(
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (spot) => theme.cardColor.withValues(alpha: 0.9),
           getTooltipItems: (touchedSpots) {
             return touchedSpots.map((spot) {
-              final isTemp = spot.barIndex == 0;
-              final val = isTemp
-                  ? spot.y.toStringAsFixed(1)
-                  : (spot.y / 10).toStringAsFixed(2);
+              final item = series[spot.barIndex];
               return LineTooltipItem(
-                '${isTemp ? "Temp" : "MQ2"}: $val${isTemp ? "°C" : "V"}',
-                TextStyle(
-                  color: isTemp ? AppTheme.neonOrange : AppTheme.neonRed,
-                  fontWeight: FontWeight.bold,
-                ),
+                '${item.label}: ${spot.y.toStringAsFixed(unit == 'V' ? 2 : 1)} $unit',
+                TextStyle(color: item.color, fontWeight: FontWeight.bold),
               );
             }).toList();
           },
@@ -415,46 +521,36 @@ class _HomeTabState extends State<HomeTab> {
         ),
       ),
       borderData: FlBorderData(show: false),
-      lineBarsData: [
-        LineChartBarData(
-          spots: tempSpots,
-          isCurved: true,
-          color: AppTheme.neonOrange,
-          barWidth: 4,
-          dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(
-            show: true,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.neonOrange.withValues(alpha: 0.3),
-                Colors.transparent,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+      lineBarsData: series
+          .map(
+            (item) => LineChartBarData(
+              spots: List.generate(
+                history.length,
+                (index) => item.valueFor(history[index]) == null
+                    ? FlSpot.nullSpot
+                    : FlSpot(index.toDouble(), item.valueFor(history[index])!),
+              ),
+              isCurved: true,
+              color: item.color,
+              barWidth: 3,
+              dotData: const FlDotData(show: false),
             ),
-          ),
-        ),
-        LineChartBarData(
-          spots: coSpots,
-          isCurved: true,
-          color: AppTheme.neonRed,
-          barWidth: 4,
-          dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(
-            show: true,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.neonRed.withValues(alpha: 0.3),
-                Colors.transparent,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-        ),
-      ],
+          )
+          .toList(),
     );
   }
+}
+
+class _TrendSeries {
+  const _TrendSeries({
+    required this.label,
+    required this.color,
+    required this.valueFor,
+  });
+
+  final String label;
+  final Color color;
+  final double? Function(SensorData data) valueFor;
 }
 
 class LegacySensorMetricCard extends StatelessWidget {

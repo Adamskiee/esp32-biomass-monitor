@@ -9,13 +9,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  });
+
+  setUp(() {
+    databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (call) async => '/tmp/biomass-tests',
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('com.tekartik.sqflite'),
+      (call) async => switch (call.method) {
+        'openDatabase' => {'id': 1},
+        'query' =>
+          (call.arguments as Map)['sql'] == 'PRAGMA user_version'
+              ? [
+                  {'user_version': 2},
+                ]
+              : <Map<String, Object?>>[],
+        'insert' => 1,
+        _ => null,
+      },
+    );
   });
 
   test(
@@ -113,6 +139,43 @@ void main() {
       client.close();
       await database.close();
       await directory.delete(recursive: true);
+    },
+  );
+
+  test(
+    'session analytics includes ambient, MQ135, and particulate values',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final client = MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'temperature_c': 30.0,
+            'chamber_temp_c': 60.0,
+            'mq135_v': 0.75,
+            'mq2_v': 1.25,
+            'pm1_0_ug_m3': 8.0,
+            'pm2_5_ug_m3': 12.0,
+            'pm10_ug_m3': 18.0,
+          }),
+          200,
+        ),
+      );
+      final state = AppStateProvider(prefs, client: client);
+      await state.saveDeviceIp('192.168.1.42');
+      expect(await state.login('operator', 'secret'), isTrue);
+
+      await Future<void>.delayed(const Duration(seconds: 2));
+
+      expect(
+        state.getSessionAnalytics(),
+        containsPair('avgAmbientTemp', '30.0'),
+      );
+      expect(state.getSessionAnalytics(), containsPair('avgMq135', '0.75'));
+      expect(state.getSessionAnalytics(), containsPair('avgPm2_5', '12.0'));
+
+      state.dispose();
+      client.close();
     },
   );
 }

@@ -7,7 +7,6 @@ import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_history_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_log_controller.dart';
-import 'package:biomass_iot_app/features/monitoring/pms_readings.dart';
 import 'package:biomass_iot_app/features/monitoring/telemetry_csv.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -157,7 +156,10 @@ class _MonitorTabState extends State<MonitorTab> {
   void _generateAndShareCSV(List<SensorData> history) {
     if (history.isEmpty) return;
     // ignore: deprecated_member_use
-    Share.share(buildTelemetryCsv(history), subject: 'Biomass_Telemetry_Export.csv');
+    Share.share(
+      buildTelemetryCsv(history),
+      subject: 'Biomass_Telemetry_Export.csv',
+    );
   }
 
   @override
@@ -190,10 +192,6 @@ class _MonitorTabState extends State<MonitorTab> {
                       ),
                       1: Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text("Air Quality"),
-                      ),
-                      2: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text("Attempts"),
                       ),
                     },
@@ -206,15 +204,7 @@ class _MonitorTabState extends State<MonitorTab> {
                   duration: const Duration(milliseconds: 300),
                   child: _segIndex == 0
                       ? _buildSensorsView(state, theme)
-                      : _segIndex == 2
-                      ? const AttemptsSection()
-                      : state.isHardwareConnected
-                      ? _buildAirQualityView(state.currentData, theme)
-                      : const Center(
-                          child: Text(
-                            'ESP32 disconnected. Air quality is unavailable.',
-                          ),
-                        ),
+                      : const AttemptsSection(),
                 ),
               ),
             ],
@@ -257,35 +247,63 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
         ),
         const SizedBox(height: 16),
-        FluidTileGrid(
-          minTileWidth: 200,
-          children: [
-            _statCard(
-              "Peak Temp",
-              "${stats['maxT']} °C",
-              AppTheme.neonOrange,
-              theme,
-            ),
-            _statCard(
-              "Peak MQ2",
-              "${stats['maxMq2']} V",
-              AppTheme.neonRed,
-              theme,
-            ),
-            _statCard(
-              "Avg Temp",
-              "${stats['avgT']} °C",
-              AppTheme.neonOrange,
-              theme,
-            ),
-            _statCard(
-              "Avg MQ2",
-              "${stats['avgMq2']} V",
-              AppTheme.neonRed,
-              theme,
-            ),
-          ],
-        ),
+        _analyticsSection('Temperature', [
+          _analyticsCard(
+            'Chamber Temperature',
+            '${stats['maxT']} °C',
+            '${stats['avgT']} °C',
+            AppTheme.neonOrange,
+            theme,
+          ),
+          _analyticsCard(
+            'Ambient Temperature',
+            '${stats['maxAmbientTemp']} °C',
+            '${stats['avgAmbientTemp']} °C',
+            AppTheme.neonOrange,
+            theme,
+          ),
+        ], theme),
+        const SizedBox(height: 24),
+        _analyticsSection('Gas Sensors', [
+          _analyticsCard(
+            'MQ-2',
+            '${stats['maxMq2']} V',
+            '${stats['avgMq2']} V',
+            AppTheme.neonRed,
+            theme,
+          ),
+          _analyticsCard(
+            'MQ-135',
+            '${stats['maxMq135']} V',
+            '${stats['avgMq135']} V',
+            AppTheme.neonPurple,
+            theme,
+          ),
+        ], theme),
+        const SizedBox(height: 24),
+        _analyticsSection('Particulate Matter', [
+          _analyticsCard(
+            'PM1.0',
+            '${stats['maxPm1_0']} µg/m³',
+            '${stats['avgPm1_0']} µg/m³',
+            AppTheme.neonGreen,
+            theme,
+          ),
+          _analyticsCard(
+            'PM2.5',
+            '${stats['maxPm2_5']} µg/m³',
+            '${stats['avgPm2_5']} µg/m³',
+            AppTheme.neonGreen,
+            theme,
+          ),
+          _analyticsCard(
+            'PM10',
+            '${stats['maxPm10']} µg/m³',
+            '${stats['avgPm10']} µg/m³',
+            AppTheme.neonGreen,
+            theme,
+          ),
+        ], theme),
         const SizedBox(height: 32),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -393,17 +411,28 @@ class _MonitorTabState extends State<MonitorTab> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        "Chamber: ${log.chamberTempC?.toStringAsFixed(1) ?? '--'}°C | MQ2: ${log.mq2V?.toStringAsFixed(2) ?? '--'}V | Temp: ${log.temperatureC?.toStringAsFixed(1) ?? '--'}°C",
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "PM1.0: ${log.pm1_0UgM3?.toStringAsFixed(0) ?? '--'} | PM2.5: ${log.pm2_5UgM3?.toStringAsFixed(0) ?? '--'} | PM10: ${log.pm10UgM3?.toStringAsFixed(0) ?? '--'} µg/m³",
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 2,
+                        children: [
+                          _sensorReading(
+                            'Chamber Temp',
+                            log.chamberTempC,
+                            '°C',
+                            1,
+                          ),
+                          _sensorReading(
+                            'Ambient Temp',
+                            log.temperatureC,
+                            '°C',
+                            1,
+                          ),
+                          _sensorReading('MQ-135', log.mq135V, 'V', 2),
+                          _sensorReading('MQ-2', log.mq2V, 'V', 2),
+                          _sensorReading('PM1.0', log.pm1_0UgM3, 'µg/m³', 0),
+                          _sensorReading('PM2.5', log.pm2_5UgM3, 'µg/m³', 0),
+                          _sensorReading('PM10', log.pm10UgM3, 'µg/m³', 0),
+                        ],
                       ),
                     ],
                   ),
@@ -446,7 +475,44 @@ class _MonitorTabState extends State<MonitorTab> {
     );
   }
 
-  Widget _statCard(String title, String val, Color color, ThemeData theme) {
+  Widget _sensorReading(
+    String label,
+    double? value,
+    String unit,
+    int decimals,
+  ) {
+    final reading = value?.toStringAsFixed(decimals) ?? '--';
+    return Text(
+      '$label: $reading $unit',
+      style: const TextStyle(color: Colors.grey, fontSize: 12),
+    );
+  }
+
+  Widget _analyticsSection(String title, List<Widget> cards, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: theme.textTheme.bodyLarge?.color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        FluidTileGrid(minTileWidth: 240, children: cards),
+      ],
+    );
+  }
+
+  Widget _analyticsCard(
+    String title,
+    String peak,
+    String average,
+    Color color,
+    ThemeData theme,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -465,108 +531,36 @@ class _MonitorTabState extends State<MonitorTab> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            val,
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _analyticsValue('Peak', peak, color),
+              Container(width: 1, height: 38, color: theme.dividerColor),
+              _analyticsValue('Average', average, color),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAirQualityView(SensorData data, ThemeData theme) {
-    final isCompact = MediaQuery.of(context).size.width < 600;
-
-    return ListView(
-      key: const ValueKey(1),
-      padding: EdgeInsets.only(
-        left: isCompact ? 16 : 24,
-        right: isCompact ? 16 : 24,
-        bottom: 100,
-      ),
-      children: [
-        Text(
-          "Reported Gas Sensor Voltages",
-          style: TextStyle(
-            color: theme.textTheme.bodyLarge?.color,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        const SizedBox(height: 24),
-        _pollutantBar(
-          "MQ135 Gas Voltage",
-          (data.mq135V ?? 0) / 5.0,
-          AppTheme.neonOrange,
-          "${(data.mq135V ?? 0).toStringAsFixed(2)} V",
-          theme,
-        ),
-        const SizedBox(height: 24),
-        PmsReadings(data: data),
-        const SizedBox(height: 24),
-        _pollutantBar(
-          "MQ2 Smoke/Gas Voltage",
-          (data.mq2V ?? 0) / 5.0,
-          AppTheme.neonPurple,
-          "${(data.mq2V ?? 0).toStringAsFixed(2)} V",
-          theme,
-        ),
-      ],
-    );
-  }
-
-  Widget _pollutantBar(
-    String label,
-    double percent,
-    Color color,
-    String valLabel,
-    ThemeData theme,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              valLabel,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 1000),
-          curve: Curves.easeOutCubic,
-          tween: Tween<double>(begin: 0.0, end: percent.clamp(0.0, 1.0)),
-          builder: (context, value, _) => ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: value,
-              backgroundColor: theme.dividerColor.withValues(alpha: 0.5),
+  Widget _analyticsValue(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
               color: color,
-              minHeight: 14,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
