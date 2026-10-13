@@ -54,6 +54,12 @@ The paginated sensor log and current-session CSV export retain these three
 fields as `PM1.0(ug/m3)`, `PM2.5(ug/m3)`, and `PM10(ug/m3)`. Particulate data
 is telemetry only and does not control the sprinkler or other safety outputs.
 
+The Home dashboard groups live and historical trends by unit so readings remain
+readable: ambient and chamber temperatures, MQ2 and MQ135 voltages, and PM1.0,
+PM2.5, and PM10 concentrations. Each chart uses the same Live, 1H, and 24H
+timeframe control. A missing reading appears as a gap, so the app does not
+misrepresent unavailable sensor data as zero.
+
 The sensor data log reads the full local history in pages of 10 records, newest
 first. Live updates are off by default so records do not move between pages
 while they are being reviewed. Use Refresh to create a newer snapshot, or turn
