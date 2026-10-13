@@ -23,6 +23,11 @@ void main() {
   late MockClient client;
   late SharedPreferences prefs;
   var temperature = 26.5;
+  var mq135 = 0.75;
+  var mq2 = 1.25;
+  double? pm1 = 8.0;
+  double? pm25 = 12.0;
+  double? pm10 = 18.0;
 
   setUp(() async {
     databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
@@ -49,13 +54,21 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     temperature = 26.5;
+    mq135 = 0.75;
+    mq2 = 1.25;
+    pm1 = 8.0;
+    pm25 = 12.0;
+    pm10 = 18.0;
     client = MockClient(
       (request) async => http.Response(
         jsonEncode({
           'temperature_c': temperature,
           'chamber_temp_c': 65.4,
-          'mq135_v': 0.75,
-          'mq2_v': 1.25,
+          'mq135_v': mq135,
+          'mq2_v': mq2,
+          'pm1_0_ug_m3': pm1,
+          'pm2_5_ug_m3': pm25,
+          'pm10_ug_m3': pm10,
           'pump_on': false,
           'active_triggers': [],
         }),
@@ -189,9 +202,7 @@ void main() {
     },
   );
 
-  testWidgets('Home renders the latest sensor value and live history', (
-    tester,
-  ) async {
+  testWidgets('Home renders all live telemetry trend groups', (tester) async {
     await initialize(tester);
     expect(await state.login('operator', 'secret'), isTrue);
     await mount(tester);
@@ -200,16 +211,90 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('26.5 °C'), findsOneWidget);
     temperature = 29.5;
+    mq135 = 0.95;
+    mq2 = 1.55;
+    pm1 = 9.0;
+    pm25 = 13.0;
+    pm10 = 19.0;
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('29.5 °C'), findsOneWidget);
     expect(find.text('26.5 °C'), findsNothing);
-    await tester.scrollUntilVisible(find.byType(LineChart), 150);
-    final chart = tester.widget<LineChart>(find.byType(LineChart));
-    expect(chart.data.lineBarsData.first.spots, const [
+    await tester.scrollUntilVisible(find.byType(LineChart).last, 150);
+    expect(find.byType(LineChart), findsNWidgets(3));
+    final charts = tester
+        .widgetList<LineChart>(find.byType(LineChart))
+        .toList();
+    expect(charts[0].data.lineBarsData.first.spots, const [
       FlSpot(0, 26.5),
       FlSpot(1, 29.5),
+    ]);
+    expect(charts[0].data.lineBarsData, hasLength(2));
+    expect(charts[1].data.lineBarsData, hasLength(2));
+    expect(charts[2].data.lineBarsData, hasLength(3));
+    expect(charts[1].data.lineBarsData[0].spots, const [
+      FlSpot(0, 1.25),
+      FlSpot(1, 1.55),
+    ]);
+    expect(charts[1].data.lineBarsData[1].spots, const [
+      FlSpot(0, 0.75),
+      FlSpot(1, 0.95),
+    ]);
+    expect(charts[2].data.lineBarsData[0].spots, const [
+      FlSpot(0, 8),
+      FlSpot(1, 9),
+    ]);
+    expect(charts[2].data.lineBarsData[1].spots, const [
+      FlSpot(0, 12),
+      FlSpot(1, 13),
+    ]);
+    expect(charts[2].data.lineBarsData[2].spots, const [
+      FlSpot(0, 18),
+      FlSpot(1, 19),
+    ]);
+    expect(find.text('Temperature'), findsOneWidget);
+    expect(find.text('Gas Sensors'), findsOneWidget);
+    expect(find.text('Particulate Matter'), findsOneWidget);
+    await dispose(tester);
+  });
+
+  testWidgets('Home shows unavailable particulate readings as chart gaps', (
+    tester,
+  ) async {
+    await initialize(tester);
+    expect(await state.login('operator', 'secret'), isTrue);
+    await mount(tester);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    pm1 = null;
+    pm25 = null;
+    pm10 = null;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    pm1 = 9.0;
+    pm25 = 13.0;
+    pm10 = 19.0;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.scrollUntilVisible(find.byType(LineChart).last, 150);
+    final particulateChart = tester
+        .widgetList<LineChart>(find.byType(LineChart))
+        .toList()[2];
+    expect(particulateChart.data.lineBarsData[0].spots, const [
+      FlSpot(0, 8),
+      FlSpot.nullSpot,
+      FlSpot(2, 9),
+    ]);
+    expect(particulateChart.data.lineBarsData[1].spots, const [
+      FlSpot(0, 12),
+      FlSpot.nullSpot,
+      FlSpot(2, 13),
+    ]);
+    expect(particulateChart.data.lineBarsData[2].spots, const [
+      FlSpot(0, 18),
+      FlSpot.nullSpot,
+      FlSpot(2, 19),
     ]);
     await dispose(tester);
   });
@@ -334,7 +419,7 @@ void main() {
     await tester.pump();
     expect(state.telemetryRevision, 0);
     expect(state.history, hasLength(1));
-    expect(find.byType(LineChart), findsOneWidget);
+    expect(find.byType(LineChart), findsNWidgets(3));
     await dispose(tester);
   });
 }
