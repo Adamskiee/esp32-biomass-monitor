@@ -22,7 +22,7 @@ class AppDatabase implements DatabaseProvider {
     _database = await _databaseFactory.openDatabase(
       _databasePath ?? await _defaultPath(),
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
@@ -55,6 +55,9 @@ class AppDatabase implements DatabaseProvider {
       await _migrateSensorColumns(db);
       await _createAttemptTables(db);
     }
+    if (oldVersion < 5) {
+      await _createAlertsIndex(db);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -68,6 +71,7 @@ class AppDatabase implements DatabaseProvider {
         time TEXT
       )
     ''');
+    await _createAlertsIndex(db);
     await _createAttemptTables(db);
     await db.execute('''
       CREATE TABLE audit_logs (
@@ -92,6 +96,10 @@ class AppDatabase implements DatabaseProvider {
       timestamp TEXT
     )
   ''');
+
+  Future<void> _createAlertsIndex(Database db) => db.execute(
+    'CREATE INDEX IF NOT EXISTS alerts_time_rowid ON alerts(time DESC)',
+  );
 
   Future<void> _migrateSensorColumns(Database db) async {
     final columns = (await db.rawQuery(

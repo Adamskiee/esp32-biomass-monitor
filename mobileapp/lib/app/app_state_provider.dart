@@ -29,6 +29,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   final List<SensorData> _history = [];
   int _telemetryRevision = 0;
   final List<AlertItem> _alerts = [];
+  int _alertCount = 0;
   final List<AuditLog> _auditLogs = [
     AuditLog("System Initialized", "SYSTEM", "08:00 AM"),
   ];
@@ -57,6 +58,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   @override
   int get telemetryRevision => _telemetryRevision;
   List<AlertItem> get alerts => _alerts;
+  int get alertCount => _alertCount;
   List<AuditLog> get auditLogs => _auditLogs;
 
   Map<String, String> getSessionAnalytics() {
@@ -102,6 +104,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       _history.addAll(dbData.reversed);
 
       final dbAlerts = await dbHelper.getAlerts();
+      _alertCount = await dbHelper.getAlertCount();
       if (dbAlerts.isNotEmpty) {
         _alerts.clear();
         _alerts.addAll(dbAlerts);
@@ -171,11 +174,13 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
 
   void removeAlert(String id) {
     _alerts.removeWhere((a) => a.id == id);
+    if (_alertCount > 0) _alertCount--;
     notifyListeners();
   }
 
   void clearAllAlerts() {
     _alerts.clear();
+    _alertCount = 0;
     notifyListeners();
   }
 
@@ -235,6 +240,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
           timestamp: timestamp,
         );
         _alerts.insert(0, alert);
+        _alertCount++;
         DatabaseHelper().insertAlert(alert);
       }
       notifyListeners();

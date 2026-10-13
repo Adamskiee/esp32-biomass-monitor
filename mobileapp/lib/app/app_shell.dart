@@ -69,7 +69,7 @@ class _MainWrapperState extends State<MainWrapper> {
       (state) => state.deviceIp,
     );
     final alertCount = context.select<AppStateProvider, int>(
-      (state) => state.alerts.length,
+      (state) => state.alertCount,
     );
     final state = context.read<AppStateProvider>();
     final theme = Theme.of(context);

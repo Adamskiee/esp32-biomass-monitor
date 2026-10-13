@@ -38,10 +38,15 @@ required field.
 
 The main telemetry view shows no live readings while the ESP32 is disconnected.
 It stores history, alerts, and audit logs locally in `biomass_iot.db` only from
-successful responses. The app keeps one saved device IP; it does not keep a
-node list or save credentials. MQ sensor values are voltages; the app does not
-calculate a certified air quality index or carbon monoxide concentration from
-them.
+successful responses. The alert screen first reads the newest 20 alerts, then
+loads another batch when you scroll near the end. Severity filters run in the
+local database before each batch is read, so a long history does not delay the
+screen opening. The displayed total covers the full filtered snapshot; alerts
+created after it opened appear after a refresh. On phones, the end of the list
+stays above the floating navigation bar so the final alert and load state are
+fully visible. The app keeps one saved device IP; it does not keep a node list
+or save credentials. MQ sensor values are voltages; the app does not calculate
+a certified air quality index or carbon monoxide concentration from them.
 
 The Air Quality tab also shows PM1.0, PM2.5, and PM10 mass concentrations in
 µg/m³. `--` means the device has not provided a fresh particulate reading.
