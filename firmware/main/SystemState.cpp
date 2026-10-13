@@ -234,7 +234,6 @@ void evaluateSafetyLoop() {
     requestSprinkler(manual_sprinkler);
   }
 
-  setFan(true);
   if (is_temp_fault || is_mq2_fault) {
     setLedStatus(false, true, false);
   } else if (temp_latch_danger) {
@@ -243,18 +242,4 @@ void evaluateSafetyLoop() {
     setLedStatus(false, false, true);
   }
   setBuzzer(!is_temp_fault && current_chamber_c > threshold_chamber_temp_c);
-}
-
-void updateActuatorTransitions() {
-#ifdef ARDUINO
-  if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) {
-    return;
-  }
-#endif
-
-  updateSprinklerActuators();
-
-#ifdef ARDUINO
-  xSemaphoreGive(stateMutex);
-#endif
 }

@@ -48,114 +48,63 @@ void resetSafetyState() {
 
 void testSprinklerStartupOutputsOff() {
   const char *name = "sprinkler startup outputs off";
-  pin_modes[PIN_RELAY_SOLENOID] = INPUT;
   pin_modes[PIN_RELAY_PUMP] = INPUT;
-  pin_levels[PIN_RELAY_SOLENOID] = RELAY_ON;
   pin_levels[PIN_RELAY_PUMP] = RELAY_ON;
   initActuators();
-  EXPECT_FALSE(name, current_solenoid_state);
   EXPECT_FALSE(name, current_pump_state);
-  EXPECT_TRUE(name, pin_levels[PIN_RELAY_SOLENOID] == RELAY_OFF);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_PUMP] == RELAY_OFF);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_BUZZER] == RELAY_OFF);
 }
 
-void testSprinklerStartsValveBeforePump() {
-  const char *name = "sprinkler starts valve before pump";
+void testPumpRequestsApplyImmediately() {
+  const char *name = "pump requests apply immediately";
   resetSafetyState();
   requestSprinkler(true);
-  EXPECT_TRUE(name, current_solenoid_state);
-  EXPECT_FALSE(name, current_pump_state);
-  EXPECT_TRUE(name, pin_levels[PIN_RELAY_SOLENOID] == RELAY_ON);
-  EXPECT_TRUE(name, pin_levels[PIN_RELAY_PUMP] == RELAY_OFF);
-  test_millis += 499;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_pump_state);
-  test_millis += 1;
-  updateSprinklerActuators();
   EXPECT_TRUE(name, current_pump_state);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_PUMP] == RELAY_ON);
-}
-
-void testSprinklerStopsPumpBeforeValve() {
-  const char *name = "sprinkler stops pump before valve";
-  resetSafetyState();
-  requestSprinkler(true);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
   requestSprinkler(false);
   EXPECT_FALSE(name, current_pump_state);
-  EXPECT_TRUE(name, current_solenoid_state);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_PUMP] == RELAY_OFF);
-  EXPECT_TRUE(name, pin_levels[PIN_RELAY_SOLENOID] == RELAY_ON);
-  test_millis += 499;
-  updateSprinklerActuators();
-  EXPECT_TRUE(name, current_solenoid_state);
-  test_millis += 1;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_solenoid_state);
-  EXPECT_TRUE(name, pin_levels[PIN_RELAY_SOLENOID] == RELAY_OFF);
-}
-
-void testStartupReversalKeepsPumpOff() {
-  const char *name = "startup reversal keeps pump off";
-  resetSafetyState();
   requestSprinkler(true);
-  test_millis += 200;
-  requestSprinkler(false);
-  EXPECT_FALSE(name, current_pump_state);
-  EXPECT_TRUE(name, current_solenoid_state);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_pump_state);
-  EXPECT_FALSE(name, current_solenoid_state);
-}
-
-void testShutdownReversalKeepsValveOpen() {
-  const char *name = "shutdown reversal keeps valve open";
-  resetSafetyState();
-  requestSprinkler(true);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  requestSprinkler(false);
-  test_millis += 200;
-  requestSprinkler(true);
-  EXPECT_TRUE(name, current_solenoid_state);
-  EXPECT_FALSE(name, current_pump_state);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  EXPECT_TRUE(name, current_solenoid_state);
   EXPECT_TRUE(name, current_pump_state);
 }
 
-void testTransitionHandlesMillisWraparound() {
-  const char *name = "sprinkler transition handles millis wraparound";
+void testManualPumpFaultDoesNotLatch() {
+  const char *name = "manual pump fault does not latch";
   resetSafetyState();
-  test_millis = UINT32_MAX - 250;
-  requestSprinkler(true);
-  test_millis += 499;
-  updateSprinklerActuators();
+  current_chamber_c = NAN;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, applyManualSprinklerCommand(true) ==
+                        ManualSprinklerResult::Accepted);
+  EXPECT_TRUE(name, current_pump_state);
+  EXPECT_FALSE(name, catastrophic_latch);
+  EXPECT_TRUE(name, applyManualSprinklerCommand(false) ==
+                        ManualSprinklerResult::Accepted);
   EXPECT_FALSE(name, current_pump_state);
-  test_millis += 1;
-  updateSprinklerActuators();
+  EXPECT_FALSE(name, catastrophic_latch);
+}
+
+void testThresholdUpdateImmediatelyReevaluatesPump() {
+  const char *name = "threshold update immediately reevaluates pump";
+  resetSafetyState();
+  current_chamber_c = 85.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, current_pump_state);
+  EXPECT_TRUE(name, applyThresholdUpdate(true, 100.0f, false, 0.0f) ==
+                        ThresholdUpdateResult::Accepted);
+  EXPECT_FALSE(name, current_pump_state);
+  EXPECT_TRUE(name, applyThresholdUpdate(true, 80.0f, false, 0.0f) ==
+                        ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name, current_pump_state);
 }
 
-void testFanStateTracksOutput() {
-  const char *name = "fan state tracks output";
-  setFan(true);
-  EXPECT_TRUE(name, current_fan_state);
-  setFan(false);
-  EXPECT_FALSE(name, current_fan_state);
-}
-
-void testTemperatureDangerActivatesSolenoid() {
-  const char *name = "temperature danger activates solenoid";
+void testTemperatureDangerActivatesPump() {
+  const char *name = "temperature danger activates pump";
   resetSafetyState();
   current_chamber_c = 85.0f;
   manual_sprinkler = true;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_FALSE(name, manual_sprinkler);
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
@@ -165,17 +114,18 @@ void testLedFollowsLatchedTemperatureDanger() {
   resetSafetyState();
   current_chamber_c = 80.0f;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_ON);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_BUZZER] == RELAY_OFF);
 
   current_chamber_c = 78.0f;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_ON);
 
   current_chamber_c = 75.0f;
   evaluateSafetyLoop();
+  EXPECT_FALSE(name, current_pump_state);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
 }
 
@@ -183,7 +133,7 @@ void testProcessingSensorReadingsEvaluatesSafety() {
   const char *name = "processing sensor readings evaluates safety";
   resetSafetyState();
   processSensorReadings(28.0f, 85.0f, 1.2f, 0.5f);
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
 
@@ -194,7 +144,7 @@ void testTemperatureDangerReassertsSprinklerRequest() {
   requestSprinkler(false);
   current_chamber_c = 85.0f;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
 }
 
 void testTemperatureHysteresis() {
@@ -205,23 +155,19 @@ void testTemperatureHysteresis() {
   current_chamber_c = 78.0f;
   test_millis += 501;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   current_chamber_c = 75.0f;
-  test_millis += 501;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_FALSE(name, current_pump_state);
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
-void testMq2DangerDoesNotActivateSolenoid() {
-  const char *name = "MQ2 danger does not activate solenoid";
+void testMq2DangerDoesNotActivatePump() {
+  const char *name = "MQ2 danger does not activate pump";
   resetSafetyState();
   current_mq2_v = 3.0f;
   evaluateSafetyLoop();
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_FALSE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
   current_mq2_v = 2.3f;
   evaluateSafetyLoop();
@@ -244,7 +190,7 @@ void testMq2DangerPreservesManualSprinkler() {
                         ManualSprinklerResult::Accepted);
   current_mq2_v = 3.0f;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_TRUE(name, manual_sprinkler);
 }
 
@@ -298,20 +244,16 @@ void testTemperatureFaultAllowsManualSprinkler() {
   resetSafetyState();
   current_chamber_c = NAN;
   evaluateSafetyLoop();
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_FALSE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "temp_sensor_fault");
-  manual_sprinkler = true;
-  test_millis += 501;
-  evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, applyManualSprinklerCommand(true) ==
+                        ManualSprinklerResult::Accepted);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_TRUE(name, manual_sprinkler);
   EXPECT_FALSE(name, catastrophic_latch);
-  manual_sprinkler = false;
-  test_millis += 501;
-  evaluateSafetyLoop();
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_TRUE(name, applyManualSprinklerCommand(false) ==
+                        ManualSprinklerResult::Accepted);
+  EXPECT_FALSE(name, current_pump_state);
 }
 
 void testCatastrophicFireLatch() {
@@ -322,13 +264,12 @@ void testCatastrophicFireLatch() {
   current_chamber_c = NAN;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, catastrophic_latch);
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "catastrophic_latch");
   manual_sprinkler = false;
-  test_millis += 501;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, catastrophic_latch);
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
 }
 
 void testManualOffCannotOverrideCatastrophicLatch() {
@@ -341,7 +282,7 @@ void testManualOffCannotOverrideCatastrophicLatch() {
   const auto result = applyManualSprinklerCommand(false);
   EXPECT_TRUE(name, result == ManualSprinklerResult::SafetyOverride);
   EXPECT_TRUE(name, catastrophic_latch);
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
 }
 
 void testManualSprinklerInSafeState() {
@@ -349,13 +290,10 @@ void testManualSprinklerInSafeState() {
   resetSafetyState();
   manual_sprinkler = true;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   manual_sprinkler = false;
-  test_millis += 501;
   evaluateSafetyLoop();
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_FALSE(name, current_pump_state);
 }
 
 void testManualCommandControlsSprinklerInSafeState() {
@@ -364,13 +302,11 @@ void testManualCommandControlsSprinklerInSafeState() {
   const auto enabled = applyManualSprinklerCommand(true);
   EXPECT_TRUE(name, enabled == ManualSprinklerResult::Accepted);
   EXPECT_TRUE(name, manual_sprinkler);
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   const auto disabled = applyManualSprinklerCommand(false);
   EXPECT_TRUE(name, disabled == ManualSprinklerResult::Accepted);
   EXPECT_FALSE(name, manual_sprinkler);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateSprinklerActuators();
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_FALSE(name, current_pump_state);
 }
 
 void testManualSprinklerUsesCoordinator() {
@@ -378,10 +314,6 @@ void testManualSprinklerUsesCoordinator() {
   resetSafetyState();
   EXPECT_TRUE(name, applyManualSprinklerCommand(true) ==
                         ManualSprinklerResult::Accepted);
-  EXPECT_TRUE(name, current_solenoid_state);
-  EXPECT_FALSE(name, current_pump_state);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateActuatorTransitions();
   EXPECT_TRUE(name, current_pump_state);
 }
 
@@ -390,10 +322,6 @@ void testTemperatureDangerUsesCoordinator() {
   resetSafetyState();
   current_chamber_c = threshold_chamber_temp_c;
   evaluateSafetyLoop();
-  EXPECT_TRUE(name, current_solenoid_state);
-  EXPECT_FALSE(name, current_pump_state);
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateActuatorTransitions();
   EXPECT_TRUE(name, current_pump_state);
 }
 
@@ -402,12 +330,9 @@ void testCatastrophicLatchKeepsPumpRequested() {
   resetSafetyState();
   current_chamber_c = 100.0f;
   evaluateSafetyLoop();
-  test_millis += SPRINKLER_TRANSITION_MS;
-  updateActuatorTransitions();
   current_chamber_c = NAN;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, catastrophic_latch);
-  EXPECT_TRUE(name, current_solenoid_state);
   EXPECT_TRUE(name, current_pump_state);
   EXPECT_TRUE(name, applyManualSprinklerCommand(false) ==
                         ManualSprinklerResult::SafetyOverride);
@@ -453,7 +378,7 @@ void testLowerThresholdImmediatelyReevaluatesSafety() {
   current_chamber_c = 70.0f;
   const auto result = applyThresholdUpdate(true, 60.0f, false, 0.0f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Accepted);
-  EXPECT_TRUE(name, current_solenoid_state);
+  EXPECT_TRUE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
 
@@ -491,17 +416,17 @@ void testPmsDoesNotAffectSafety() {
   const char *name = "PMS does not affect safety";
   resetSafetyState();
   const std::string triggers_before = active_triggers_json;
-  const bool sprinkler_before = current_solenoid_state;
+  const bool pump_before = current_pump_state;
   const PmsReading reading{8, 12, 18};
 
   recordPmsReading(reading, 1000);
 
   EXPECT_TRUE(name, active_triggers_json == triggers_before);
-  EXPECT_TRUE(name, current_solenoid_state == sprinkler_before);
+  EXPECT_TRUE(name, current_pump_state == pump_before);
   current_mq2_v = 3.0f;
   evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
-  EXPECT_FALSE(name, current_solenoid_state);
+  EXPECT_FALSE(name, current_pump_state);
 }
 
 void run(const char *name, const std::function<void()> &test) {
@@ -527,15 +452,11 @@ void digitalWrite(uint8_t pin, uint8_t level) {
 
 int main() {
   run("sprinkler startup outputs off", testSprinklerStartupOutputsOff);
-  run("sprinkler starts valve before pump", testSprinklerStartsValveBeforePump);
-  run("sprinkler stops pump before valve", testSprinklerStopsPumpBeforeValve);
-  run("startup reversal keeps pump off", testStartupReversalKeepsPumpOff);
-  run("shutdown reversal keeps valve open", testShutdownReversalKeepsValveOpen);
-  run("sprinkler transition handles millis wraparound",
-      testTransitionHandlesMillisWraparound);
-  run("fan state tracks output", testFanStateTracksOutput);
-  run("temperature danger activates solenoid",
-      testTemperatureDangerActivatesSolenoid);
+  run("pump requests apply immediately", testPumpRequestsApplyImmediately);
+  run("manual pump fault does not latch", testManualPumpFaultDoesNotLatch);
+  run("threshold update immediately reevaluates pump",
+      testThresholdUpdateImmediatelyReevaluatesPump);
+  run("temperature danger activates pump", testTemperatureDangerActivatesPump);
   run("LED follows latched temperature danger",
       testLedFollowsLatchedTemperatureDanger);
   run("processing sensor readings evaluates safety",
@@ -543,8 +464,7 @@ int main() {
   run("temperature danger reasserts sprinkler request",
       testTemperatureDangerReassertsSprinklerRequest);
   run("temperature hysteresis", testTemperatureHysteresis);
-  run("MQ2 danger does not activate solenoid",
-      testMq2DangerDoesNotActivateSolenoid);
+  run("MQ2 danger does not activate pump", testMq2DangerDoesNotActivatePump);
   run("MQ2 danger keeps LED green", testMq2DangerKeepsLedGreen);
   run("MQ2 danger preserves manual sprinkler",
       testMq2DangerPreservesManualSprinkler);

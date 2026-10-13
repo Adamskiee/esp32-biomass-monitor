@@ -54,9 +54,7 @@ void recordPmsReading(const PmsReading &reading, uint32_t sampled_at_ms);
 void resetPmsReadingCache();
 // The caller holds stateMutex while copying the sample.
 bool copyFreshPmsReadingLocked(uint32_t now_ms, PmsReading &out);
-// On Arduino, the caller must hold stateMutex while evaluating outputs.
 void evaluateSafetyLoop();
-void updateActuatorTransitions();
 
 void initSystemState();
 void saveSystemState(float chamber_limit, float mq2_limit);

@@ -6,31 +6,30 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Actuators Test Started");
 
-  // Write HIGH *before* pinMode to prevent relay chattering/glitching on startup
-  digitalWrite(PIN_RELAY_SOLENOID, RELAY_OFF);
-  digitalWrite(PIN_RELAY_FAN, RELAY_OFF);
+  digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+  digitalWrite(PIN_RELAY_BUZZER, RELAY_OFF);
   digitalWrite(PIN_RELAY_LED_RED, RELAY_OFF);
   digitalWrite(PIN_RELAY_LED_YELLOW, RELAY_OFF);
   digitalWrite(PIN_RELAY_LED_GREEN, RELAY_OFF);
 
-  pinMode(PIN_RELAY_SOLENOID, OUTPUT);
-  pinMode(PIN_RELAY_FAN, OUTPUT);
+  pinMode(PIN_RELAY_PUMP, OUTPUT);
+  pinMode(PIN_RELAY_BUZZER, OUTPUT);
   pinMode(PIN_RELAY_LED_RED, OUTPUT);
   pinMode(PIN_RELAY_LED_YELLOW, OUTPUT);
   pinMode(PIN_RELAY_LED_GREEN, OUTPUT);
 }
 
 void loop() {
-  Serial.println("Turning ON: Solenoid");
-  digitalWrite(PIN_RELAY_SOLENOID, RELAY_ON);
+  Serial.println("Turning ON: Pump");
+  digitalWrite(PIN_RELAY_PUMP, RELAY_ON);
   delay(1000);
-  digitalWrite(PIN_RELAY_SOLENOID, RELAY_OFF);
+  digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
   delay(1000);
 
-  Serial.println("Turning ON: Fan");
-  digitalWrite(PIN_RELAY_FAN, RELAY_ON);
+  Serial.println("Turning ON: Buzzer");
+  digitalWrite(PIN_RELAY_BUZZER, RELAY_ON);
   delay(1000);
-  digitalWrite(PIN_RELAY_FAN, RELAY_OFF);
+  digitalWrite(PIN_RELAY_BUZZER, RELAY_OFF);
   delay(1000);
 
   Serial.println("Turning ON: Red LED");

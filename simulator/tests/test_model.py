@@ -3,21 +3,9 @@ import unittest
 from simulator.model import SafetyOverrideError, SimulatorState
 
 
-class FakeClock:
-    def __init__(self):
-        self.now = 0.0
-
-    def __call__(self):
-        return self.now
-
-    def advance(self, seconds):
-        self.now += seconds
-
-
 class SimulatorStateTests(unittest.TestCase):
     def setUp(self):
-        self.clock = FakeClock()
-        self.state = SimulatorState(clock=self.clock)
+        self.state = SimulatorState()
 
     def test_normal_snapshot_has_documented_fields_and_changing_readings(self):
         first = self.state.snapshot()
@@ -25,12 +13,11 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertEqual(set(first), {
             "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
-            "threshold_chamber_temp_c", "threshold_mq2_v", "fan_on",
-            "sprinkler_on", "pump_on", "manual_sprinkler", "active_triggers",
+            "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
+            "manual_sprinkler", "active_triggers",
         })
         self.assertEqual(first["threshold_chamber_temp_c"], 80.0)
         self.assertEqual(first["threshold_mq2_v"], 2.5)
-        self.assertTrue(first["fan_on"])
         self.assertEqual(first["active_triggers"], [])
         self.assertNotEqual(first["temperature_c"], second["temperature_c"])
 
@@ -44,31 +31,28 @@ class SimulatorStateTests(unittest.TestCase):
                     (8, 12, 18),
                 )
 
-    def test_heat_forces_valve_then_pump_and_fault_latches(self):
+    def test_heat_forces_pump_and_fault_latches(self):
         self.state.select_scenario("heat")
         first = self.state.snapshot()
         self.assertEqual(first["chamber_temp_c"], 100.0)
         self.assertIn("high_chamber_temp", first["active_triggers"])
-        self.assertTrue(first["sprinkler_on"])
-        self.assertFalse(first["pump_on"])
+        self.assertTrue(first["pump_on"])
         with self.assertRaises(SafetyOverrideError):
             self.state.set_manual_sprinkler(False)
-        self.clock.advance(0.5)
-        self.assertTrue(self.state.snapshot()["pump_on"])
         self.state.select_scenario("temp-fault")
         fault = self.state.snapshot()
         self.assertIsNone(fault["chamber_temp_c"])
         self.assertIn("temp_sensor_fault", fault["active_triggers"])
         self.assertIn("catastrophic_latch", fault["active_triggers"])
         self.state.select_scenario("normal")
-        self.assertTrue(self.state.snapshot()["sprinkler_on"])
+        self.assertTrue(self.state.snapshot()["pump_on"])
 
     def test_gas_alert_does_not_start_sprinkler(self):
         self.state.select_scenario("gas")
         state = self.state.snapshot()
         self.assertEqual(state["mq2_v"], 2.8)
         self.assertIn("high_mq2_gas", state["active_triggers"])
-        self.assertFalse(state["sprinkler_on"])
+        self.assertFalse(state["pump_on"])
 
     def test_fault_scenarios_report_null_and_triggers(self):
         self.state.select_scenario("temp-fault")
@@ -124,30 +108,27 @@ class SimulatorStateTests(unittest.TestCase):
 
     def test_normal_reading_crossing_threshold_activates_safety(self):
         self.state.update_thresholds({"threshold_chamber_temp_c": 45.1})
-        self.assertFalse(self.state.snapshot()["sprinkler_on"])
+        self.assertFalse(self.state.snapshot()["pump_on"])
         crossing = self.state.snapshot()
         self.assertGreaterEqual(crossing["chamber_temp_c"], 45.1)
         self.assertIn("high_chamber_temp", crossing["active_triggers"])
-        self.assertTrue(crossing["sprinkler_on"])
+        self.assertTrue(crossing["pump_on"])
 
-    def test_rapid_manual_toggle_preserves_valve_pump_order(self):
+    def test_manual_pump_changes_immediately(self):
         self.state.set_manual_sprinkler(True)
-        self.assertEqual((self.state.snapshot()["sprinkler_on"], self.state.snapshot()["pump_on"]), (True, False))
-        self.clock.advance(0.2)
+        self.assertEqual((self.state.snapshot()["manual_sprinkler"], self.state.snapshot()["pump_on"]), (True, True))
         self.state.set_manual_sprinkler(False)
-        self.assertFalse(self.state.snapshot()["pump_on"])
-        self.clock.advance(0.1)
+        self.assertEqual((self.state.snapshot()["manual_sprinkler"], self.state.snapshot()["pump_on"]), (False, False))
         self.state.set_manual_sprinkler(True)
-        self.clock.advance(0.2)
-        self.assertFalse(self.state.snapshot()["pump_on"])
-        self.clock.advance(0.3)
+        self.assertEqual((self.state.snapshot()["manual_sprinkler"], self.state.snapshot()["pump_on"]), (True, True))
+
+    def test_threshold_update_immediately_controls_pump(self):
+        self.state.select_scenario("heat")
         self.assertTrue(self.state.snapshot()["pump_on"])
-        self.state.set_manual_sprinkler(False)
-        shutdown = self.state.snapshot()
-        self.assertTrue(shutdown["sprinkler_on"])
-        self.assertFalse(shutdown["pump_on"])
-        self.clock.advance(0.5)
-        self.assertFalse(self.state.snapshot()["sprinkler_on"])
+        self.state.update_thresholds({"threshold_chamber_temp_c": 110})
+        self.assertFalse(self.state.snapshot()["pump_on"])
+        self.state.update_thresholds({"threshold_chamber_temp_c": 80})
+        self.assertTrue(self.state.snapshot()["pump_on"])
 
     def test_unknown_scenario_keeps_state(self):
         self.state.select_scenario("heat")
@@ -172,7 +153,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertEqual(self.state.scenario, "normal")
         self.assertEqual((state["threshold_chamber_temp_c"], state["threshold_mq2_v"]), (80.0, 2.5))
         self.assertEqual(state["active_triggers"], [])
-        self.assertFalse(state["sprinkler_on"])
+        self.assertFalse(state["pump_on"])
 
 
 if __name__ == "__main__":

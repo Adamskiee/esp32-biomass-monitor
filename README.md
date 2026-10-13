@@ -9,8 +9,8 @@
 
 The Biomass Monitor and Filtration System is an ESP32-based environmental
 monitor for controlled disposal of biodegradable waste. It monitors smoke,
-combustible gases, and chamber temperature. The fan runs continuously while
-firmware safety rules control alarms and a water sprinkler.
+combustible gases, and chamber temperature. Firmware safety rules control
+alarms and a direct pump-driven water sprinkler.
 
 The companion Flutter app provides live telemetry, authenticated manual
 sprinkler control, threshold configuration, and active danger alerts.
@@ -23,8 +23,7 @@ sprinkler control, threshold configuration, and active danger alerts.
 - K-type thermocouple
 - DHT-22 temperature and humidity sensor
 - PMS5003 particulate sensor
-- Filtration fan and driver
-- Water sprinkler solenoid and relay
+- Water sprinkler pump and relay
 - Status LEDs and buzzer
 
 ## How do I build and upload the firmware?

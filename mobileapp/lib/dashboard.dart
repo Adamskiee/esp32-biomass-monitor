@@ -285,44 +285,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                   ),
-                  const Divider(),
-                  ListTile(
-                    leading: Icon(
-                      Icons.mode_fan_off,
-                      color: _state['fan_on'] == true
-                          ? Colors.green
-                          : Colors.grey,
-                    ),
-                    title: const Text('Fan Status'),
-                    trailing: Text(
-                      _state['fan_on'] == true ? 'ACTIVE' : 'IDLE',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _state['fan_on'] == true
-                            ? Colors.green
-                            : Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: Icon(
-                      Icons.water_drop,
-                      color: _state['sprinkler_on'] == true
-                          ? Colors.blue
-                          : Colors.grey,
-                    ),
-                    title: const Text('Sprinkler Status'),
-                    trailing: Text(
-                      _state['sprinkler_on'] == true ? 'ACTIVE' : 'IDLE',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _state['sprinkler_on'] == true
-                            ? Colors.blue
-                            : Colors.grey,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -343,8 +305,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ? 'Reported by ESP32'
                     : 'Command pending; waiting for ESP32',
               ),
-              value: _state['sprinkler_on'] == true,
-              onChanged: _isOffline || _queuedSprinklerState != null
+              value: pumpOn == true,
+              onChanged:
+                  _isOffline || pumpOn == null || _queuedSprinklerState != null
                   ? null
                   : (val) => setState(() => _queuedSprinklerState = val),
             ),

@@ -64,19 +64,14 @@ Returns cached readings and current safety outputs:
   "pm10_ug_m3": 18,
   "threshold_chamber_temp_c": 130.0,
   "threshold_mq2_v": 2.5,
-  "fan_on": true,
-  "sprinkler_on": true,
-  "pump_on": false,
+  "pump_on": true,
   "manual_sprinkler": false,
   "active_triggers": []
 }
 ```
 
-`sprinkler_on` reports the commanded solenoid relay output and `pump_on`
-reports the commanded pump relay output. They can temporarily differ during
-the 500 ms startup and shutdown sequence. The example above shows startup:
-the valve is commanded on while the pump is still off. Neither field confirms
-that the valve moved, the pump ran, or water flowed.
+`pump_on` reports the commanded pump relay output immediately. It does not
+confirm that the pump ran or that water flowed.
 
 Sensor reads represented internally as `NaN` are returned as `null`. A missing
 DHT-22 makes both temperature and `humidity_percent` null. A missing PMS5003
