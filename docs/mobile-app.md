@@ -3,7 +3,7 @@
 ## What does the app control?
 
 The Flutter app displays readings and actuator states reported by the ESP32.
-The firmware decides when safety rules activate the fan and sprinkler. The app
+The firmware decides when safety rules activate the pump and sprinkler. The app
 can request manual sprinkler operation and update two safety thresholds, but a
 request does not become the displayed state until the ESP32 reports it.
 
@@ -29,11 +29,12 @@ the simulator started with `--host 0.0.0.0` and the computer's Wi-Fi IPv4
 address in the app. The simulator guide shows the exact command and a browser
 check for connection problems.
 
-The dashboard also shows a read-only Pump Status indicator. It can briefly
-differ from Sprinkler Status while the controller opens the valve before
-starting the pump or stops the pump before closing the valve. The indicator
-reports the commanded relay output, so it does not confirm that the pump ran or
-that water flowed.
+The dashboard shows one read-only Pump Status indicator. Its manual sprinkler
+switch uses the reported boolean `pump_on`, so missing or malformed actuator
+telemetry displays UNAVAILABLE and disables control. The indicator reports the
+commanded relay output, so it does not confirm that the pump ran or that water
+flowed. Update the device and app together because older responses omit the
+required field.
 
 The main telemetry view shows no live readings while the ESP32 is disconnected.
 It stores history, alerts, and audit logs locally in `biomass_iot.db` only from

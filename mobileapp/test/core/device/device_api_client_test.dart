@@ -45,8 +45,6 @@ void main() {
               'mq2_v': 1.1,
               'threshold_chamber_temp_c': 60.0,
               'threshold_mq2_v': 1.5,
-              'fan_on': true,
-              'sprinkler_on': false,
               'pump_on': false,
               'manual_sprinkler': false,
               'active_triggers': ['high_mq2_gas'],

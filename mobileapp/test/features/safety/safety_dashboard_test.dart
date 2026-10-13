@@ -47,8 +47,6 @@ void main() {
           jsonEncode({
             'chamber_temp_c': 55.0,
             'mq2_v': 1.0,
-            'fan_on': false,
-            'sprinkler_on': true,
             'pump_on': true,
             'active_triggers': [],
           }),
@@ -80,8 +78,6 @@ void main() {
           jsonEncode({
             'chamber_temp_c': 55.0,
             'mq2_v': 1.0,
-            'fan_on': false,
-            'sprinkler_on': true,
             'pump_on': false,
             'active_triggers': [],
           }),
@@ -113,8 +109,6 @@ void main() {
           jsonEncode({
             'chamber_temp_c': 55.0,
             'mq2_v': 1.0,
-            'fan_on': false,
-            'sprinkler_on': true,
             'active_triggers': [],
           }),
           200,
@@ -147,7 +141,6 @@ void main() {
           jsonEncode({
             'chamber_temp_c': 55.0,
             'mq2_v': 1.0,
-            'fan_on': false,
             'sprinkler_on': true,
             'pump_on': 'on',
             'active_triggers': [],
@@ -465,7 +458,7 @@ void main() {
           jsonEncode({
             'chamber_temp_c': 90.0,
             'mq2_v': 0.5,
-            'sprinkler_on': true,
+            'pump_on': true,
             'active_triggers': ['high_chamber_temp'],
           }),
           200,
@@ -500,7 +493,7 @@ void main() {
             jsonEncode({
               'chamber_temp_c': 50.0,
               'mq2_v': 0.5,
-              'sprinkler_on': postedSprinklerState,
+              'pump_on': postedSprinklerState,
               'active_triggers': [],
             }),
             200,
@@ -550,7 +543,7 @@ void main() {
               jsonEncode({
                 'chamber_temp_c': 50.0,
                 'mq2_v': 0.5,
-                'sprinkler_on': reportedSprinklerState,
+                'pump_on': reportedSprinklerState,
                 'active_triggers': [],
               }),
               200,
@@ -599,7 +592,7 @@ void main() {
             jsonEncode({
               'chamber_temp_c': 50.0,
               'mq2_v': 0.5,
-              'sprinkler_on': false,
+              'pump_on': false,
               'active_triggers': [],
             }),
             200,
@@ -642,7 +635,7 @@ void main() {
           jsonEncode({
             'chamber_temp_c': 50.0,
             'mq2_v': 0.5,
-            'sprinkler_on': false,
+            'pump_on': false,
             'active_triggers': [],
             'threshold_chamber_temp_c': 60.0,
             'threshold_mq2_v': 1.5,
