@@ -45,10 +45,10 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
        _ownsAlertsController = alertsController == null {
-    if (alertsController != null) {
-      _alertsController = alertsController;
-      _alertsController!.addListener(_onAlertsChanged);
-    }
+    _alertsController =
+        alertsController ?? AlertsController(AlertsStore(AppDatabase()));
+    _alertsController!.addListener(_onAlertsChanged);
+    unawaited(_alertsController!.load());
     _deviceAddresses = DeviceAddressStore(_prefs);
     _deviceAddresses.migrateLegacyNodes().then((_) => notifyListeners());
     _loadHistory();
@@ -68,11 +68,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   List<SensorData> get history => _history;
   @override
   int get telemetryRevision => _telemetryRevision;
-  AlertsController get alertsController {
-    _alertsController ??= AlertsController(AlertsStore(AppDatabase()))
-      ..addListener(_onAlertsChanged);
-    return _alertsController!;
-  }
+  AlertsController get alertsController => _alertsController!;
 
   List<AlertItem> get alerts => _alertsController?.alerts ?? const [];
   int get alertCount => _alertsController?.totalAlerts ?? 0;

@@ -152,4 +152,32 @@ void main() {
       await directory.delete(recursive: true);
     },
   );
+
+  test('retains active sensor faults across a controller restart', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final faultedReading = SensorData.fromJson({'mq135_v': null});
+    final firstController = AlertsController(AlertsStore(database));
+    await firstController.recordTriggers(faultedReading, []);
+
+    final restartedController = AlertsController(AlertsStore(database));
+    await restartedController.recordTriggers(faultedReading, []);
+    await restartedController.recordTriggers(
+      SensorData.fromJson({'mq135_v': 1.2}),
+      [],
+    );
+
+    final alerts = await AlertsStore(database).getAlerts();
+    expect(alerts.where((alert) => alert.severity == 'warning'), hasLength(1));
+    expect(
+      alerts.where((alert) => alert.title == 'INFO: MQ135 Sensor Recovered'),
+      hasLength(1),
+    );
+
+    await database.close();
+    await directory.delete(recursive: true);
+  });
 }

@@ -69,7 +69,7 @@ void main() {
       startedAt.add(const Duration(hours: 1)),
     );
 
-    expect((await appDatabase.database).getVersion(), completion(5));
+    expect((await appDatabase.database).getVersion(), completion(6));
     expect(next.sequenceNumber, 2);
     expect((await store.listReadings(savedId)).single.data.temperatureC, 25.0);
     expect((await store.listAttempts()).map((attempt) => attempt.id), [
@@ -133,7 +133,7 @@ void main() {
     final version = await (await reopenedDatabase.database).rawQuery(
       'PRAGMA user_version',
     );
-    expect(version.single['user_version'], 5);
+    expect(version.single['user_version'], 6);
     expect((await reopenedHistory.getSensorData()).single.chamberTempC, 36.5);
     expect((await reopenedHistory.getSensorData()).single.pm1_0UgM3, isNull);
     expect((await reopenedAlerts.getAlerts()).single.id, 'alert-1');
@@ -262,7 +262,7 @@ void main() {
       databasePath: appPath,
     );
     final appHistory = SensorHistoryStore(appDatabase);
-    expect(await (await appDatabase.database).getVersion(), 5);
+    expect(await (await appDatabase.database).getVersion(), 6);
     expect((await appHistory.getSensorData()).single.pm2_5UgM3, isNull);
     expect((await AlertsStore(appDatabase).getAlerts()).single.id, 'old-alert');
     expect(
@@ -296,7 +296,7 @@ void main() {
       databasePath: legacyPath,
     );
     final legacyHistory = DatabaseHelper.forTesting(legacyStorage);
-    expect(await (await legacyStorage.database).getVersion(), 5);
+    expect(await (await legacyStorage.database).getVersion(), 6);
     expect((await legacyHistory.getSensorData()).single.pm1_0UgM3, isNull);
     await legacyHistory.insertSensorData(
       SensorData(
