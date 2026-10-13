@@ -326,6 +326,35 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
     });
+
+    testWidgets('shows particulate readings from legacy API field names', (
+      tester,
+    ) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'pm1_ug_m3': 10.0,
+            'pm25_ug_m3': 20.0,
+            'pm10_ug_m3': 30.0,
+            'pump_on': false,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(find.text('PM1.0: 10 µg/m³'), findsOneWidget);
+      expect(find.text('PM2.5: 20 µg/m³'), findsOneWidget);
+      expect(find.text('PM10: 30 µg/m³'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 
   group('DashboardScreen Alerting and Mute', () {
