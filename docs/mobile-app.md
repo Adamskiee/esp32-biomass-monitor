@@ -48,11 +48,13 @@ fully visible. The app keeps one saved device IP; it does not keep a node list
 or save credentials. MQ sensor values are voltages; the app does not calculate
 a certified air quality index or carbon monoxide concentration from them.
 
-The Air Quality tab also shows PM1.0, PM2.5, and PM10 mass concentrations in
-µg/m³. `--` means the device has not provided a fresh particulate reading.
-The paginated sensor log and current-session CSV export retain these three
-fields as `PM1.0(ug/m3)`, `PM2.5(ug/m3)`, and `PM10(ug/m3)`. Particulate data
-is telemetry only and does not control the sprinkler or other safety outputs.
+The Sensor Logs tab contains every recorded sensor value: chamber and ambient
+temperature, MQ-135 and MQ-2 voltage, and PM1.0, PM2.5, and PM10 mass
+concentrations in µg/m³. `--` means the device has not provided that reading.
+Its session analytics show peak and average values for each metric. The
+current-session CSV export retains particulate fields as `PM1.0(ug/m3)`,
+`PM2.5(ug/m3)`, and `PM10(ug/m3)`. Particulate data is telemetry only and does
+not control the sprinkler or other safety outputs.
 
 The Home dashboard groups live and historical trends by unit so readings remain
 readable: ambient and chamber temperatures, MQ2 and MQ135 voltages, and PM1.0,
