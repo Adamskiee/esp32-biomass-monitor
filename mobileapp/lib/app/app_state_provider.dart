@@ -7,8 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/storage/app_database.dart';
 import '../database_helper.dart';
 import '../features/alerts/alert_item.dart';
+import '../features/alerts/alerts_controller.dart';
+import '../features/alerts/alerts_store.dart';
 import '../features/authentication/device_address_store.dart';
 import '../features/monitoring/sensor_data.dart';
 import '../features/monitoring/telemetry_source.dart';
@@ -19,6 +22,8 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   late final DeviceAddressStore _deviceAddresses;
   final http.Client _client;
   final bool _ownsClient;
+  final bool _ownsAlertsController;
+  AlertsController? _alertsController;
 
   bool _isAuthenticated = false, _isAdmin = false, _isHardwareConnected = false;
   int _currentTab = 0;
@@ -28,16 +33,22 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   SensorData _currentData = SensorData(timestamp: DateTime.now());
   final List<SensorData> _history = [];
   int _telemetryRevision = 0;
-  final List<AlertItem> _alerts = [];
-  int _alertCount = 0;
   final List<AuditLog> _auditLogs = [
     AuditLog("System Initialized", "SYSTEM", "08:00 AM"),
   ];
   Timer? _pollingTimer;
 
-  AppStateProvider(this._prefs, {http.Client? client})
-    : _client = client ?? http.Client(),
-      _ownsClient = client == null {
+  AppStateProvider(
+    this._prefs, {
+    http.Client? client,
+    AlertsController? alertsController,
+  }) : _client = client ?? http.Client(),
+       _ownsClient = client == null,
+       _ownsAlertsController = alertsController == null {
+    _alertsController =
+        alertsController ?? AlertsController(AlertsStore(AppDatabase()));
+    _alertsController!.addListener(_onAlertsChanged);
+    unawaited(_alertsController!.load());
     _deviceAddresses = DeviceAddressStore(_prefs);
     _deviceAddresses.migrateLegacyNodes().then((_) => notifyListeners());
     _loadHistory();
@@ -57,8 +68,10 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   List<SensorData> get history => _history;
   @override
   int get telemetryRevision => _telemetryRevision;
-  List<AlertItem> get alerts => _alerts;
-  int get alertCount => _alertCount;
+  AlertsController get alertsController => _alertsController!;
+
+  List<AlertItem> get alerts => _alertsController?.alerts ?? const [];
+  int get alertCount => _alertsController?.totalAlerts ?? 0;
   List<AuditLog> get auditLogs => _auditLogs;
 
   Map<String, String> getSessionAnalytics() {
@@ -69,30 +82,63 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
         "avgT": "0.0",
         "maxMq2": "0.0",
         "avgMq2": "0.0",
+        "maxAmbientTemp": "0.0",
+        "avgAmbientTemp": "0.0",
+        "maxMq135": "0.0",
+        "avgMq135": "0.0",
+        "maxPm1_0": "0.0",
+        "avgPm1_0": "0.0",
+        "maxPm2_5": "0.0",
+        "avgPm2_5": "0.0",
+        "maxPm10": "0.0",
+        "avgPm10": "0.0",
       };
     }
 
-    var validTemps = _history
-        .where((e) => e.chamberTempC != null)
-        .map((e) => e.chamberTempC!);
-    double minT = validTemps.isEmpty ? 0.0 : validTemps.reduce(min);
-    double maxT = validTemps.isEmpty ? 0.0 : validTemps.reduce(max);
-    double avgT = validTemps.isEmpty
-        ? 0.0
-        : validTemps.reduce((a, b) => a + b) / validTemps.length;
+    Map<String, String> summarise(Iterable<double?> readings, int decimals) {
+      final values = readings.whereType<double>().toList();
+      final minimum = values.isEmpty ? 0.0 : values.reduce(min);
+      final peak = values.isEmpty ? 0.0 : values.reduce(max);
+      final average = values.isEmpty
+          ? 0.0
+          : values.reduce((total, value) => total + value) / values.length;
+      return {
+        'min': minimum.toStringAsFixed(decimals),
+        'max': peak.toStringAsFixed(decimals),
+        'avg': average.toStringAsFixed(decimals),
+      };
+    }
 
-    var validMq2 = _history.where((e) => e.mq2V != null).map((e) => e.mq2V!);
-    double maxMq2 = validMq2.isEmpty ? 0.0 : validMq2.reduce(max);
-    double avgMq2 = validMq2.isEmpty
-        ? 0.0
-        : validMq2.reduce((a, b) => a + b) / validMq2.length;
+    final chamber = summarise(
+      _history.map((reading) => reading.chamberTempC),
+      1,
+    );
+    final ambient = summarise(
+      _history.map((reading) => reading.temperatureC),
+      1,
+    );
+    final mq2 = summarise(_history.map((reading) => reading.mq2V), 2);
+    final mq135 = summarise(_history.map((reading) => reading.mq135V), 2);
+    final pm1_0 = summarise(_history.map((reading) => reading.pm1_0UgM3), 1);
+    final pm2_5 = summarise(_history.map((reading) => reading.pm2_5UgM3), 1);
+    final pm10 = summarise(_history.map((reading) => reading.pm10UgM3), 1);
 
     return {
-      "minT": minT.toStringAsFixed(1),
-      "maxT": maxT.toStringAsFixed(1),
-      "avgT": avgT.toStringAsFixed(1),
-      "maxMq2": maxMq2.toStringAsFixed(2),
-      "avgMq2": avgMq2.toStringAsFixed(2),
+      "minT": chamber['min']!,
+      "maxT": chamber['max']!,
+      "avgT": chamber['avg']!,
+      "maxMq2": mq2['max']!,
+      "avgMq2": mq2['avg']!,
+      "maxAmbientTemp": ambient['max']!,
+      "avgAmbientTemp": ambient['avg']!,
+      "maxMq135": mq135['max']!,
+      "avgMq135": mq135['avg']!,
+      "maxPm1_0": pm1_0['max']!,
+      "avgPm1_0": pm1_0['avg']!,
+      "maxPm2_5": pm2_5['max']!,
+      "avgPm2_5": pm2_5['avg']!,
+      "maxPm10": pm10['max']!,
+      "avgPm10": pm10['avg']!,
     };
   }
 
@@ -102,13 +148,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       final dbData = await dbHelper.getSensorData(limit: 60);
       _history.clear();
       _history.addAll(dbData.reversed);
-
-      final dbAlerts = await dbHelper.getAlerts();
-      _alertCount = await dbHelper.getAlertCount();
-      if (dbAlerts.isNotEmpty) {
-        _alerts.clear();
-        _alerts.addAll(dbAlerts);
-      }
 
       final dbLogs = await dbHelper.getAuditLogs();
       if (dbLogs.isNotEmpty) {
@@ -172,18 +211,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     notifyListeners();
   }
 
-  void removeAlert(String id) {
-    _alerts.removeWhere((a) => a.id == id);
-    if (_alertCount > 0) _alertCount--;
-    notifyListeners();
-  }
-
-  void clearAllAlerts() {
-    _alerts.clear();
-    _alertCount = 0;
-    notifyListeners();
-  }
-
   Future<void> forceRefresh() async {
     await Future.delayed(const Duration(seconds: 1));
     startLiveTelemetryStream();
@@ -193,63 +220,67 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     _pollingTimer?.cancel();
     int interval = _prefs.getInt('pollingInterval') ?? 2;
 
-    _pollingTimer = Timer.periodic(Duration(seconds: interval), (_) async {
-      var gasDanger = false;
-      try {
-        final response = await _client
-            .get(
-              Uri.parse('http://$deviceIp/api/state'),
-              headers: {'Authorization': _basicAuthHeader},
-            )
-            .timeout(const Duration(seconds: 2));
-        if (response.statusCode == 200) {
-          final reportedState =
-              json.decode(response.body) as Map<String, dynamic>;
-          _currentData = SensorData.fromJson(reportedState);
-          gasDanger = (reportedState['active_triggers'] as List<dynamic>? ?? [])
-              .contains('high_mq2_gas');
-          _isHardwareConnected = true;
-        } else {
-          _isHardwareConnected = false;
-        }
-      } catch (e) {
+    _pollingTimer = Timer.periodic(
+      Duration(seconds: interval),
+      (_) => unawaited(pollOnce()),
+    );
+  }
+
+  Future<void> pollOnce() async {
+    var triggers = <String>[];
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('http://$deviceIp/api/state'),
+            headers: {'Authorization': _basicAuthHeader},
+          )
+          .timeout(const Duration(seconds: 2));
+      if (response.statusCode == 200) {
+        final reportedState =
+            json.decode(response.body) as Map<String, dynamic>;
+        _currentData = SensorData.fromJson(reportedState);
+        triggers = (reportedState['active_triggers'] as List<dynamic>? ?? [])
+            .whereType<String>()
+            .toList();
+        _isHardwareConnected = true;
+      } else {
         _isHardwareConnected = false;
       }
-      if (!_isHardwareConnected) {
-        _currentData = SensorData(timestamp: DateTime.now());
-        notifyListeners();
-        return;
-      }
-
-      _history.add(_currentData);
-      if (_history.length > 60) _history.removeAt(0);
-      DatabaseHelper().insertSensorData(_currentData);
-      _telemetryRevision++;
-
-      if (gasDanger &&
-          _currentData.mq2V != null &&
-          !_alerts.any((a) => a.title.contains("Gas Hazard"))) {
-        HapticFeedback.heavyImpact();
-        final timestamp = DateTime.now();
-        final alert = AlertItem(
-          id: timestamp.millisecondsSinceEpoch.toString(),
-          title: 'CRITICAL: High Gas Detected',
-          description:
-              'ESP32 reported a high MQ-2 reading (${_currentData.mq2V!.toStringAsFixed(2)} V).',
-          severity: 'critical',
-          timestamp: timestamp,
-        );
-        _alerts.insert(0, alert);
-        _alertCount++;
-        DatabaseHelper().insertAlert(alert);
-      }
+    } catch (_) {
+      _isHardwareConnected = false;
+    }
+    if (!_isHardwareConnected) {
+      _currentData = SensorData(timestamp: DateTime.now());
       notifyListeners();
-    });
+      return;
+    }
+
+    _history.add(_currentData);
+    if (_history.length > 60) _history.removeAt(0);
+    unawaited(
+      DatabaseHelper().insertSensorData(_currentData).catchError((_) => 0),
+    );
+    _telemetryRevision++;
+
+    final hadGasHazard = alerts.any(
+      (alert) => alert.title.contains('Gas Hazard'),
+    );
+    await alertsController.recordTriggers(_currentData, triggers);
+    if (triggers.contains('high_mq2_gas') &&
+        _currentData.mq2V != null &&
+        !hadGasHazard) {
+      HapticFeedback.heavyImpact();
+    }
+    notifyListeners();
   }
+
+  void _onAlertsChanged() => notifyListeners();
 
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _alertsController?.removeListener(_onAlertsChanged);
+    if (_ownsAlertsController) _alertsController?.dispose();
     if (_ownsClient) _client.close();
     super.dispose();
   }

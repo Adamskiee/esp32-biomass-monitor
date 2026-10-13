@@ -109,10 +109,53 @@ void main() {
 
       await mount(tester, size: const Size(320, 800));
 
+      await tester.scrollUntilVisible(find.text('12:34:56'), 300);
       expect(tester.takeException(), isNull);
       expect(find.text('12:34:56'), findsOneWidget);
     },
   );
+
+  testWidgets('lists every sensor reading without an air quality segment', (
+    tester,
+  ) async {
+    await history.insertSensorData(
+      SensorData(
+        chamberTempC: 58.4,
+        temperatureC: 31.2,
+        mq135V: 0.75,
+        mq2V: 1.75,
+        pm1_0UgM3: 8,
+        pm2_5UgM3: 12,
+        pm10UgM3: 18,
+        timestamp: DateTime(2026, 10, 7, 12, 34, 56),
+      ),
+    );
+
+    await mount(tester);
+
+    expect(find.text('Air Quality'), findsNothing);
+    expect(find.text('Ambient Temperature'), findsOneWidget);
+    expect(find.text('PM2.5'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('Ambient Temp: 31.2 °C'),
+      300,
+    );
+    expect(find.textContaining('Ambient Temp: 31.2 °C'), findsOneWidget);
+    expect(find.textContaining('MQ-135: 0.75 V'), findsOneWidget);
+    expect(find.textContaining('PM1.0: 8 µg/m³'), findsOneWidget);
+  });
+
+  testWidgets('groups session analytics by sensor type', (tester) async {
+    await mount(tester);
+
+    expect(find.text('Temperature'), findsOneWidget);
+    expect(find.text('Gas Sensors'), findsOneWidget);
+    expect(find.text('Particulate Matter'), findsOneWidget);
+    expect(find.text('Chamber Temperature'), findsOneWidget);
+    expect(find.text('Ambient Temperature'), findsOneWidget);
+    expect(find.text('Peak'), findsNWidgets(7));
+    expect(find.text('Average'), findsNWidgets(7));
+  });
 
   testWidgets('shows ten records per page with navigation controls', (
     tester,

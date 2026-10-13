@@ -18,14 +18,6 @@ class MainWrapper extends StatefulWidget {
 }
 
 class _MainWrapperState extends State<MainWrapper> {
-  final List<Widget> _screens = const [
-    HomeTab(),
-    MonitorTab(),
-    ControlTab(),
-    AlertsTab(),
-    SettingsScreen(),
-  ];
-
   void _showLogoutConfirmation(BuildContext context) {
     showDialog(
       context: context,
@@ -72,6 +64,13 @@ class _MainWrapperState extends State<MainWrapper> {
       (state) => state.alertCount,
     );
     final state = context.read<AppStateProvider>();
+    const screens = [
+      HomeTab(),
+      MonitorTab(),
+      ControlTab(),
+      AlertsTab(),
+      SettingsScreen(),
+    ];
     final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width > 850;
 
@@ -240,7 +239,7 @@ class _MainWrapperState extends State<MainWrapper> {
                 Expanded(
                   child: TabTransition(
                     currentIndex: currentTab,
-                    children: _screens,
+                    children: screens,
                   ),
                 ),
               ],

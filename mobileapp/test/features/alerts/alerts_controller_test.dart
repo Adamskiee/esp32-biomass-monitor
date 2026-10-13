@@ -74,4 +74,110 @@ void main() {
       await directory.delete(recursive: true);
     },
   );
+
+  test(
+    'records one warning per sensor fault and an info alert on recovery',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('alerts-');
+      final database = AppDatabase(
+        databaseFactory: databaseFactoryFfi,
+        databasePath: '${directory.path}/biomass_iot.db',
+      );
+      final controller = AlertsController(AlertsStore(database));
+      final faultedReading = SensorData.fromJson({
+        'temperature_c': null,
+        'humidity_percent': null,
+        'chamber_temp_c': null,
+        'mq135_v': null,
+        'mq2_v': null,
+        'pm1_0_ug_m3': null,
+        'pm2_5_ug_m3': null,
+        'pm10_ug_m3': null,
+      });
+
+      await controller.recordTriggers(faultedReading, [
+        'temp_sensor_fault',
+        'mq2_sensor_fault',
+      ]);
+      await controller.recordTriggers(faultedReading, [
+        'temp_sensor_fault',
+        'mq2_sensor_fault',
+      ]);
+
+      expect(controller.alerts, hasLength(5));
+      expect(
+        controller.alerts.map((alert) => alert.title),
+        containsAll(<String>[
+          'WARNING: DHT22 Sensor Fault',
+          'WARNING: Thermocouple Sensor Fault',
+          'WARNING: MQ135 Sensor Fault',
+          'WARNING: MQ2 Sensor Fault',
+          'WARNING: PMS5003 Sensor Fault',
+        ]),
+      );
+      expect(
+        controller.alerts.every((alert) => alert.severity == 'warning'),
+        isTrue,
+      );
+
+      await controller.recordTriggers(
+        SensorData.fromJson({
+          'temperature_c': 25,
+          'humidity_percent': 60,
+          'chamber_temp_c': 38,
+          'mq135_v': 1.2,
+          'mq2_v': 1.1,
+          'pm1_0_ug_m3': 4,
+          'pm2_5_ug_m3': 6,
+          'pm10_ug_m3': 9,
+        }),
+        [],
+      );
+
+      expect(controller.alerts, hasLength(10));
+      expect(
+        controller.alerts
+            .where((alert) => alert.severity == 'info')
+            .map((alert) => alert.title),
+        containsAll(<String>[
+          'INFO: DHT22 Sensor Recovered',
+          'INFO: Thermocouple Sensor Recovered',
+          'INFO: MQ135 Sensor Recovered',
+          'INFO: MQ2 Sensor Recovered',
+          'INFO: PMS5003 Sensor Recovered',
+        ]),
+      );
+
+      await database.close();
+      await directory.delete(recursive: true);
+    },
+  );
+
+  test('retains active sensor faults across a controller restart', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final faultedReading = SensorData.fromJson({'mq135_v': null});
+    final firstController = AlertsController(AlertsStore(database));
+    await firstController.recordTriggers(faultedReading, []);
+
+    final restartedController = AlertsController(AlertsStore(database));
+    await restartedController.recordTriggers(faultedReading, []);
+    await restartedController.recordTriggers(
+      SensorData.fromJson({'mq135_v': 1.2}),
+      [],
+    );
+
+    final alerts = await AlertsStore(database).getAlerts();
+    expect(alerts.where((alert) => alert.severity == 'warning'), hasLength(1));
+    expect(
+      alerts.where((alert) => alert.title == 'INFO: MQ135 Sensor Recovered'),
+      hasLength(1),
+    );
+
+    await database.close();
+    await directory.delete(recursive: true);
+  });
 }

@@ -7,11 +7,10 @@ import 'database_provider.dart';
 
 class AppDatabase implements DatabaseProvider {
   AppDatabase({DatabaseFactory? databaseFactory, String? databasePath})
-    : _databaseFactory = databaseFactory ?? _defaultDatabaseFactory,
+    : _databaseFactory = databaseFactory,
       _databasePath = databasePath;
 
-  static final DatabaseFactory _defaultDatabaseFactory = databaseFactory;
-  final DatabaseFactory _databaseFactory;
+  final DatabaseFactory? _databaseFactory;
   final String? _databasePath;
   Database? _database;
 
@@ -19,10 +18,10 @@ class AppDatabase implements DatabaseProvider {
   Future<Database> get database async {
     if (_database != null) return _database!;
     if (kIsWeb) throw UnsupportedError('SQLite is not supported on the Web');
-    _database = await _databaseFactory.openDatabase(
+    _database = await (_databaseFactory ?? databaseFactory).openDatabase(
       _databasePath ?? await _defaultPath(),
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 6,
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
@@ -58,6 +57,9 @@ class AppDatabase implements DatabaseProvider {
     if (oldVersion < 5) {
       await _createAlertsIndex(db);
     }
+    if (oldVersion < 6) {
+      await _createAlertStatesTable(db);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -72,6 +74,7 @@ class AppDatabase implements DatabaseProvider {
       )
     ''');
     await _createAlertsIndex(db);
+    await _createAlertStatesTable(db);
     await _createAttemptTables(db);
     await db.execute('''
       CREATE TABLE audit_logs (
@@ -100,6 +103,13 @@ class AppDatabase implements DatabaseProvider {
   Future<void> _createAlertsIndex(Database db) => db.execute(
     'CREATE INDEX IF NOT EXISTS alerts_time_rowid ON alerts(time DESC)',
   );
+
+  Future<void> _createAlertStatesTable(Database db) => db.execute('''
+    CREATE TABLE IF NOT EXISTS alert_states (
+      key TEXT PRIMARY KEY,
+      active INTEGER NOT NULL
+    )
+  ''');
 
   Future<void> _migrateSensorColumns(Database db) async {
     final columns = (await db.rawQuery(
