@@ -56,6 +56,9 @@ void main() {
           'chamber_temp_c': 65.4,
           'mq135_v': 0.75,
           'mq2_v': 1.25,
+          'pm1_0_ug_m3': 12.0,
+          'pm2_5_ug_m3': 34.5,
+          'pm10_ug_m3': 56.0,
           'pump_on': false,
           'active_triggers': [],
         }),
@@ -199,6 +202,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('26.5 °C'), findsOneWidget);
+    expect(find.text('PM1.0'), findsOneWidget);
+    expect(find.text('12.0 µg/m³'), findsOneWidget);
+    expect(find.text('PM2.5'), findsOneWidget);
+    expect(find.text('34.5 µg/m³'), findsOneWidget);
+    expect(find.text('PM10'), findsOneWidget);
+    expect(find.text('56.0 µg/m³'), findsOneWidget);
     temperature = 29.5;
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();

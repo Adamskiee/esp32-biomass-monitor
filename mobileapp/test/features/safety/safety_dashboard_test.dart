@@ -258,6 +258,9 @@ void main() {
             jsonEncode({
               'chamber_temp_c': 65.4,
               'mq2_v': 1.25,
+              'pm1_0_ug_m3': 12.0,
+              'pm2_5_ug_m3': 34.5,
+              'pm10_ug_m3': 56.0,
               'fan_on': true,
               'sprinkler_on': false,
               'threshold_chamber_temp_c': 70.0,
@@ -277,6 +280,10 @@ void main() {
         expect(find.text('Live Sensor Data'), findsOneWidget);
         expect(find.text('65.4 °C'), findsOneWidget);
         expect(find.text('1.25 V'), findsOneWidget);
+        expect(find.text('Particulate Matter'), findsOneWidget);
+        expect(find.text('PM1.0: 12 µg/m³'), findsOneWidget);
+        expect(find.text('PM2.5: 34.5 µg/m³'), findsOneWidget);
+        expect(find.text('PM10: 56 µg/m³'), findsOneWidget);
 
         await tester.scrollUntilVisible(find.text('70.0 °C'), 100);
         expect(find.text('Manual Sprinkler'), findsOneWidget);
@@ -292,6 +299,62 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+
+    testWidgets('shows unavailable particulate readings when data is absent', (
+      tester,
+    ) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'pump_on': false,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(find.text('Particulate Matter'), findsOneWidget);
+      expect(find.text('PM1.0: --'), findsOneWidget);
+      expect(find.text('PM2.5: --'), findsOneWidget);
+      expect(find.text('PM10: --'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('shows particulate readings from legacy API field names', (
+      tester,
+    ) async {
+      client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'chamber_temp_c': 55.0,
+            'mq2_v': 1.0,
+            'pm1_ug_m3': 10.0,
+            'pm25_ug_m3': 20.0,
+            'pm10_ug_m3': 30.0,
+            'pump_on': false,
+            'active_triggers': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+      await tester.pump();
+
+      expect(find.text('PM1.0: 10 µg/m³'), findsOneWidget);
+      expect(find.text('PM2.5: 20 µg/m³'), findsOneWidget);
+      expect(find.text('PM10: 30 µg/m³'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 
   group('DashboardScreen Alerting and Mute', () {
@@ -468,6 +531,7 @@ void main() {
 
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
+      await tester.scrollUntilVisible(find.byType(Switch), 100);
       await tester.tap(find.byType(Switch));
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
@@ -512,6 +576,7 @@ void main() {
       await tester.pump();
 
       final switchFinder = find.byType(Switch);
+      await tester.scrollUntilVisible(switchFinder, 100);
       expect(switchFinder, findsOneWidget);
       Switch switchWidget = tester.widget(switchFinder);
       expect(switchWidget.value, isFalse);
@@ -564,6 +629,7 @@ void main() {
         await tester.pump();
 
         final switchFinder = find.byType(Switch);
+        await tester.scrollUntilVisible(switchFinder, 100);
         await tester.tap(switchFinder);
         await tester.pump();
         await tester.pump(const Duration(seconds: 2));
@@ -611,6 +677,7 @@ void main() {
       await tester.pump();
 
       final switchFinder = find.byType(Switch);
+      await tester.scrollUntilVisible(switchFinder, 100);
       await tester.tap(switchFinder);
       await tester.pump();
       await tester.tap(switchFinder);
@@ -646,7 +713,7 @@ void main() {
 
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.drag(find.byType(ListView), const Offset(0, -600));
       await tester.pump();
       tester.widget<Slider>(find.byType(Slider).first).onChanged!(65.0);
       await tester.pump();
@@ -785,7 +852,7 @@ void main() {
 
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.drag(find.byType(ListView), const Offset(0, -600));
       await tester.pump();
       tester.widget<Slider>(find.byType(Slider).first).onChanged!(65.0);
       await tester.pump();
@@ -795,6 +862,7 @@ void main() {
         'Apply Thresholds',
       );
       expect(applyButton, findsOneWidget);
+      await tester.scrollUntilVisible(applyButton, 100);
       await tester.tap(applyButton);
       await tester.pump();
 
