@@ -69,7 +69,7 @@ void main() {
       startedAt.add(const Duration(hours: 1)),
     );
 
-    expect((await appDatabase.database).getVersion(), completion(4));
+    expect((await appDatabase.database).getVersion(), completion(5));
     expect(next.sequenceNumber, 2);
     expect((await store.listReadings(savedId)).single.data.temperatureC, 25.0);
     expect((await store.listAttempts()).map((attempt) => attempt.id), [
@@ -133,7 +133,7 @@ void main() {
     final version = await (await reopenedDatabase.database).rawQuery(
       'PRAGMA user_version',
     );
-    expect(version.single['user_version'], 4);
+    expect(version.single['user_version'], 5);
     expect((await reopenedHistory.getSensorData()).single.chamberTempC, 36.5);
     expect((await reopenedHistory.getSensorData()).single.pm1_0UgM3, isNull);
     expect((await reopenedAlerts.getAlerts()).single.id, 'alert-1');
@@ -143,6 +143,79 @@ void main() {
     );
     await reopenedDatabase.close();
   });
+
+  test('reads a stable severity-filtered alert page', () async {
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: databasePath,
+    );
+    final alerts = AlertsStore(database);
+    final base = DateTime.utc(2026, 10, 13, 12);
+
+    for (var index = 0; index < 5; index++) {
+      await alerts.insertAlert(
+        AlertItem(
+          id: 'alert-$index',
+          title: 'Alert $index',
+          description: 'Saved alert',
+          severity: index.isEven ? 'critical' : 'info',
+          timestamp: base.add(Duration(minutes: index)),
+        ),
+      );
+    }
+
+    final snapshot = await alerts.getLatestAlertRowId();
+    await alerts.insertAlert(
+      AlertItem(
+        id: 'new-alert',
+        title: 'New alert',
+        description: 'Created after the snapshot',
+        severity: 'critical',
+        timestamp: base.add(const Duration(hours: 1)),
+      ),
+    );
+
+    final page = await alerts.getAlerts(
+      limit: 2,
+      offset: 0,
+      severity: 'critical',
+      throughRowId: snapshot,
+    );
+
+    expect(page.map((alert) => alert.id), ['alert-4', 'alert-2']);
+    expect(
+      await alerts.getAlertCount(severity: 'critical', throughRowId: snapshot),
+      3,
+    );
+    await database.close();
+  });
+
+  test(
+    'limits the dashboard alert history while retaining its total count',
+    () async {
+      final database = AppDatabase(
+        databaseFactory: databaseFactoryFfi,
+        databasePath: databasePath,
+      );
+      final helper = DatabaseHelper.forTesting(database);
+      final timestamp = DateTime.utc(2026, 10, 13);
+      for (var index = 0; index < 21; index++) {
+        await helper.insertAlert(
+          AlertItem(
+            id: 'dashboard-alert-$index',
+            title: 'Alert $index',
+            description: 'Saved alert',
+            severity: 'info',
+            timestamp: timestamp.add(Duration(minutes: index)),
+          ),
+        );
+      }
+
+      expect(await helper.getAlerts(), hasLength(20));
+      expect(await helper.getAlertCount(), 21);
+      await database.close();
+    },
+  );
 
   test('migrates version two rows through each history API', () async {
     Future<void> seedVersionTwo(String path) async {
@@ -189,7 +262,7 @@ void main() {
       databasePath: appPath,
     );
     final appHistory = SensorHistoryStore(appDatabase);
-    expect(await (await appDatabase.database).getVersion(), 4);
+    expect(await (await appDatabase.database).getVersion(), 5);
     expect((await appHistory.getSensorData()).single.pm2_5UgM3, isNull);
     expect((await AlertsStore(appDatabase).getAlerts()).single.id, 'old-alert');
     expect(
@@ -223,7 +296,7 @@ void main() {
       databasePath: legacyPath,
     );
     final legacyHistory = DatabaseHelper.forTesting(legacyStorage);
-    expect(await (await legacyStorage.database).getVersion(), 4);
+    expect(await (await legacyStorage.database).getVersion(), 5);
     expect((await legacyHistory.getSensorData()).single.pm1_0UgM3, isNull);
     await legacyHistory.insertSensorData(
       SensorData(
