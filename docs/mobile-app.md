@@ -48,6 +48,12 @@ fully visible. The app keeps one saved device IP; it does not keep a node list
 or save credentials. MQ sensor values are voltages; the app does not calculate
 a certified air quality index or carbon monoxide concentration from them.
 
+The app records a warning when a DHT22, thermocouple, MQ135, MQ2, or PMS5003
+sensor reports unavailable data. It records one warning for a continuing fault
+and an info alert when that same sensor starts reporting valid data again.
+These alerts report sensor availability; they do not change sprinkler control
+or confirm that a sensor is physically disconnected.
+
 The Air Quality tab also shows PM1.0, PM2.5, and PM10 mass concentrations in
 µg/m³. `--` means the device has not provided a fresh particulate reading.
 The paginated sensor log and current-session CSV export retain these three
