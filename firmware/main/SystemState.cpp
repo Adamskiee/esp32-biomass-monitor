@@ -1,5 +1,6 @@
 #include "SystemState.h"
 #include "Actuators.h"
+#include <BiomassConfig.h>
 #include <math.h>
 
 using std::isfinite;
@@ -24,6 +25,8 @@ static bool mq2_latch_danger = false;
 static PmsReading latest_pms_reading{};
 static uint32_t latest_pms_sampled_at_ms = 0;
 static bool has_pms_reading = false;
+static uint32_t mq_warmup_started_at_ms = 0;
+static bool mq_sensors_are_warming_up = false;
 
 constexpr float MQ2_GAS_DANGER_V = 2.5f;
 constexpr float MQ2_RAIL_SHORT_V = 4.8f;
@@ -119,17 +122,33 @@ ManualSprinklerResult applyManualSprinklerCommand(bool enabled) {
   return ManualSprinklerResult::Accepted;
 }
 
+void startMqWarmup(uint32_t now_ms) { mq_warmup_started_at_ms = now_ms; }
+
+uint32_t mqWarmupRemainingSeconds(uint32_t now_ms) {
+  const uint32_t elapsed_ms = now_ms - mq_warmup_started_at_ms;
+  if (elapsed_ms >= MQ_WARMUP_DURATION_MS) {
+    return 0;
+  }
+  return (MQ_WARMUP_DURATION_MS - elapsed_ms + 999) / 1000;
+}
+
+bool mqSensorsAreWarmingUp() { return mq_sensors_are_warming_up; }
+
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
-                           float mq2_v) {
+                           float mq2_v, bool mq_sensors_warming_up) {
   if (stateMutex != nullptr) {
     xSemaphoreTake(stateMutex, portMAX_DELAY);
   }
 
   current_temp_c = temperature_c;
   current_chamber_c = chamber_c;
-  current_mq135_v = mq135_v;
-  current_mq2_v = mq2_v;
+  mq_sensors_are_warming_up = mq_sensors_warming_up;
+  current_mq135_v = mq_sensors_warming_up ? NAN : mq135_v;
+  current_mq2_v = mq_sensors_warming_up ? NAN : mq2_v;
 
+  if (mq_sensors_warming_up) {
+    mq2_latch_danger = false;
+  }
   evaluateSafetyLoop();
 
   if (stateMutex != nullptr) {
@@ -170,13 +189,13 @@ bool copyFreshPmsReadingLocked(uint32_t now_ms, PmsReading &out) {
 
 void evaluateSafetyLoop() {
   bool is_temp_fault = isnan(current_chamber_c);
-  bool is_mq2_fault =
-      isnan(current_mq2_v) || current_mq2_v > MQ2_RAIL_SHORT_V;
+  bool is_mq2_fault = !mq_sensors_are_warming_up &&
+                      (isnan(current_mq2_v) || current_mq2_v > MQ2_RAIL_SHORT_V);
 
   bool in_temp_danger =
       !is_temp_fault && (current_chamber_c >= threshold_chamber_temp_c);
-  bool in_mq2_danger =
-      !is_mq2_fault && (current_mq2_v >= MQ2_GAS_DANGER_V);
+  bool in_mq2_danger = !mq_sensors_are_warming_up && !is_mq2_fault &&
+                       (current_mq2_v >= MQ2_GAS_DANGER_V);
 
   if (in_temp_danger) {
     temp_latch_danger = true;

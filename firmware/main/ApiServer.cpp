@@ -57,6 +57,10 @@ void initApiServer() {
       doc["mq2_v"] = nullptr;
     else
       doc["mq2_v"] = current_mq2_v;
+    const uint32_t mq_warmup_remaining_seconds =
+        mqWarmupRemainingSeconds(millis());
+    doc["mq_warming_up"] = mqSensorsAreWarmingUp();
+    doc["mq_warmup_remaining_seconds"] = mq_warmup_remaining_seconds;
     PmsReading pms_reading{};
     if (copyFreshPmsReadingLocked(millis(), pms_reading)) {
       doc["pm1_0_ug_m3"] = pms_reading.pm1_0_ug_m3;

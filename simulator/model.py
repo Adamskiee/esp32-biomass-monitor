@@ -1,5 +1,6 @@
 import math
 import threading
+import time
 from collections.abc import Mapping
 
 
@@ -8,6 +9,7 @@ class SafetyOverrideError(Exception):
 
 
 class SimulatorState:
+    _MQ_WARMUP_SECONDS = 300
     _READINGS = {
         "gas": (25.0, 45.0, 1.2, 2.8),
         "heat": (25.0, 100.0, 1.2, 1.0),
@@ -19,8 +21,9 @@ class SimulatorState:
         "threshold_mq2_v": (0.1, 5.0),
     }
 
-    def __init__(self):
+    def __init__(self, clock=time.monotonic):
         self._lock = threading.RLock()
+        self._clock = clock
         self.reset()
 
     @property
@@ -43,6 +46,12 @@ class SimulatorState:
             self._catastrophic_latch = False
             self._manual_sprinkler = False
             self._pump_on = False
+            self._mq_warmup_started_at = self._clock()
+
+    def start_mq_warmup(self) -> None:
+        with self._lock:
+            self._mq_warmup_started_at = self._clock()
+            self._gas_danger = False
 
     def select_scenario(self, name: str) -> None:
         if name not in (*self._READINGS, "normal", "offline"):
@@ -90,7 +99,9 @@ class SimulatorState:
                 self._mq135_v = 1.2 + drift / 10
                 self._mq2_v = 1.0 + drift / 10
                 self._tick += 1
-                self._evaluate_safety()
+            mq_warmup_remaining_seconds = self._mq_warmup_remaining_seconds()
+            mq_warming_up = mq_warmup_remaining_seconds > 0
+            self._evaluate_safety(mq_warming_up)
             triggers = []
             if self._catastrophic_latch:
                 triggers.append("catastrophic_latch")
@@ -100,13 +111,15 @@ class SimulatorState:
                 triggers.append("high_mq2_gas")
             if self._chamber_temp_c is None:
                 triggers.append("temp_sensor_fault")
-            if self._mq2_v is None or self._mq2_v > 4.8:
+            if not mq_warming_up and (self._mq2_v is None or self._mq2_v > 4.8):
                 triggers.append("mq2_sensor_fault")
             return {
                 "temperature_c": self._temperature_c,
                 "chamber_temp_c": self._chamber_temp_c,
-                "mq135_v": self._mq135_v,
-                "mq2_v": self._mq2_v,
+                "mq135_v": None if mq_warming_up else self._mq135_v,
+                "mq2_v": None if mq_warming_up else self._mq2_v,
+                "mq_warming_up": mq_warming_up,
+                "mq_warmup_remaining_seconds": mq_warmup_remaining_seconds,
                 "pm1_0_ug_m3": 8,
                 "pm2_5_ug_m3": 12,
                 "pm10_ug_m3": 18,
@@ -117,15 +130,19 @@ class SimulatorState:
                 "active_triggers": triggers,
             }
 
-    def _evaluate_safety(self) -> None:
+    def _evaluate_safety(self, mq_warming_up: bool | None = None) -> None:
         temp_fault = self._chamber_temp_c is None
-        gas_fault = self._mq2_v is None or self._mq2_v > 4.8
+        if mq_warming_up is None:
+            mq_warming_up = self._mq_warmup_remaining_seconds() > 0
+        gas_fault = not mq_warming_up and (self._mq2_v is None or self._mq2_v > 4.8)
         if not temp_fault:
             if self._chamber_temp_c >= self._threshold_chamber_temp_c:
                 self._temp_danger = True
             elif self._chamber_temp_c <= self._threshold_chamber_temp_c * 0.95:
                 self._temp_danger = False
-        if not gas_fault:
+        if mq_warming_up:
+            self._gas_danger = False
+        elif not gas_fault:
             if self._mq2_v >= 2.5:
                 self._gas_danger = True
             elif self._mq2_v <= 2.5 * 0.95:
@@ -140,3 +157,7 @@ class SimulatorState:
 
     def _request_sprinkler(self, enabled: bool) -> None:
         self._pump_on = enabled
+
+    def _mq_warmup_remaining_seconds(self, now: float | None = None) -> int:
+        elapsed = (self._clock() if now is None else now) - self._mq_warmup_started_at
+        return max(0, math.ceil(self._MQ_WARMUP_SECONDS - elapsed))

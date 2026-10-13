@@ -48,10 +48,20 @@ components:
           type: number
           format: float
           nullable: true
+          description: MQ-135 voltage. Null during the five-minute MQ warm-up after device startup.
         mq2_v:
           type: number
           format: float
           nullable: true
+          description: MQ-2 voltage. Null during the five-minute MQ warm-up after device startup.
+        mq_warming_up:
+          type: boolean
+          description: True while the MQ-135 and MQ-2 heaters complete their five-minute warm-up after device startup.
+        mq_warmup_remaining_seconds:
+          type: integer
+          minimum: 0
+          maximum: 300
+          description: Seconds remaining before MQ readings and MQ2 gas alerts become active.
         pm1_0_ug_m3:
           type: number
           format: float

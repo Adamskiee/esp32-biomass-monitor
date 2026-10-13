@@ -27,3 +27,4 @@
 
 // Timing and Safety Thresholds
 #define POLL_INTERVAL_MS 2000
+#define MQ_WARMUP_DURATION_MS 300000UL

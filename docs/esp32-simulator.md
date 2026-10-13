@@ -70,8 +70,9 @@ Type one command into the simulator terminal while the app is open:
 | `temp-fault` | Chamber temperature becomes unavailable. If `heat` was active immediately before it, a catastrophic latch keeps the sprinkler on until `reset`. |
 | `mq2-fault` | MQ2 becomes unavailable and `mq2_sensor_fault` appears. |
 | `offline` | Authenticated requests return 503 and the app shows its disconnected state. The simulator retains readings and settings. |
+| `warmup` | Restart the five-minute MQ-135 and MQ-2 warm-up countdown without changing the selected scenario. |
 | `status` | Print the selected scenario. |
-| `reset` | Restore `normal`, clear safety latches and manual control, and restore 80.0 °C and 2.5 V thresholds. |
+| `reset` | Restore `normal`, clear safety latches and manual control, restore 80.0 °C and 2.5 V thresholds, and start the five-minute MQ warm-up countdown. |
 | `help` | Print available commands. |
 | `quit` | Stop the server. |
 
@@ -85,7 +86,11 @@ operation or water flow.
 
 The stored MQ2 threshold can be edited and displayed, but the gas alarm still
 uses a fixed 2.5 V trigger, matching the firmware. Thresholds and latches are
-not persisted. `reset` simulates a device restart.
+not persisted. The simulator starts with, and `reset` simulates, an ESP32
+restart. During the first five minutes, `mq_warming_up` is `true`,
+`mq_warmup_remaining_seconds` counts down from 300, both MQ readings are
+`null`, and MQ2 gas and fault triggers are suppressed. This lets the app show
+the same warm-up state it receives from firmware.
 
 ## How do I check the API?
 

@@ -42,7 +42,7 @@ void resetSafetyState() {
   current_mq2_v = 0.5f;
   manual_sprinkler = false;
   catastrophic_latch = false;
-  evaluateSafetyLoop();
+  processSensorReadings(25.0f, 25.0f, 0.5f, 0.5f, false);
   initActuators();
 }
 
@@ -172,6 +172,30 @@ void testMq2DangerDoesNotActivatePump() {
   current_mq2_v = 2.3f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testMqWarmupCountsDownForFiveMinutes() {
+  const char *name = "MQ warmup counts down for five minutes";
+  startMqWarmup(1000);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(1000) == 300);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(300000) == 1);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(301000) == 0);
+}
+
+void testMq2DangerIsIgnoredWhileSensorsWarmUp() {
+  const char *name = "MQ2 danger is ignored while sensors warm up";
+  resetSafetyState();
+  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, true);
+  EXPECT_TRUE(name, mqSensorsAreWarmingUp());
+  EXPECT_TRUE(name, std::isnan(current_mq2_v));
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+
+  processSensorReadings(28.0f, 25.0f, 1.2f, NAN, true);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+
+  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, false);
+  EXPECT_FALSE(name, mqSensorsAreWarmingUp());
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
 }
 
 void testMq2DangerKeepsLedGreen() {
@@ -465,6 +489,9 @@ int main() {
       testTemperatureDangerReassertsSprinklerRequest);
   run("temperature hysteresis", testTemperatureHysteresis);
   run("MQ2 danger does not activate pump", testMq2DangerDoesNotActivatePump);
+  run("MQ warmup counts down for five minutes", testMqWarmupCountsDownForFiveMinutes);
+  run("MQ2 danger is ignored while sensors warm up",
+      testMq2DangerIsIgnoredWhileSensorsWarmUp);
   run("MQ2 danger keeps LED green", testMq2DangerKeepsLedGreen);
   run("MQ2 danger preserves manual sprinkler",
       testMq2DangerPreservesManualSprinkler);

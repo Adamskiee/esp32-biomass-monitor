@@ -9,7 +9,9 @@ from simulator.model import SimulatorState
 
 class CommandTests(unittest.TestCase):
     def setUp(self):
-        self.state = SimulatorState()
+        self.now = 0.0
+        self.state = SimulatorState(clock=lambda: self.now)
+        self.now = 301.0
 
     def test_each_scenario_command_switches_state(self):
         for name in ("normal", "gas", "heat", "temp-fault", "mq2-fault", "offline"):
@@ -18,19 +20,35 @@ class CommandTests(unittest.TestCase):
                 self.assertEqual(self.state.scenario, name)
                 self.assertIn(name, result)
 
+    def test_warmup_command_restarts_mq_warmup(self):
+        self.state.select_scenario("gas")
+        result = process_command(self.state, "warmup")
+
+        snapshot = self.state.snapshot()
+
+        self.assertEqual(result, "MQ warm-up started")
+        self.assertEqual(self.state.scenario, "gas")
+        self.assertTrue(snapshot["mq_warming_up"])
+        self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 300)
+        self.assertIsNone(snapshot["mq2_v"])
+        self.assertNotIn("high_mq2_gas", snapshot["active_triggers"])
+
     def test_reset_restores_defaults_and_status_reports_scenario(self):
         self.state.select_scenario("heat")
         self.state.update_thresholds({"threshold_mq2_v": 4})
         self.assertIn("heat", process_command(self.state, "status"))
         process_command(self.state, "reset")
+        snapshot = self.state.snapshot()
         self.assertEqual(self.state.scenario, "normal")
-        self.assertEqual(self.state.snapshot()["threshold_mq2_v"], 2.5)
+        self.assertEqual(snapshot["threshold_mq2_v"], 2.5)
+        self.assertTrue(snapshot["mq_warming_up"])
+        self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 300)
 
     def test_unknown_command_does_not_change_state_and_lists_commands(self):
         self.state.select_scenario("gas")
         result = process_command(self.state, "typo")
         self.assertEqual(self.state.scenario, "gas")
-        for name in ("normal", "gas", "heat", "temp-fault", "mq2-fault", "offline", "status", "reset", "help", "quit"):
+        for name in ("normal", "gas", "heat", "temp-fault", "mq2-fault", "offline", "warmup", "status", "reset", "help", "quit"):
             self.assertIn(name, result)
 
     def test_parser_has_local_demo_defaults(self):

@@ -14,6 +14,7 @@ class SensorMetricCard extends StatelessWidget {
     this.decimals = 0,
     this.isCompact = false,
     this.maxVal = 100.0,
+    this.statusText,
   });
 
   final String title;
@@ -25,11 +26,13 @@ class SensorMetricCard extends StatelessWidget {
   final int decimals;
   final bool isCompact;
   final double maxVal;
+  final String? statusText;
 
   @override
   Widget build(BuildContext context) {
-    final isFault = value == null;
-    final displayColor = isFault ? Colors.amber : color;
+    final isWarmingUp = statusText != null;
+    final isFault = value == null && !isWarmingUp;
+    final displayColor = isFault || isWarmingUp ? Colors.amber : color;
     return GlowingCard(
       glowColor: displayColor,
       padding: EdgeInsets.all(isCompact ? 16 : 24),
@@ -49,7 +52,7 @@ class SensorMetricCard extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    if (!isFault)
+                    if (!isFault && !isWarmingUp)
                       TweenAnimationBuilder<double>(
                         duration: const Duration(seconds: 1),
                         curve: Curves.easeOutExpo,
@@ -94,7 +97,7 @@ class SensorMetricCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          if (isFault)
+          if (isFault || isWarmingUp)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -109,7 +112,7 @@ class SensorMetricCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sensor fault',
+                  statusText ?? 'Sensor fault',
                   style: TextStyle(
                     color: displayColor,
                     fontSize: isCompact ? 11 : 13,

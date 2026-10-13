@@ -57,8 +57,10 @@ Returns cached readings and current safety outputs:
   "pm25_ug_m3": 20,
   "pm10_ug_m3": 30,
   "chamber_temp_c": 120.0,
-  "mq135_v": 2.1,
-  "mq2_v": 1.5,
+  "mq135_v": null,
+  "mq2_v": null,
+  "mq_warming_up": true,
+  "mq_warmup_remaining_seconds": 300,
   "pm1_0_ug_m3": 8,
   "pm2_5_ug_m3": 12,
   "pm10_ug_m3": 18,
@@ -76,7 +78,11 @@ confirm that the pump ran or that water flowed.
 Sensor reads represented internally as `NaN` are returned as `null`. A missing
 DHT-22 makes both temperature and `humidity_percent` null. A missing PMS5003
 makes all three PM fields null. PM values use PMS5003 environmental mass
-concentrations in µg/m³. MQ2
+concentrations in µg/m³. After every ESP32 restart, MQ-135 and MQ-2 have a
+five-minute heater warm-up. During warm-up, both MQ voltage fields are `null`,
+`mq_warming_up` is `true`, and `mq_warmup_remaining_seconds` counts down from
+300. The firmware does not report an MQ2 fault or `high_mq2_gas` trigger until
+the countdown reaches zero. MQ2
 readings from 0.0 V through 2.4 V are safe. Readings at or above 2.5 V add the
 `high_mq2_gas` trigger, while only `NaN` values and values above 4.8 V add the
 `mq2_sensor_fault` trigger. `active_triggers` can contain:
