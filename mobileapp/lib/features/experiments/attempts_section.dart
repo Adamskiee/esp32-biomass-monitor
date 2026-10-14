@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../app/app_theme.dart';
 import 'attempt.dart';
 import 'attempt_comparison_screen.dart';
 import 'attempt_controller.dart';
@@ -25,69 +26,202 @@ class _AttemptsSectionState extends State<AttemptsSection> {
       _withId = null;
     }
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
       children: [
-        Text('Attempts', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        if (active == null)
-          ElevatedButton(
-            onPressed: controller.isBusy
-                ? null
-                : () => _start(context, controller),
-            child: const Text('Start Attempt'),
-          )
-        else
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${active.label} recording'),
-              Text('${active.sampleCount} samples'),
-              ElevatedButton(
-                onPressed: controller.isBusy ? null : controller.stop,
-                child: const Text('Stop Attempt'),
-              ),
-            ],
-          ),
-        const SizedBox(height: 24),
-        for (final scenario in AttemptScenario.values) ...[
-          Text(
-            scenario.labelPrefix,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          for (final attempt in attempts.where(
-            (item) =>
-                item.scenario == scenario &&
-                item.status != AttemptStatus.active,
-          ))
-            _attemptTile(attempt, controller),
-          const SizedBox(height: 16),
-        ],
-        ElevatedButton(
-          onPressed: controller.isBusy || _withoutId == null || _withId == null
-              ? null
-              : () async {
-                  final comparison = await controller.compare(
-                    _withoutId!,
-                    _withId!,
-                  );
-                  if (!context.mounted) return;
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          AttemptComparisonScreen(comparison: comparison),
-                    ),
-                  );
-                },
-          child: const Text('Compare attempts'),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Icon(Icons.science_outlined, color: AppTheme.neonGreen),
+            const SizedBox(width: 12),
+            Text('Attempts', style: Theme.of(context).textTheme.headlineSmall),
+          ],
         ),
+        const SizedBox(height: 8),
+        Text(
+          'Record paired readings to compare filtration conditions.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 20),
+        _recordingCard(context, controller, active),
+        const SizedBox(height: 20),
+        Text('Saved attempts', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        Text('Select one saved attempt from each scenario before comparing.'),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cards = AttemptScenario.values
+                .map(
+                  (scenario) => _scenarioCard(
+                    context,
+                    scenario,
+                    attempts
+                        .where(
+                          (item) =>
+                              item.scenario == scenario &&
+                              item.status != AttemptStatus.active,
+                        )
+                        .toList(growable: false),
+                    controller,
+                  ),
+                )
+                .toList(growable: false);
+            if (constraints.maxWidth >= 700) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: cards[0]),
+                  const SizedBox(width: 16),
+                  Expanded(child: cards[1]),
+                ],
+              );
+            }
+            return Column(
+              children: [cards[0], const SizedBox(height: 16), cards[1]],
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+        _comparisonCard(context, controller, attempts),
       ],
+    );
+  }
+
+  Widget _recordingCard(
+    BuildContext context,
+    AttemptController controller,
+    Attempt? active,
+  ) => Card(
+    clipBehavior: Clip.antiAlias,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Recording', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            active == null
+                ? 'Start an attempt when the chamber is ready.'
+                : '${active.label} is recording · ${active.sampleCount} samples',
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: controller.isBusy
+                  ? null
+                  : active == null
+                  ? () => _start(context, controller)
+                  : controller.stop,
+              icon: Icon(active == null ? Icons.play_arrow : Icons.stop),
+              label: Text(active == null ? 'Start attempt' : 'Stop attempt'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _scenarioCard(
+    BuildContext context,
+    AttemptScenario scenario,
+    List<Attempt> scenarioAttempts,
+    AttemptController controller,
+  ) => Card(
+    clipBehavior: Clip.antiAlias,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              scenario.labelPrefix,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          if (scenarioAttempts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Text('No attempts saved yet'),
+            )
+          else
+            ...scenarioAttempts.map(
+              (attempt) => _attemptTile(attempt, controller),
+            ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _comparisonCard(
+    BuildContext context,
+    AttemptController controller,
+    List<Attempt> attempts,
+  ) {
+    final without = attempts
+        .where((attempt) => attempt.id == _withoutId)
+        .firstOrNull;
+    final filtered = attempts
+        .where((attempt) => attempt.id == _withId)
+        .firstOrNull;
+    final canCompare =
+        !controller.isBusy && without != null && filtered != null;
+    return Card(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose attempts to compare',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              canCompare
+                  ? 'Comparing ${without.label} with ${filtered.label}.'
+                  : 'Save one attempt from each scenario to unlock comparison.',
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: canCompare
+                    ? () async {
+                        final comparison = await controller.compare(
+                          _withoutId!,
+                          _withId!,
+                        );
+                        if (!context.mounted) return;
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                AttemptComparisonScreen(comparison: comparison),
+                          ),
+                        );
+                      }
+                    : null,
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.compare_arrows),
+                    SizedBox(width: 8),
+                    Text('Compare attempts'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _attemptTile(Attempt attempt, AttemptController controller) =>
       ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         title: Text(attempt.label),
         subtitle: Text(
           '${attempt.status.name} · ${attempt.sampleCount} samples',
