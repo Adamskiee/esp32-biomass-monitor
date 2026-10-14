@@ -5,6 +5,7 @@ import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -42,6 +43,21 @@ void main() {
         _ => null,
       },
     );
+  });
+
+  test('history loading preserves readings received while it was pending', () {
+    final persisted = SensorData(
+      timestamp: DateTime.utc(2026, 10, 14, 10),
+      temperatureC: 25,
+    );
+    final live = SensorData(
+      timestamp: DateTime.utc(2026, 10, 14, 11),
+      temperatureC: 30,
+    );
+
+    final history = mergeSensorHistory(persisted: [persisted], live: [live]);
+
+    expect(history.map((reading) => reading.temperatureC), [25, 30]);
   });
 
   test(

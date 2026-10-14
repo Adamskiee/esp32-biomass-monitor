@@ -17,6 +17,21 @@ import '../features/monitoring/sensor_data.dart';
 import '../features/monitoring/telemetry_source.dart';
 import '../features/safety/audit_log.dart';
 
+List<SensorData> mergeSensorHistory({
+  required List<SensorData> persisted,
+  required List<SensorData> live,
+}) {
+  final readingsByTimestamp = <DateTime, SensorData>{
+    for (final reading in persisted) reading.timestamp: reading,
+  };
+  for (final reading in live) {
+    readingsByTimestamp[reading.timestamp] = reading;
+  }
+  final history = readingsByTimestamp.values.toList()
+    ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  return history.length > 60 ? history.sublist(history.length - 60) : history;
+}
+
 class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   final SharedPreferences _prefs;
   late final DeviceAddressStore _deviceAddresses;
@@ -146,8 +161,12 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     try {
       final dbHelper = DatabaseHelper();
       final dbData = await dbHelper.getSensorData(limit: 60);
+      final mergedHistory = mergeSensorHistory(
+        persisted: dbData.reversed.toList(),
+        live: _history,
+      );
       _history.clear();
-      _history.addAll(dbData.reversed);
+      _history.addAll(mergedHistory);
 
       final dbLogs = await dbHelper.getAuditLogs();
       if (dbLogs.isNotEmpty) {
