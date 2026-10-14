@@ -92,10 +92,30 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder compareButton() =>
-      find.widgetWithText(ElevatedButton, 'Compare attempts');
+  Finder compareButton() => find.widgetWithText(
+    ElevatedButton,
+    'Compare attempts',
+    skipOffstage: false,
+  );
+
+  testWidgets('shows guidance when neither scenario has saved attempts', (
+    tester,
+  ) async {
+    await mount(tester);
+
+    expect(find.text('No attempts saved yet'), findsNWidgets(2));
+    expect(find.text('Choose attempts to compare'), findsOneWidget);
+    expect(
+      find.text('Save one attempt from each scenario to unlock comparison.'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('groups saved attempts by scenario', (tester) async {
+    tester.view.physicalSize = const Size(450, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     savedAttempt(AttemptScenario.withoutFiltration, 1);
     savedAttempt(AttemptScenario.withFiltration, 2);
     await mount(tester);
@@ -151,7 +171,7 @@ void main() {
       tester
           .getBottomLeft(
             find.text(
-              'Select one saved attempt from each scenario before comparing.',
+              'Save one attempt from each scenario to unlock comparison.',
             ),
           )
           .dy,
