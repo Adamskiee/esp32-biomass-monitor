@@ -76,14 +76,6 @@ class AppDatabase implements DatabaseProvider {
     await _createAlertsIndex(db);
     await _createAlertStatesTable(db);
     await _createAttemptTables(db);
-    await db.execute('''
-      CREATE TABLE audit_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        action TEXT,
-        user TEXT,
-        timestamp TEXT
-      )
-    ''');
   }
 
   Future<void> _createSensorDataTable(Database db) => db.execute('''

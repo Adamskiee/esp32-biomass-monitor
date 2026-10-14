@@ -13,12 +13,10 @@ class SettingsController extends ChangeNotifier {
   bool _pushNotifications;
   bool _biometricLogin;
   int _pollingInterval;
-  double _mqCalibOffset = 0;
 
   bool get isDarkMode => _isDarkMode;
   bool get pushNotifications => _pushNotifications;
   bool get biometricLogin => _biometricLogin;
-  double get mqCalibOffset => _mqCalibOffset;
   int get pollingInterval => _pollingInterval;
 
   void toggleTheme() {
@@ -36,11 +34,6 @@ class SettingsController extends ChangeNotifier {
   void toggleBiometric(bool value) {
     _biometricLogin = value;
     _prefs.setBool('biometricLogin', value);
-    notifyListeners();
-  }
-
-  void setMqOffset(double value) {
-    _mqCalibOffset = value;
     notifyListeners();
   }
 

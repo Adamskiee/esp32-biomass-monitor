@@ -9,8 +9,6 @@ import 'package:biomass_iot_app/features/alerts/alert_item.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_history_store.dart';
-import 'package:biomass_iot_app/features/safety/audit_log.dart';
-import 'package:biomass_iot_app/features/safety/audit_log_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -92,7 +90,6 @@ void main() {
     );
     final history = SensorHistoryStore(firstDatabase);
     final alerts = AlertsStore(firstDatabase);
-    final auditLogs = AuditLogStore(firstDatabase);
     final timestamp = DateTime.utc(2026, 10, 6, 12);
 
     await history.insertSensorData(
@@ -113,9 +110,6 @@ void main() {
         timestamp: timestamp,
       ),
     );
-    await auditLogs.insertAuditLog(
-      AuditLog('Enabled sprinkler', 'admin', '12:00'),
-    );
     expect(
       (await firstDatabase.database).rawQuery('PRAGMA user_version'),
       completion(contains(isNotEmpty)),
@@ -128,7 +122,6 @@ void main() {
     );
     final reopenedHistory = SensorHistoryStore(reopenedDatabase);
     final reopenedAlerts = AlertsStore(reopenedDatabase);
-    final reopenedAuditLogs = AuditLogStore(reopenedDatabase);
 
     final version = await (await reopenedDatabase.database).rawQuery(
       'PRAGMA user_version',
@@ -137,10 +130,6 @@ void main() {
     expect((await reopenedHistory.getSensorData()).single.chamberTempC, 36.5);
     expect((await reopenedHistory.getSensorData()).single.pm1_0UgM3, isNull);
     expect((await reopenedAlerts.getAlerts()).single.id, 'alert-1');
-    expect(
-      (await reopenedAuditLogs.getAuditLogs()).single.action,
-      'Enabled sprinkler',
-    );
     await reopenedDatabase.close();
   });
 
@@ -230,9 +219,6 @@ void main() {
             await db.execute(
               'CREATE TABLE alerts (id TEXT PRIMARY KEY, title TEXT, description TEXT, severity TEXT, time TEXT)',
             );
-            await db.execute(
-              'CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, user TEXT, timestamp TEXT)',
-            );
           },
         ),
       );
@@ -247,11 +233,6 @@ void main() {
         'severity': 'info',
         'time': DateTime.utc(2026, 10, 8).toIso8601String(),
       });
-      await database.insert('audit_logs', {
-        'action': 'Old action',
-        'user': 'admin',
-        'timestamp': '08:00',
-      });
       await database.close();
     }
 
@@ -265,10 +246,6 @@ void main() {
     expect(await (await appDatabase.database).getVersion(), 6);
     expect((await appHistory.getSensorData()).single.pm2_5UgM3, isNull);
     expect((await AlertsStore(appDatabase).getAlerts()).single.id, 'old-alert');
-    expect(
-      (await AuditLogStore(appDatabase).getAuditLogs()).single.action,
-      'Old action',
-    );
     await appHistory.insertSensorData(
       SensorData(
         pm1_0UgM3: 8,

@@ -37,8 +37,8 @@ flowed. Update the device and app together because older responses omit the
 required field.
 
 The main telemetry view shows no live readings while the ESP32 is disconnected.
-It stores history, alerts, and audit logs locally in `biomass_iot.db` only from
-successful responses. The alert screen first reads the newest 20 alerts, then
+It stores history and alerts locally in `biomass_iot.db` only from successful
+responses. The alert screen first reads the newest 20 alerts, then
 loads another batch when you scroll near the end. Severity filters run in the
 local database before each batch is read, so a long history does not delay the
 screen opening. The displayed total covers the full filtered snapshot; alerts

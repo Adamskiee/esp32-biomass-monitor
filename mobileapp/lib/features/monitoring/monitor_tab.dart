@@ -564,7 +564,3 @@ class _MonitorTabState extends State<MonitorTab> {
     );
   }
 }
-
-// ==========================================
-// TAB 3: CONTROL (NETWORK, AUDIT LOG & CALIBRATION)
-// ==========================================
