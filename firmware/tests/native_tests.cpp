@@ -232,14 +232,10 @@ void testPatchRejectionIsAtomic() {
 
 void resetSafetyState() {
   test_millis = 1000;
+  initSystemState();
   initActuators();
-  threshold_chamber_temp_c = 80.0f;
-  threshold_mq2_v = 2.5f;
-  current_chamber_c = 25.0f;
-  current_mq2_v = 0.5f;
-  manual_sprinkler = false;
-  catastrophic_latch = false;
-  processSensorReadings(25.0f, 25.0f, 0.5f, 0.5f, false);
+  recordPmsReading(PmsReading{0, 0, 0}, test_millis);
+  processSensorReadings(25.0f, 25.0f, 0.5f, 0.5f, false, 50.0f);
   initActuators();
 }
 
@@ -329,7 +325,7 @@ void testLedFollowsLatchedTemperatureDanger() {
 void testProcessingSensorReadingsEvaluatesSafety() {
   const char *name = "processing sensor readings evaluates safety";
   resetSafetyState();
-  processSensorReadings(28.0f, 85.0f, 1.2f, 0.5f);
+  processSensorReadings(28.0f, 85.0f, 1.2f, 0.5f, false, 50.0f);
   EXPECT_TRUE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
@@ -382,15 +378,15 @@ void testMqWarmupCountsDownForFiveMinutes() {
 void testMq2DangerIsIgnoredWhileSensorsWarmUp() {
   const char *name = "MQ2 danger is ignored while sensors warm up";
   resetSafetyState();
-  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, true);
+  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, true, 50.0f);
   EXPECT_TRUE(name, mqSensorsAreWarmingUp());
   EXPECT_TRUE(name, std::isnan(current_mq2_v));
   EXPECT_TRUE(name, active_triggers_json == "[]");
 
-  processSensorReadings(28.0f, 25.0f, 1.2f, NAN, true);
+  processSensorReadings(28.0f, 25.0f, 1.2f, NAN, true, 50.0f);
   EXPECT_TRUE(name, active_triggers_json == "[]");
 
-  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, false);
+  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, false, 50.0f);
   EXPECT_FALSE(name, mqSensorsAreWarmingUp());
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
 }
@@ -431,13 +427,40 @@ void testMq2SafeRangeDoesNotTriggerGasDanger() {
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
-void testMq2DangerStartsAtFixedThreshold() {
-  const char *name = "MQ2 danger starts at fixed threshold";
+void testMq2DangerStartsAtConfiguredThreshold() {
+  const char *name = "MQ2 danger starts at configured threshold";
   resetSafetyState();
-  threshold_mq2_v = 3.0f;
+  safety_thresholds.values[1] = 3.0f;
   current_mq2_v = 2.5f;
   evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  current_mq2_v = 3.0f;
+  evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  current_mq2_v = 2.9f;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  current_mq2_v = 2.85f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testEnvironmentalFaultRecovery() {
+  const char *name = "environmental fault recovery";
+  resetSafetyState();
+  current_temp_c = INFINITY;
+  current_mq135_v = NAN;
+  resetPmsReadingCache();
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "ambient_temp_sensor_fault");
+  EXPECT_CONTAINS(name, active_triggers_json, "mq135_sensor_fault");
+  EXPECT_CONTAINS(name, active_triggers_json, "pms_sensor_fault");
+  EXPECT_FALSE(name, current_pump_state);
+  current_temp_c = 25.0f;
+  current_mq135_v = 0.5f;
+  recordPmsReading(PmsReading{0, 0, 0}, test_millis);
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
 void testMq2RailShortIsReportedAsFault() {
@@ -541,7 +564,7 @@ void testManualSprinklerUsesCoordinator() {
 void testTemperatureDangerUsesCoordinator() {
   const char *name = "temperature danger uses coordinator";
   resetSafetyState();
-  current_chamber_c = threshold_chamber_temp_c;
+  current_chamber_c = safety_thresholds.values[0];
   evaluateSafetyLoop();
   EXPECT_TRUE(name, current_pump_state);
 }
@@ -563,10 +586,10 @@ void testCatastrophicLatchKeepsPumpRequested() {
 void testBuzzerUsesActiveLowRelay() {
   const char *name = "buzzer uses active-low relay";
   resetSafetyState();
-  current_chamber_c = threshold_chamber_temp_c;
+  current_chamber_c = safety_thresholds.values[0];
   evaluateSafetyLoop();
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_BUZZER] == RELAY_OFF);
-  current_chamber_c = threshold_chamber_temp_c + 0.1f;
+  current_chamber_c = safety_thresholds.values[0] + 0.1f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_BUZZER] == RELAY_ON);
 }
@@ -577,8 +600,8 @@ void testInvalidThresholdUpdateIsTransactional() {
   state_needs_save = false;
   const auto result = applyThresholdUpdate(true, 1000.0f, true, 1.5f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Invalid);
-  EXPECT_TRUE(name, threshold_chamber_temp_c == 80.0f);
-  EXPECT_TRUE(name, threshold_mq2_v == 2.5f);
+  EXPECT_TRUE(name, safety_thresholds.values[0] == 80.0f);
+  EXPECT_TRUE(name, safety_thresholds.values[1] == 2.5f);
   EXPECT_FALSE(name, state_needs_save);
 }
 
@@ -588,8 +611,8 @@ void testValidThresholdUpdateChangesRequestedFields() {
   state_needs_save = false;
   const auto result = applyThresholdUpdate(true, 120.0f, false, 0.0f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Accepted);
-  EXPECT_TRUE(name, threshold_chamber_temp_c == 120.0f);
-  EXPECT_TRUE(name, threshold_mq2_v == 2.5f);
+  EXPECT_TRUE(name, safety_thresholds.values[0] == 120.0f);
+  EXPECT_TRUE(name, safety_thresholds.values[1] == 2.5f);
   EXPECT_TRUE(name, state_needs_save);
 }
 
@@ -650,6 +673,312 @@ void testPmsDoesNotAffectSafety() {
   EXPECT_FALSE(name, current_pump_state);
 }
 
+void configureHumidity(const char *name, float minimum, float maximum) {
+  auto patch = patchFor(ThresholdField::HumidityMin, minimum);
+  patch.fields |= 1u << 8;
+  patch.values.values[8] = maximum;
+  EXPECT_TRUE(name, applyThresholdUpdate(patch) == ThresholdUpdateResult::Accepted);
+}
+
+void testConfiguredUpperLimits() {
+  struct Case {
+    ThresholdField field;
+    const char *trigger;
+    float limit;
+    float below;
+    float recovering;
+    float recovered;
+  };
+  const Case cases[] = {
+      {ThresholdField::Chamber, "high_chamber_temp", 80, 79, 77, 76},
+      {ThresholdField::Mq2, "high_mq2_gas", 3, 2.99f, 2.9f, 2.85f},
+      {ThresholdField::Mq135, "high_mq135_gas", 3, 2.99f, 2.9f, 2.85f},
+      {ThresholdField::Ambient, "high_ambient_temp", 40, 39, 39, 38},
+      {ThresholdField::Ambient, "high_ambient_temp", -10, -10.1f, -10.25f, -10.5f},
+      {ThresholdField::Ambient, "high_ambient_temp", 0, -0.1f, -0.25f, -0.5f},
+      {ThresholdField::Pm1, "high_pm1_0", 100, 99, 96, 95},
+      {ThresholdField::Pm25, "high_pm2_5", 100, 99, 96, 95},
+      {ThresholdField::Pm10, "high_pm10", 100, 99, 96, 95}};
+  for (const auto &c : cases) {
+    const char *name = c.trigger;
+    resetSafetyState();
+    auto reading = [&](float value) {
+      if (c.field == ThresholdField::Chamber) current_chamber_c = value;
+      if (c.field == ThresholdField::Mq2) current_mq2_v = value;
+      if (c.field == ThresholdField::Mq135) current_mq135_v = value;
+      if (c.field == ThresholdField::Ambient) current_temp_c = value;
+      PmsReading pm{};
+      if (c.field == ThresholdField::Pm1) pm.pm1_0_ug_m3 = value;
+      if (c.field == ThresholdField::Pm25) pm.pm2_5_ug_m3 = value;
+      if (c.field == ThresholdField::Pm10) pm.pm10_ug_m3 = value;
+      recordPmsReading(pm, test_millis);
+      evaluateSafetyLoop();
+    };
+    reading(c.below);
+    EXPECT_TRUE(name, applyThresholdUpdate(patchFor(c.field, c.limit)) ==
+                          ThresholdUpdateResult::Accepted);
+    EXPECT_TRUE(name, active_triggers_json.find(c.trigger) == String::npos);
+    reading(c.limit);
+    EXPECT_CONTAINS(name, active_triggers_json, c.trigger);
+    EXPECT_TRUE(name, current_pump_state == (c.field == ThresholdField::Chamber));
+    reading(c.recovering);
+    EXPECT_CONTAINS(name, active_triggers_json, c.trigger);
+    reading(c.recovered);
+    EXPECT_TRUE(name, active_triggers_json.find(c.trigger) == String::npos);
+    EXPECT_FALSE(name, current_pump_state);
+  }
+}
+
+void testHumidityRecovery() {
+  const char *name = "humidity recovery";
+  resetSafetyState();
+  configureHumidity(name, 30, 70);
+  for (float boundary : {30.0f, 70.0f}) {
+    processSensorReadings(25, 25, 0.5f, 0.5f, false, boundary);
+    EXPECT_TRUE(name, active_triggers_json == "[]");
+  }
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 29);
+  EXPECT_CONTAINS(name, active_triggers_json, "low_humidity");
+  EXPECT_FALSE(name, current_pump_state);
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 31.9f);
+  EXPECT_CONTAINS(name, active_triggers_json, "low_humidity");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 32);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 71);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_humidity");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 68.1f);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_humidity");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 68);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 29);
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 71);
+  EXPECT_TRUE(name, active_triggers_json == "[\"high_humidity\"]");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 29);
+  EXPECT_TRUE(name, active_triggers_json == "[\"low_humidity\"]");
+  configureHumidity(name, 30, 31);
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 30.24f);
+  EXPECT_CONTAINS(name, active_triggers_json, "low_humidity");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 30.25f);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 32);
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 30.76f);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_humidity");
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 30.75f);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testEnvironmentalInvalidReadings() {
+  const char *name = "environmental invalid readings";
+  resetSafetyState();
+  for (float value : {NAN, INFINITY, -INFINITY}) {
+    processSensorReadings(value, value, value, value, false, value);
+    for (const char *fault : {"temp_sensor_fault", "mq2_sensor_fault",
+                              "mq135_sensor_fault", "ambient_temp_sensor_fault",
+                              "humidity_sensor_fault"}) {
+      EXPECT_CONTAINS(name, active_triggers_json, fault);
+    }
+    EXPECT_FALSE(name, current_pump_state);
+    EXPECT_FALSE(name, catastrophic_latch);
+    processSensorReadings(25, 25, 0.5f, 0.5f, false, 50);
+    EXPECT_TRUE(name, active_triggers_json == "[]");
+  }
+  for (float value : {-40.1f, 80.1f}) {
+    processSensorReadings(value, 25, 0.5f, 0.5f, false, 50);
+    EXPECT_TRUE(name, active_triggers_json == "[\"ambient_temp_sensor_fault\"]");
+  }
+  for (float value : {-40.0f, 80.0f}) {
+    processSensorReadings(value, 25, 0.5f, 0.5f, false, 50);
+    EXPECT_TRUE(name, active_triggers_json == "[]");
+  }
+  for (float value : {-0.1f, 100.1f}) {
+    processSensorReadings(25, 25, 0.5f, 0.5f, false, value);
+    EXPECT_TRUE(name, active_triggers_json == "[\"humidity_sensor_fault\"]");
+  }
+  for (float value : {0.0f, 100.0f}) {
+    processSensorReadings(25, 25, 0.5f, 0.5f, false, value);
+    EXPECT_TRUE(name, active_triggers_json == "[]");
+  }
+}
+
+void testEnvironmentalLatchesClearOnFault() {
+  const char *name = "environmental latches clear on fault";
+  resetSafetyState();
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
+                        ThresholdUpdateResult::Accepted);
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Ambient, 40)) ==
+                        ThresholdUpdateResult::Accepted);
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Pm1, 100)) ==
+                        ThresholdUpdateResult::Accepted);
+  configureHumidity(name, 30, 70);
+  recordPmsReading(PmsReading{100, 0, 0}, test_millis);
+  processSensorReadings(40, 25, 3, 0.5f, false, 29);
+  for (const char *trigger : {"high_mq135_gas", "high_ambient_temp",
+                              "high_pm1_0", "low_humidity"}) {
+    EXPECT_CONTAINS(name, active_triggers_json, trigger);
+  }
+  resetPmsReadingCache();
+  processSensorReadings(NAN, 25, NAN, 0.5f, false, NAN);
+  for (const char *trigger : {"high_mq135_gas", "high_ambient_temp",
+                              "high_pm1_0", "low_humidity"}) {
+    EXPECT_TRUE(name, active_triggers_json.find(trigger) == String::npos);
+  }
+  recordPmsReading(PmsReading{96, 0, 0}, test_millis);
+  processSensorReadings(39, 25, 2.9f, 0.5f, false, 31);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testChangedLimitsReevaluateValidReadings() {
+  const char *name = "changed limits reevaluate valid readings";
+  resetSafetyState();
+  processSensorReadings(40, 80, 3, 3, false, 29);
+  recordPmsReading(PmsReading{100, 100, 100}, test_millis);
+  ThresholdPatch limits{defaultSafetyThresholds(), 0x1ff};
+  limits.values.values = {80, 3, 3, 40, 100, 100, 100, 30, 70};
+  EXPECT_TRUE(name, applyThresholdUpdate(limits) == ThresholdUpdateResult::Accepted);
+  for (const char *trigger : {"high_chamber_temp", "high_mq2_gas",
+                              "high_mq135_gas", "high_ambient_temp", "high_pm1_0",
+                              "high_pm2_5", "high_pm10", "low_humidity"}) {
+    EXPECT_CONTAINS(name, active_triggers_json, trigger);
+  }
+  SafetyThresholds accepted{};
+  limits.values.values = {81, 3.01f, 3.01f, 41, 101, 101, 101, 28, 70};
+  EXPECT_TRUE(name, applyThresholdUpdate(limits, &accepted) ==
+                        ThresholdUpdateResult::Accepted);
+  EXPECT_TRUE(name, accepted.values == limits.values.values);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_FALSE(name, current_pump_state);
+  limits.values.values[0] = 80;
+  EXPECT_TRUE(name, applyThresholdUpdate(limits) == ThresholdUpdateResult::Accepted);
+  processSensorReadings(25, INFINITY, 0.5f, 0.5f, false, 50);
+  limits.values.values[0] = 150;
+  EXPECT_TRUE(name, applyThresholdUpdate(limits) == ThresholdUpdateResult::Accepted);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
+  EXPECT_CONTAINS(name, active_triggers_json, "catastrophic_latch");
+  EXPECT_TRUE(name, catastrophic_latch && current_pump_state);
+  EXPECT_TRUE(name, applyManualSprinklerCommand(false) ==
+                        ManualSprinklerResult::SafetyOverride);
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 50);
+  EXPECT_TRUE(name, catastrophic_latch && current_pump_state);
+}
+
+void testSimultaneousEnvironmentalAlertsKeepManualPumpUsable() {
+  const char *name = "simultaneous environmental alerts keep manual pump usable";
+  resetSafetyState();
+  ThresholdPatch limits{defaultSafetyThresholds(), 0x1ff};
+  limits.values.values = {80, 3, 3, 40, 100, 100, 100, 30, 70};
+  EXPECT_TRUE(name, applyThresholdUpdate(limits) == ThresholdUpdateResult::Accepted);
+  recordPmsReading(PmsReading{100, 100, 100}, test_millis);
+  processSensorReadings(40, 25, 3, 3, false, 29);
+  for (const char *trigger : {"high_mq2_gas", "high_mq135_gas",
+                              "high_ambient_temp", "high_pm1_0", "high_pm2_5",
+                              "high_pm10", "low_humidity"}) {
+    EXPECT_CONTAINS(name, active_triggers_json, trigger);
+  }
+  EXPECT_FALSE(name, current_pump_state);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_OFF);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_BUZZER] == RELAY_OFF);
+  EXPECT_TRUE(name, applyManualSprinklerCommand(true) ==
+                        ManualSprinklerResult::Accepted);
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, current_pump_state && manual_sprinkler);
+  EXPECT_TRUE(name, applyManualSprinklerCommand(false) ==
+                        ManualSprinklerResult::Accepted);
+  EXPECT_FALSE(name, current_pump_state);
+}
+
+void testWarmupSuppressesBothMqConditions() {
+  const char *name = "warmup suppresses both MQ conditions";
+  resetSafetyState();
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
+                        ThresholdUpdateResult::Accepted);
+  processSensorReadings(25, 25, 3, 3, false, 50);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq135_gas");
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  for (float value : {3.0f, NAN, INFINITY}) {
+    processSensorReadings(25, 25, value, value, true, 50);
+    EXPECT_TRUE(name, active_triggers_json == "[]");
+    EXPECT_TRUE(name, std::isnan(current_mq135_v) && std::isnan(current_mq2_v));
+  }
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Ambient, 40)) ==
+                        ThresholdUpdateResult::Accepted);
+  processSensorReadings(40, 80, NAN, NAN, true, 50);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
+  EXPECT_CONTAINS(name, active_triggers_json, "high_ambient_temp");
+  EXPECT_TRUE(name, active_triggers_json.find("mq") == String::npos);
+  EXPECT_TRUE(name, current_pump_state);
+  processSensorReadings(25, 25, 2.4f, 2.4f, false, 50);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+}
+
+void testPmsFaultEvaluationAndRollover() {
+  const char *name = "PMS fault evaluation and rollover";
+  resetSafetyState();
+  resetPmsReadingCache();
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[\"pms_sensor_fault\"]");
+  recordPmsReading(PmsReading{0, 0, 0}, test_millis);
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  test_millis += 10000;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  ++test_millis;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[\"pms_sensor_fault\"]");
+  test_millis = UINT32_MAX - 5000;
+  recordPmsReading(PmsReading{0, 0, 0}, test_millis);
+  test_millis += 10000;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  ++test_millis;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[\"pms_sensor_fault\"]");
+}
+
+void testMq2FaultPreservesLatchAndRailPriority() {
+  const char *name = "MQ2 fault preserves latch and rail priority";
+  resetSafetyState();
+  current_mq2_v = 3;
+  evaluateSafetyLoop();
+  current_mq2_v = NAN;
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq2, 4)) ==
+                        ThresholdUpdateResult::Accepted);
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
+  current_mq2_v = 3.9f;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  current_mq2_v = 3.8f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq2, 5)) ==
+                        ThresholdUpdateResult::Accepted);
+  current_mq2_v = 5;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[\"mq2_sensor_fault\"]");
+  EXPECT_FALSE(name, current_pump_state);
+}
+
+void testInitResetsEveryConditionAndCache() {
+  const char *name = "init resets every condition and cache";
+  resetSafetyState();
+  current_chamber_c = 100;
+  evaluateSafetyLoop();
+  current_chamber_c = NAN;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, catastrophic_latch);
+  initSystemState();
+  EXPECT_FALSE(name, catastrophic_latch || manual_sprinkler || state_needs_save);
+  EXPECT_TRUE(name, std::isnan(current_humidity_percent));
+  PmsReading sample{};
+  EXPECT_FALSE(name, copyFreshPmsReadingLocked(test_millis, sample));
+  recordPmsReading(PmsReading{0, 0, 0}, test_millis);
+  processSensorReadings(25, 25, 0.5f, 0.5f, false, 50);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_FALSE(name, current_pump_state);
+}
+
 void run(const char *name, const std::function<void()> &test) {
   ++test_count;
   const int failures_before = failure_count;
@@ -672,6 +1001,19 @@ void digitalWrite(uint8_t pin, uint8_t level) {
 }
 
 int main() {
+  run("configured upper limits", testConfiguredUpperLimits);
+  run("humidity recovery", testHumidityRecovery);
+  run("environmental invalid readings", testEnvironmentalInvalidReadings);
+  run("environmental latches clear on fault", testEnvironmentalLatchesClearOnFault);
+  run("changed limits reevaluate valid readings",
+      testChangedLimitsReevaluateValidReadings);
+  run("simultaneous environmental alerts keep manual pump usable",
+      testSimultaneousEnvironmentalAlertsKeepManualPumpUsable);
+  run("warmup suppresses both MQ conditions", testWarmupSuppressesBothMqConditions);
+  run("PMS fault evaluation and rollover", testPmsFaultEvaluationAndRollover);
+  run("MQ2 fault preserves latch and rail priority",
+      testMq2FaultPreservesLatchAndRailPriority);
+  run("init resets every condition and cache", testInitResetsEveryConditionAndCache);
   run("threshold defaults", testThresholdDefaults);
   run("threshold ranges", testThresholdRanges);
   run("humidity pair validation", testHumidityPairValidation);
@@ -699,8 +1041,9 @@ int main() {
   run("MQ2 zero volts is normal", testMq2ZeroVoltsIsNormal);
   run("MQ2 safe range does not trigger gas danger",
       testMq2SafeRangeDoesNotTriggerGasDanger);
-  run("MQ2 danger starts at fixed threshold",
-      testMq2DangerStartsAtFixedThreshold);
+  run("MQ2 danger starts at configured threshold",
+      testMq2DangerStartsAtConfiguredThreshold);
+  run("environmental fault recovery", testEnvironmentalFaultRecovery);
   run("MQ2 rail short is reported as fault", testMq2RailShortIsReportedAsFault);
   run("MQ2 NaN is reported as fault", testMq2NanIsReportedAsFault);
   run("temperature fault allows manual sprinkler",

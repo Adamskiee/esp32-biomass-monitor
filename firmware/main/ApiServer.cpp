@@ -71,8 +71,8 @@ void initApiServer() {
       doc["pm2_5_ug_m3"] = nullptr;
       doc["pm10_ug_m3"] = nullptr;
     }
-    doc["threshold_chamber_temp_c"] = threshold_chamber_temp_c;
-    doc["threshold_mq2_v"] = threshold_mq2_v;
+    doc["threshold_chamber_temp_c"] = safety_thresholds.values[0];
+    doc["threshold_mq2_v"] = safety_thresholds.values[1];
     doc["pump_on"] = current_pump_state;
     doc["manual_sprinkler"] = manual_sprinkler;
     deserializeJson(doc["active_triggers"], active_triggers_json);
@@ -189,8 +189,8 @@ void initApiServer() {
 
               JsonDocument doc;
               if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5))) {
-                doc["threshold_chamber_temp_c"] = threshold_chamber_temp_c;
-                doc["threshold_mq2_v"] = threshold_mq2_v;
+                doc["threshold_chamber_temp_c"] = safety_thresholds.values[0];
+                doc["threshold_mq2_v"] = safety_thresholds.values[1];
                 xSemaphoreGive(stateMutex);
 
                 AsyncResponseStream *response =

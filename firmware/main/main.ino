@@ -31,6 +31,7 @@ void loop() {
     float t_mq135 = readMQ135Voltage();
     float t_mq2 = readMQ2Voltage();
     float t_temp = readTemperature();
+    float t_humidity = readHumidity();
     float t_chamber = readThermocouple();
 
     char tempStr[16];
@@ -48,13 +49,12 @@ void loop() {
     static float safe_mq2_limit = 2.5;
 
     const bool mq_sensors_warming_up = mqWarmupRemainingSeconds(now) > 0;
-    processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2,
-                          mq_sensors_warming_up);
-
     PmsReading pms_reading{};
     if (readPmsReading(pms_reading)) {
       recordPmsReading(pms_reading, millis());
     }
+    processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2,
+                          mq_sensors_warming_up, t_humidity);
 
     // Grab safe copies for persistence without holding the mutex during flash
     // writes
@@ -67,8 +67,8 @@ void loop() {
         last_save = millis();     // Optimistically update
       }
 
-      safe_chamber_limit = threshold_chamber_temp_c;
-      safe_mq2_limit = threshold_mq2_v;
+      safe_chamber_limit = safety_thresholds.values[0];
+      safe_mq2_limit = safety_thresholds.values[1];
       xSemaphoreGive(stateMutex);
     }
 

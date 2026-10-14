@@ -1,5 +1,6 @@
 #pragma once
 #include "PmsReading.h"
+#include "SafetyThresholds.h"
 #ifdef ARDUINO
 #include <Arduino.h>
 #include <Preferences.h>
@@ -16,14 +17,13 @@ inline void xSemaphoreTake(SemaphoreHandle_t, uint32_t) {}
 inline void xSemaphoreGive(SemaphoreHandle_t) {}
 #endif
 
-// Thresholds
-extern float threshold_chamber_temp_c;
-extern float threshold_mq2_v;
+extern SafetyThresholds safety_thresholds;
 // Cached Sensor Readings (API reads these instead of blocking)
 extern float current_temp_c;
 extern float current_chamber_c;
 extern float current_mq135_v;
 extern float current_mq2_v;
+extern float current_humidity_percent;
 
 extern bool state_needs_save;
 extern SemaphoreHandle_t stateMutex;
@@ -47,9 +47,12 @@ enum class ManualSprinklerResult {
 ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit, float mq2_limit);
+ThresholdUpdateResult applyThresholdUpdate(const ThresholdPatch &patch,
+                                           SafetyThresholds *accepted = nullptr);
 ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
 void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
-                           float mq2_v, bool mq_sensors_warming_up = false);
+                           float mq2_v, bool mq_sensors_warming_up = false,
+                           float humidity_percent = NAN);
 void startMqWarmup(uint32_t now_ms);
 uint32_t mqWarmupRemainingSeconds(uint32_t now_ms);
 bool mqSensorsAreWarmingUp();
