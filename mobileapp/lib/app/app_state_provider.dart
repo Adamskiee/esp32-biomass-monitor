@@ -15,7 +15,6 @@ import '../features/alerts/alerts_store.dart';
 import '../features/authentication/device_address_store.dart';
 import '../features/monitoring/sensor_data.dart';
 import '../features/monitoring/telemetry_source.dart';
-import '../features/safety/audit_log.dart';
 
 List<SensorData> mergeSensorHistory({
   required List<SensorData> persisted,
@@ -48,9 +47,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   SensorData _currentData = SensorData(timestamp: DateTime.now());
   final List<SensorData> _history = [];
   int _telemetryRevision = 0;
-  final List<AuditLog> _auditLogs = [
-    AuditLog("System Initialized", "SYSTEM", "08:00 AM"),
-  ];
   Timer? _pollingTimer;
 
   AppStateProvider(
@@ -87,7 +83,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
 
   List<AlertItem> get alerts => _alertsController?.alerts ?? const [];
   int get alertCount => _alertsController?.totalAlerts ?? 0;
-  List<AuditLog> get auditLogs => _auditLogs;
 
   Map<String, String> getSessionAnalytics() {
     if (_history.isEmpty) {
@@ -167,12 +162,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       );
       _history.clear();
       _history.addAll(mergedHistory);
-
-      final dbLogs = await dbHelper.getAuditLogs();
-      if (dbLogs.isNotEmpty) {
-        _auditLogs.clear();
-        _auditLogs.addAll(dbLogs);
-      }
 
       notifyListeners();
     } catch (error) {

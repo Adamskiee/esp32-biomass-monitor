@@ -9,7 +9,6 @@ abstract final class DatabaseSchema {
   static Future<void> create(Database db, int version) async {
     await _createSensorDataTable(db);
     await _createAlertsTable(db);
-    await _createAuditLogsTable(db);
     await _createAttemptTables(db);
   }
 
@@ -55,15 +54,6 @@ abstract final class DatabaseSchema {
       description TEXT,
       severity TEXT,
       time TEXT
-    )
-  ''');
-
-  static Future<void> _createAuditLogsTable(Database db) => db.execute('''
-    CREATE TABLE audit_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      action TEXT,
-      user TEXT,
-      timestamp TEXT
     )
   ''');
 

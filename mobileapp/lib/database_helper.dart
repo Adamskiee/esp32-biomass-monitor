@@ -6,7 +6,6 @@ import 'core/storage/database_provider.dart';
 
 import 'features/alerts/alert_item.dart';
 import 'features/monitoring/sensor_data.dart';
-import 'features/safety/audit_log.dart';
 
 class DatabaseHelper implements DatabaseProvider {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -181,32 +180,5 @@ class DatabaseHelper implements DatabaseProvider {
     );
     if (rows.isEmpty) return 0;
     return (rows.single['alert_count'] as num).toInt();
-  }
-
-  // --- Audit Logs CRUD ---
-  Future<int> insertAuditLog(AuditLog log) async {
-    if (kIsWeb) return 0;
-    Database db = await database;
-    return await db.insert('audit_logs', {
-      'action': log.action,
-      'user': log.user,
-      'timestamp': log.timestamp,
-    });
-  }
-
-  Future<List<AuditLog>> getAuditLogs() async {
-    if (kIsWeb) return [];
-    Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query(
-      'audit_logs',
-      orderBy: 'id DESC',
-    );
-    return List.generate(maps.length, (i) {
-      return AuditLog(
-        maps[i]['action'] as String,
-        maps[i]['user'] as String,
-        maps[i]['timestamp'] as String,
-      );
-    });
   }
 }
