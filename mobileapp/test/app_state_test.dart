@@ -161,11 +161,22 @@ void main() {
           200,
         ),
       );
-      final state = AppStateProvider(prefs, client: client);
+      final directory = await Directory.systemTemp.createTemp(
+        'app-state-analytics-',
+      );
+      final database = AppDatabase(
+        databaseFactory: databaseFactoryFfi,
+        databasePath: '${directory.path}/biomass_iot.db',
+      );
+      final state = AppStateProvider(
+        prefs,
+        client: client,
+        alertsController: AlertsController(AlertsStore(database)),
+      );
       await state.saveDeviceIp('192.168.1.42');
       expect(await state.login('operator', 'secret'), isTrue);
 
-      await Future<void>.delayed(const Duration(seconds: 2));
+      await state.pollOnce();
 
       expect(
         state.getSessionAnalytics(),
@@ -176,6 +187,8 @@ void main() {
 
       state.dispose();
       client.close();
+      await database.close();
+      await directory.delete(recursive: true);
     },
   );
 }
