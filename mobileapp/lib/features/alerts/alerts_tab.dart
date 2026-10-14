@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
+import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
 import 'package:flutter/cupertino.dart';
@@ -226,17 +227,9 @@ class _AlertsTabState extends State<AlertsTab> {
                             );
                           }
                           final alert = alerts[i];
-                          Color color = alert.severity == 'critical'
-                              ? AppTheme.neonRed
-                              : (alert.severity == 'warning'
-                                    ? AppTheme.neonOrange
-                                    : AppTheme.neonBlue);
-                          IconData icon = alert.severity == 'critical'
-                              ? CupertinoIcons.exclamationmark_octagon_fill
-                              : (alert.severity == 'warning'
-                                    ? CupertinoIcons
-                                          .exclamationmark_triangle_fill
-                                    : CupertinoIcons.info_circle_fill);
+                          final presentation = alertPresentationForSeverity(
+                            alert.severity,
+                          );
 
                           return Dismissible(
                             key: Key(alert.id),
@@ -272,10 +265,16 @@ class _AlertsTabState extends State<AlertsTab> {
                                     Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: color.withValues(alpha: 0.15),
+                                        color: presentation.color.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(icon, color: color, size: 24),
+                                      child: Icon(
+                                        presentation.icon,
+                                        color: presentation.color,
+                                        size: 24,
+                                      ),
                                     ),
                                     const SizedBox(width: 20),
                                     Expanded(
@@ -291,7 +290,7 @@ class _AlertsTabState extends State<AlertsTab> {
                                                 child: Text(
                                                   alert.title,
                                                   style: TextStyle(
-                                                    color: color,
+                                                    color: presentation.color,
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 15,
                                                   ),

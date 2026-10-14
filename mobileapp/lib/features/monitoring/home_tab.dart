@@ -3,6 +3,7 @@ import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/database_helper.dart';
+import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
@@ -361,41 +362,40 @@ class _HomeTabState extends State<HomeTab> {
                   ],
                 ),
                 if (state.alerts.isNotEmpty)
-                  ...state.alerts
-                      .take(2)
-                      .map(
-                        (a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            tileColor: theme.cardColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: theme.dividerColor),
-                            ),
-                            leading: Icon(
-                              CupertinoIcons.exclamationmark_triangle_fill,
-                              color: a.severity == 'critical'
-                                  ? AppTheme.neonRed
-                                  : AppTheme.neonOrange,
-                            ),
-                            title: Text(
-                              a.title,
-                              style: TextStyle(
-                                color: theme.textTheme.bodyLarge?.color,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              formatAlertTimestamp(a.timestamp),
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
+                  ...state.alerts.take(2).map((a) {
+                    final presentation = alertPresentationForSeverity(
+                      a.severity,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        tileColor: theme.cardColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: theme.dividerColor),
+                        ),
+                        leading: Icon(
+                          presentation.icon,
+                          color: presentation.color,
+                        ),
+                        title: Text(
+                          a.title,
+                          style: TextStyle(
+                            color: theme.textTheme.bodyLarge?.color,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          formatAlertTimestamp(a.timestamp),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
                           ),
                         ),
                       ),
+                    );
+                  }),
               ],
             ),
           ),

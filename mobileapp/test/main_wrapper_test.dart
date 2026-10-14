@@ -5,8 +5,10 @@ import 'package:biomass_iot_app/app/app_shell.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
+import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -260,6 +262,28 @@ void main() {
     expect(find.text('Temperature'), findsOneWidget);
     expect(find.text('Gas Sensors'), findsOneWidget);
     expect(find.text('Particulate Matter'), findsOneWidget);
+    await dispose(tester);
+  });
+
+  testWidgets('Home shows the critical alert icon for gas hazards', (
+    tester,
+  ) async {
+    await initialize(tester);
+    await state.alertsController.recordTriggers(
+      SensorData(timestamp: DateTime.now(), mq2V: 1.25),
+      ['high_mq2_gas'],
+    );
+    await mount(tester);
+
+    expect(
+      find.byIcon(CupertinoIcons.exclamationmark_octagon_fill),
+      findsOneWidget,
+    );
+    expect(
+      find.byIcon(CupertinoIcons.exclamationmark_triangle_fill),
+      findsNothing,
+    );
+
     await dispose(tester);
   });
 
