@@ -37,13 +37,27 @@ password.
 The API and Pump Status indicator report commanded relay outputs. They do not
 confirm that the pump ran or water flowed.
 
+## How do I configure safety limits?
+
+Open Control > Biomass Monitor Safety Dashboard before first use. Configure
+chamber temperature, MQ-2, MQ-135, ambient temperature, PM1.0, PM2.5, PM10,
+and both humidity boundaries. These are operator settings, not exposure
+standards or calibrated measurements. Changes apply immediately and are saved
+to flash no more than once per minute.
+
+Only chamber temperature owns automatic sprinkler and buzzer behavior. Gas,
+ambient, particulate, and humidity conditions add device triggers and app
+history entries without taking pump ownership. The device evaluates conditions
+without the app, but app alerts require a connected running app. There are no
+push notifications or device-side alert history.
+
 ## What should I check during operation?
 
 - A green LED indicates the current readings are safe. The LED starts yellow
   until the first poll.
 - MQ-135 and MQ-2 heaters warm up for five minutes after every ESP32 restart.
   During this interval, the app displays a countdown and the firmware does not
-  issue MQ2 gas or MQ2 sensor-fault triggers.
+  issue MQ gas or MQ sensor-fault triggers.
 - A red LED indicates chamber temperature at or above its configured limit.
   It also means the sprinkler has opened automatically. An MQ2 gas alert does
   not change the green LED or open the sprinkler. Check `active_triggers` and

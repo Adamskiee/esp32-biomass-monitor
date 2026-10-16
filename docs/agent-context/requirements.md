@@ -25,7 +25,7 @@ The system operates on a continuous, non-blocking evaluation loop.
 
 *   **Polling Interval:** Hardware sensors are read every `POLL_INTERVAL_MS`.
 *   **Concurrency & Data Access:** Hardware readings are safely cached into global state variables, protected by a FreeRTOS mutex (`stateMutex`). This allows the API server to serve data to the visualization dashboard rapidly without blocking the hardware control loop.
-*   **Threshold Persistence:** Dynamic safety limits (`safe_chamber_limit`, `safe_mq2_limit`) can be updated. To prevent flash memory wear, changes to these thresholds are saved to Non-Volatile Storage (NVS) with a hard rate limit of at most once every 60 seconds.
+*   **Threshold Persistence:** Nine limits cover chamber temperature, MQ-2, MQ-135, ambient temperature, PM1.0, PM2.5, PM10, and humidity minimum/maximum. New optional limits begin unset; chamber and MQ-2 default to 80 C and 2.5 V. The validated record is saved atomically to NVS at most once every 60 seconds.
 *   **Attempt recording:** The mobile app may record one connected local attempt at a time as with or without filtration. It persists readings locally and presents descriptive comparisons without a success verdict.
 
 ## 4. Safety Rules & Automation Logic
@@ -47,10 +47,12 @@ If the thermocouple fails while temperature danger is active, the system sets
 a catastrophic fire latch. The sprinkler remains on until the ESP32 restarts;
 remote manual commands cannot clear this latch.
 
-### 4.2 Gas Alert State
-The system reports an active gas alert when MQ2 voltage reaches 2.5 V. The
-alert clears when voltage falls to or below 2.375 V. Gas alerts do not
-automatically open the water sprinkler or change the green status LED.
+### 4.2 Configured environmental alerts
+Upper limits activate at equality and humidity activates strictly outside its
+configured range. Chamber, MQ-2, MQ-135, ambient, particulate, and humidity
+conditions add named triggers and app alerts. Only chamber temperature opens
+the sprinkler or activates the buzzer; other alerts do not change pump or LED
+ownership.
 
 ### 4.3 Hardware Fault State
 The system enters a hardware fault state if **ANY** of the following conditions are met, ensuring fail-safe filtration:
