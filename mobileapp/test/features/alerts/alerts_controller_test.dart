@@ -153,6 +153,115 @@ void main() {
     },
   );
 
+  test('does not record MQ sensor faults while the sensors warm up', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final controller = AlertsController(AlertsStore(database));
+    final warmupReading = SensorData.fromJson({
+      'mq135_v': null,
+      'mq2_v': null,
+      'mq_warming_up': true,
+      'mq_warmup_remaining_seconds': 300,
+    });
+
+    await controller.recordTriggers(warmupReading, []);
+
+    expect(controller.alerts, isEmpty);
+    await database.close();
+    await directory.delete(recursive: true);
+  });
+
+  test('retains active MQ sensor faults while the sensors warm up', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final controller = AlertsController(AlertsStore(database));
+
+    await controller.recordTriggers(
+      SensorData.fromJson({'mq135_v': null, 'mq2_v': null}),
+      [],
+    );
+    await controller.recordTriggers(
+      SensorData.fromJson({
+        'mq135_v': null,
+        'mq2_v': null,
+        'mq_warming_up': true,
+      }),
+      [],
+    );
+
+    expect(controller.alerts, hasLength(2));
+    expect(
+      controller.alerts.where((alert) => alert.severity == 'info'),
+      isEmpty,
+    );
+    await database.close();
+    await directory.delete(recursive: true);
+  });
+
+  test('records MQ sensor faults after warm-up ends', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final controller = AlertsController(AlertsStore(database));
+
+    await controller.recordTriggers(
+      SensorData.fromJson({
+        'mq135_v': null,
+        'mq2_v': null,
+        'mq_warming_up': true,
+      }),
+      [],
+    );
+    await controller.recordTriggers(
+      SensorData.fromJson({'mq135_v': null, 'mq2_v': null}),
+      [],
+    );
+
+    expect(
+      controller.alerts.map((alert) => alert.title),
+      containsAll(<String>[
+        'WARNING: MQ135 Sensor Fault',
+        'WARNING: MQ2 Sensor Fault',
+      ]),
+    );
+    await database.close();
+    await directory.delete(recursive: true);
+  });
+
+  test('records non-MQ sensor faults during MQ warm-up', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final controller = AlertsController(AlertsStore(database));
+
+    await controller.recordTriggers(
+      SensorData.fromJson({
+        'temperature_c': null,
+        'humidity_percent': null,
+        'mq135_v': null,
+        'mq2_v': null,
+        'mq_warming_up': true,
+      }),
+      [],
+    );
+
+    expect(controller.alerts.map((alert) => alert.title), [
+      'WARNING: DHT22 Sensor Fault',
+    ]);
+    await database.close();
+    await directory.delete(recursive: true);
+  });
+
   test('retains active sensor faults across a controller restart', () async {
     final directory = await Directory.systemTemp.createTemp('alerts-');
     final database = AppDatabase(
