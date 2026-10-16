@@ -15,6 +15,8 @@ import '../features/alerts/alerts_store.dart';
 import '../features/authentication/device_address_store.dart';
 import '../features/monitoring/sensor_data.dart';
 import '../features/monitoring/telemetry_source.dart';
+import '../features/safety/audit_log.dart';
+import '../features/safety/safety_observation_recorder.dart';
 
 List<SensorData> mergeSensorHistory({
   required List<SensorData> persisted,
@@ -38,6 +40,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   final bool _ownsClient;
   final bool _ownsAlertsController;
   AlertsController? _alertsController;
+  late final SafetyObservationRecorder _safetyObservationRecorder;
 
   bool _isAuthenticated = false, _isAdmin = false, _isHardwareConnected = false;
   int _currentTab = 0;
@@ -59,6 +62,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     _alertsController =
         alertsController ?? AlertsController(AlertsStore(AppDatabase()));
     _alertsController!.addListener(_onAlertsChanged);
+    _safetyObservationRecorder = SafetyObservationRecorder(_alertsController!);
     unawaited(_alertsController!.load());
     _deviceAddresses = DeviceAddressStore(_prefs);
     _deviceAddresses.migrateLegacyNodes().then((_) => notifyListeners());
@@ -80,6 +84,8 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   @override
   int get telemetryRevision => _telemetryRevision;
   AlertsController get alertsController => _alertsController!;
+  SafetyObservationRecorder get safetyObservationRecorder =>
+      _safetyObservationRecorder;
 
   List<AlertItem> get alerts => _alertsController?.alerts ?? const [];
   int get alertCount => _alertsController?.totalAlerts ?? 0;
@@ -236,6 +242,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
 
   Future<void> pollOnce() async {
     var triggers = <String>[];
+    final observationTicket = _safetyObservationRecorder.begin();
     try {
       final response = await _client
           .get(
@@ -247,6 +254,10 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
         final reportedState =
             json.decode(response.body) as Map<String, dynamic>;
         _currentData = SensorData.fromJson(reportedState);
+        await _safetyObservationRecorder.accept(
+          observationTicket,
+          reportedState,
+        );
         triggers = (reportedState['active_triggers'] as List<dynamic>? ?? [])
             .whereType<String>()
             .toList();
