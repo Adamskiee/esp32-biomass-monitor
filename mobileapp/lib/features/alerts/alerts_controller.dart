@@ -1,6 +1,7 @@
 import 'package:biomass_iot_app/features/alerts/alert_item.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:biomass_iot_app/features/safety/safety_condition.dart';
 import 'package:flutter/foundation.dart';
 
 class AlertsController extends ChangeNotifier {
@@ -18,7 +19,7 @@ class AlertsController extends ChangeNotifier {
   String? _errorMessage;
   bool _isDisposed = false;
   final Set<String> _activeSensorFaults = {};
-  bool _isGasHazardActive = false;
+  final Set<String> _activeConditions = {};
   bool _hasLoadedAlertStates = false;
   Future<void> _triggerQueue = Future.value();
   int _nextAlertSequence = 0;
@@ -125,20 +126,28 @@ class AlertsController extends ChangeNotifier {
         severity: 'info',
       );
     }
-    final hasGasHazard =
-        triggers.contains('high_mq2_gas') && reading.mq2V != null;
-    if (hasGasHazard && !_isGasHazardActive) {
-      _isGasHazardActive = true;
-      await _store.setAlertState('gas_hazard', true);
-      await _recordAlert(
-        title: 'CRITICAL: Gas Hazard',
-        description:
-            'ESP32 reported a high MQ-2 reading (${reading.mq2V!.toStringAsFixed(2)} V).',
-        severity: 'critical',
+    final conditions = triggers
+        .map(safetyConditionFor)
+        .whereType<SafetyCondition>()
+        .map((condition) => condition.trigger)
+        .toSet();
+    for (final trigger in conditions.difference(_activeConditions)) {
+      final condition = safetyConditionFor(trigger)!;
+      final alert = _newAlert(
+        title: '${condition.severity.toUpperCase()}: ${condition.title}',
+        description: condition.describe(reading),
+        severity: condition.severity,
       );
-    } else if (!hasGasHazard && _isGasHazardActive) {
-      _isGasHazardActive = false;
-      await _store.setAlertState('gas_hazard', false);
+      if (await _store.recordActivation('trigger:$trigger', alert)) {
+        _activeConditions.add(trigger);
+        _alerts.insert(0, alert);
+        _totalAlerts++;
+        _notifyListeners();
+      }
+    }
+    for (final trigger in _activeConditions.difference(conditions).toList()) {
+      _activeConditions.remove(trigger);
+      await _store.setAlertState('trigger:$trigger', false);
     }
   }
 
@@ -152,7 +161,18 @@ class AlertsController extends ChangeNotifier {
             .where((state) => state.startsWith('sensor:'))
             .map((state) => state.substring('sensor:'.length)),
       );
-    _isGasHazardActive = states.contains('gas_hazard');
+    _activeConditions
+      ..clear()
+      ..addAll(
+        states
+            .where((state) => state.startsWith('trigger:'))
+            .map((state) => state.substring('trigger:'.length)),
+      );
+    if (states.contains('gas_hazard')) {
+      _activeConditions.add('high_mq2_gas');
+      await _store.setAlertState('gas_hazard', false);
+      await _store.setAlertState('trigger:high_mq2_gas', true);
+    }
     _hasLoadedAlertStates = true;
   }
 
@@ -195,18 +215,30 @@ class AlertsController extends ChangeNotifier {
     required String description,
     required String severity,
   }) async {
+    final alert = _newAlert(
+      title: title,
+      description: description,
+      severity: severity,
+    );
+    _alerts.insert(0, alert);
+    _totalAlerts++;
+    await _store.insertAlert(alert);
+    _notifyListeners();
+  }
+
+  AlertItem _newAlert({
+    required String title,
+    required String description,
+    required String severity,
+  }) {
     final timestamp = DateTime.now();
-    final alert = AlertItem(
+    return AlertItem(
       id: '${timestamp.microsecondsSinceEpoch}-${_nextAlertSequence++}',
       title: title,
       description: description,
       severity: severity,
       timestamp: timestamp,
     );
-    _alerts.insert(0, alert);
-    _totalAlerts++;
-    await _store.insertAlert(alert);
-    _notifyListeners();
   }
 
   Future<void> removeAlert(String id) async {
@@ -222,7 +254,7 @@ class AlertsController extends ChangeNotifier {
     _totalAlerts = 0;
     await _store.clearAlerts();
     _activeSensorFaults.clear();
-    _isGasHazardActive = false;
+    _activeConditions.clear();
     _notifyListeners();
   }
 

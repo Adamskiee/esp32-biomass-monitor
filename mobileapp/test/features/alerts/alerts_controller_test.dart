@@ -5,11 +5,26 @@ import 'package:biomass_iot_app/features/alerts/alert_item.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:biomass_iot_app/features/safety/safety_condition.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   setUpAll(sqfliteFfiInit);
+
+  test('maps configured threshold triggers to readable conditions', () {
+    final reading = SensorData(humidityPercent: 29, timestamp: DateTime.now());
+
+    final lowHumidity = safetyConditionFor('low_humidity');
+    final highMq2 = safetyConditionFor('high_mq2_gas');
+
+    expect(lowHumidity, isNotNull);
+    expect(lowHumidity!.title, 'Low Humidity');
+    expect(lowHumidity.severity, 'warning');
+    expect(lowHumidity.describe(reading), contains('29'));
+    expect(highMq2!.severity, 'critical');
+    expect(safetyConditionFor('unknown_trigger'), isNull);
+  });
 
   test(
     'loads the next alert batch without changing the initial batch',

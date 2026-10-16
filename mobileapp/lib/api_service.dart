@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:biomass_iot_app/features/safety/safety_thresholds.dart';
 
 class ApiService {
   ApiService({
@@ -51,18 +52,41 @@ class ApiService {
   }
 
   Future<void> setThresholds(double chamberLimit, double mq2Limit) async {
+    await updateSafetyThresholds({
+      'threshold_chamber_temp_c': chamberLimit,
+      'threshold_mq2_v': mq2Limit,
+    });
+  }
+
+  Future<SafetyThresholds> fetchThresholds() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/settings'), headers: headers)
+        .timeout(const Duration(milliseconds: 2000));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load thresholds: ${response.statusCode}');
+    }
+    return SafetyThresholds.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<SafetyThresholds> updateSafetyThresholds(
+    Map<String, double> changes,
+  ) async {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/thresholds'),
           headers: headers,
-          body: jsonEncode({
-            'threshold_chamber_temp_c': chamberLimit,
-            'threshold_mq2_v': mq2Limit,
-          }),
+          body: jsonEncode(changes),
         )
         .timeout(const Duration(milliseconds: 2000));
     if (response.statusCode != 200) {
       throw Exception('Failed to set thresholds: ${response.statusCode}');
     }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final thresholds = body['thresholds'];
+    return thresholds is Map<String, dynamic>
+        ? SafetyThresholds.fromJson(thresholds)
+        : fetchThresholds();
   }
 }

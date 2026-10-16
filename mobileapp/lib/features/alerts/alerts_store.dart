@@ -26,6 +26,32 @@ class AlertsStore {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<bool> recordActivation(String key, AlertItem alert) async {
+    if (kIsWeb) return true;
+    final database = await _database.database;
+    return database.transaction((transaction) async {
+      final states = await transaction.query(
+        'alert_states',
+        where: 'key = ? AND active = ?',
+        whereArgs: [key, 1],
+        limit: 1,
+      );
+      if (states.isNotEmpty) return false;
+      await transaction.insert('alerts', {
+        'id': alert.id,
+        'title': alert.title,
+        'description': alert.description,
+        'severity': alert.severity,
+        'time': alert.timestamp?.toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await transaction.insert('alert_states', {
+        'key': key,
+        'active': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      return true;
+    });
+  }
+
   Future<List<AlertItem>> getAlerts({
     int limit = 20,
     int offset = 0,
