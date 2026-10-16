@@ -7,8 +7,44 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <WiFi.h>
+#include <cmath>
+#include <cstring>
 
 AsyncWebServer server(80);
+
+namespace {
+
+void serializeThresholds(JsonObject object, const SafetyThresholds &thresholds) {
+  for (size_t index = 0; index < thresholds.values.size(); ++index) {
+    const char *name = thresholdFieldName(static_cast<ThresholdField>(index));
+    if (std::isfinite(thresholds.values[index]))
+      object[name] = thresholds.values[index];
+    else
+      object[name] = nullptr;
+  }
+}
+
+bool parseThresholdPatch(JsonObject object, ThresholdPatch &patch) {
+  for (JsonPair entry : object) {
+    size_t index = 0;
+    for (; index < patch.values.values.size(); ++index) {
+      if (strcmp(entry.key().c_str(),
+                 thresholdFieldName(static_cast<ThresholdField>(index))) == 0)
+        break;
+    }
+    if (index == patch.values.values.size())
+      return false;
+    JsonVariant value = entry.value();
+    // Iterating supplied keys keeps an explicit null distinct from an absent key.
+    if (value.is<bool>() || !value.is<double>())
+      return false;
+    patch.fields |= 1u << index;
+    patch.values.values[index] = value.as<float>();
+  }
+  return true;
+}
+
+}
 
 void initApiServer() {
   WiFi.mode(WIFI_STA);
@@ -41,19 +77,25 @@ void initApiServer() {
     }
 
     JsonDocument doc;
-    if (isnan(current_temp_c))
+    if (!std::isfinite(current_temp_c) || current_temp_c < -40.0f ||
+        current_temp_c > 80.0f)
       doc["temperature_c"] = nullptr;
     else
       doc["temperature_c"] = current_temp_c;
-    if (isnan(current_chamber_c))
+    if (!std::isfinite(current_humidity_percent) ||
+        current_humidity_percent < 0.0f || current_humidity_percent > 100.0f)
+      doc["humidity_percent"] = nullptr;
+    else
+      doc["humidity_percent"] = current_humidity_percent;
+    if (!std::isfinite(current_chamber_c))
       doc["chamber_temp_c"] = nullptr;
     else
       doc["chamber_temp_c"] = current_chamber_c;
-    if (isnan(current_mq135_v))
+    if (!std::isfinite(current_mq135_v))
       doc["mq135_v"] = nullptr;
     else
       doc["mq135_v"] = current_mq135_v;
-    if (isnan(current_mq2_v))
+    if (!std::isfinite(current_mq2_v) || current_mq2_v > 4.8f)
       doc["mq2_v"] = nullptr;
     else
       doc["mq2_v"] = current_mq2_v;
@@ -71,8 +113,7 @@ void initApiServer() {
       doc["pm2_5_ug_m3"] = nullptr;
       doc["pm10_ug_m3"] = nullptr;
     }
-    doc["threshold_chamber_temp_c"] = safety_thresholds.values[0];
-    doc["threshold_mq2_v"] = safety_thresholds.values[1];
+    serializeThresholds(doc.as<JsonObject>(), safety_thresholds);
     doc["pump_on"] = current_pump_state;
     doc["manual_sprinkler"] = manual_sprinkler;
     deserializeJson(doc["active_triggers"], active_triggers_json);
@@ -133,25 +174,17 @@ void initApiServer() {
       return request->send(response);
     }
 
-    JsonObject jsonObj = json.as<JsonObject>();
-    JsonVariant chamberValue = jsonObj["threshold_chamber_temp_c"];
-    JsonVariant mq2Value = jsonObj["threshold_mq2_v"];
-    const bool hasChamber = !chamberValue.isUnbound();
-    const bool hasMq2 = !mq2Value.isUnbound();
-    auto isNumber = [](JsonVariant value) {
-      return value.is<float>() || value.is<int>() || value.is<int64_t>();
-    };
-    if ((hasChamber && !isNumber(chamberValue)) ||
-        (hasMq2 && !isNumber(mq2Value))) {
+    ThresholdPatch patch{};
+    if (!parseThresholdPatch(json.as<JsonObject>(), patch)) {
       AsyncWebServerResponse *response =
           request->beginResponse(400, "application/json",
                                  "{\"status\":\"error\",\"message\":"
-                                 "\"Thresholds must be numbers\"}");
+                                 "\"Expected supported numeric thresholds\"}");
       return request->send(response);
     }
 
-    const ThresholdUpdateResult result = applyThresholdUpdate(
-        hasChamber, chamberValue.as<float>(), hasMq2, mq2Value.as<float>());
+    SafetyThresholds accepted;
+    const ThresholdUpdateResult result = applyThresholdUpdate(patch, &accepted);
     if (result == ThresholdUpdateResult::Invalid) {
       AsyncWebServerResponse *response = request->beginResponse(
           400, "application/json",
@@ -166,20 +199,24 @@ void initApiServer() {
       return request->send(response);
     }
 
-    AsyncWebServerResponse *response =
-        request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
+    JsonDocument doc;
+    doc["status"] = "ok";
+    serializeThresholds(doc["thresholds"].to<JsonObject>(), accepted);
+    AsyncResponseStream *response =
+        request->beginResponseStream("application/json");
+    serializeJson(doc, *response);
     request->send(response);
   };
   AsyncCallbackJsonWebHandler *thresholdHandler =
       new AsyncCallbackJsonWebHandler("/api/thresholds", handleThresholdUpdate);
   thresholdHandler->setMethod(HTTP_POST);
-  thresholdHandler->setMaxContentLength(256);
+  thresholdHandler->setMaxContentLength(1024);
   server.addHandler(thresholdHandler);
 
   AsyncCallbackJsonWebHandler *settingsHandler =
       new AsyncCallbackJsonWebHandler("/api/settings", handleThresholdUpdate);
   settingsHandler->setMethod(HTTP_POST);
-  settingsHandler->setMaxContentLength(256);
+  settingsHandler->setMaxContentLength(1024);
   server.addHandler(settingsHandler);
 
   server.on("/api/settings", HTTP_GET,
@@ -189,8 +226,7 @@ void initApiServer() {
 
               JsonDocument doc;
               if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5))) {
-                doc["threshold_chamber_temp_c"] = safety_thresholds.values[0];
-                doc["threshold_mq2_v"] = safety_thresholds.values[1];
+                serializeThresholds(doc.to<JsonObject>(), safety_thresholds);
                 xSemaphoreGive(stateMutex);
 
                 AsyncResponseStream *response =
