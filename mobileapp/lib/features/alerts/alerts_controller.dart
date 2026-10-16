@@ -99,6 +99,13 @@ class AlertsController extends ChangeNotifier {
   ) async {
     await _loadAlertStates();
     final sensorFaults = _sensorFaults(reading, triggers);
+    if (reading.isMqWarmingUp) {
+      sensorFaults.addAll(
+        _activeSensorFaults.where(
+          (sensor) => sensor == 'MQ135' || sensor == 'MQ2',
+        ),
+      );
+    }
     for (final sensor in sensorFaults.difference(_activeSensorFaults)) {
       _activeSensorFaults.add(sensor);
       await _store.setAlertState('sensor:$sensor', true);
@@ -161,11 +168,14 @@ class AlertsController extends ChangeNotifier {
             reading.chamberTempC == null) {
       faults.add('Thermocouple');
     }
-    if (reading.reportsField('mq135_v') && reading.mq135V == null) {
+    if (!reading.isMqWarmingUp &&
+        reading.reportsField('mq135_v') &&
+        reading.mq135V == null) {
       faults.add('MQ135');
     }
-    if (triggers.contains('mq2_sensor_fault') ||
-        reading.reportsField('mq2_v') && reading.mq2V == null) {
+    if (!reading.isMqWarmingUp &&
+        (triggers.contains('mq2_sensor_fault') ||
+            reading.reportsField('mq2_v') && reading.mq2V == null)) {
       faults.add('MQ2');
     }
     if ((reading.reportsField('pm1_0_ug_m3') ||
