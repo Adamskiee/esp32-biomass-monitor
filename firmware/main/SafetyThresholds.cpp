@@ -1,9 +1,29 @@
 #include "SafetyThresholds.h"
 
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 namespace {
+
+static_assert(sizeof(float) == sizeof(uint32_t) &&
+                  std::numeric_limits<float>::is_iec559,
+              "Threshold records require IEEE-754 32-bit floats");
+constexpr uint32_t record_version = 1;
+
+void writeLittleEndian(uint8_t *bytes, uint32_t value) {
+  for (size_t i = 0; i < 4; ++i) {
+    bytes[i] = static_cast<uint8_t>(value >> (8 * i));
+  }
+}
+
+uint32_t readLittleEndian(const uint8_t *bytes) {
+  uint32_t value = 0;
+  for (size_t i = 0; i < 4; ++i) {
+    value |= static_cast<uint32_t>(bytes[i]) << (8 * i);
+  }
+  return value;
+}
 
 constexpr uint8_t field_count = static_cast<uint8_t>(ThresholdField::Count);
 constexpr uint16_t supported_fields = (1u << field_count) - 1u;
@@ -87,6 +107,36 @@ bool validateThresholdPatch(const SafetyThresholds &current,
       return false;
     }
     candidate.values[index] = value;
+  }
+  if (!validateStoredThresholds(candidate)) {
+    return false;
+  }
+  accepted = candidate;
+  return true;
+}
+
+std::array<uint8_t, THRESHOLD_RECORD_BYTES>
+encodeThresholdRecord(const SafetyThresholds &values) {
+  std::array<uint8_t, THRESHOLD_RECORD_BYTES> bytes{};
+  writeLittleEndian(bytes.data(), record_version);
+  for (size_t i = 0; i < values.values.size(); ++i) {
+    uint32_t bits;
+    std::memcpy(&bits, &values.values[i], sizeof(bits));
+    writeLittleEndian(bytes.data() + 4 + i * 4, bits);
+  }
+  return bytes;
+}
+
+bool decodeThresholdRecord(const uint8_t *bytes, size_t length,
+                           SafetyThresholds &accepted) {
+  if (bytes == nullptr || length != THRESHOLD_RECORD_BYTES ||
+      readLittleEndian(bytes) != record_version) {
+    return false;
+  }
+  SafetyThresholds candidate;
+  for (size_t i = 0; i < candidate.values.size(); ++i) {
+    const uint32_t bits = readLittleEndian(bytes + 4 + i * 4);
+    std::memcpy(&candidate.values[i], &bits, sizeof(bits));
   }
   if (!validateStoredThresholds(candidate)) {
     return false;

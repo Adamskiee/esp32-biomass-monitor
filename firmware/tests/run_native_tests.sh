@@ -17,6 +17,7 @@ g++ \
   "$repo_dir/firmware/main/Actuators.cpp" \
   "$repo_dir/firmware/main/SystemState.cpp" \
   "$repo_dir/firmware/main/SafetyThresholds.cpp" \
+  "$repo_dir/firmware/main/ThresholdPersistence.cpp" \
   "$script_dir/native_tests.cpp" \
   -o "$build_dir/native_firmware_tests"
 

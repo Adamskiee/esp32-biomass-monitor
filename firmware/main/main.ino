@@ -45,8 +45,7 @@ void loop() {
                   t_mq135, t_mq2, tempStr, t_chamber);
 
     bool do_save = false;
-    static float safe_chamber_limit = 80.0;
-    static float safe_mq2_limit = 2.5;
+    SafetyThresholds snapshot;
 
     const bool mq_sensors_warming_up = mqWarmupRemainingSeconds(now) > 0;
     PmsReading pms_reading{};
@@ -56,25 +55,21 @@ void loop() {
     processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2,
                           mq_sensors_warming_up, t_humidity);
 
-    // Grab safe copies for persistence without holding the mutex during flash
-    // writes
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10))) {
-      static unsigned long last_save = 0;
-      if (state_needs_save &&
-          (last_save == 0 || millis() - last_save > 60000)) {
-        do_save = true;
-        state_needs_save = false; // Only clear it when we are actually saving
-        last_save = millis();     // Optimistically update
-      }
-
-      safe_chamber_limit = safety_thresholds.values[0];
-      safe_mq2_limit = safety_thresholds.values[1];
+      do_save = threshold_persistence.beginSave(millis(), safety_thresholds,
+                                                snapshot);
       xSemaphoreGive(stateMutex);
     }
 
     if (do_save) {
-      saveSystemState(safe_chamber_limit, safe_mq2_limit);
-      Serial.println("System state saved to NVS.");
+      const bool succeeded = saveSystemState(snapshot);
+      // Completion must be acknowledged even if API updates temporarily own the
+      // lock.
+      xSemaphoreTake(stateMutex, portMAX_DELAY);
+      threshold_persistence.finishSave(succeeded);
+      xSemaphoreGive(stateMutex);
+      Serial.println(succeeded ? "System state saved to NVS."
+                               : "System state save failed; retry pending.");
     }
   }
 }

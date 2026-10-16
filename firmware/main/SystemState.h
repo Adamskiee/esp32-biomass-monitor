@@ -1,6 +1,7 @@
 #pragma once
 #include "PmsReading.h"
 #include "SafetyThresholds.h"
+#include "ThresholdPersistence.h"
 #ifdef ARDUINO
 #include <Arduino.h>
 #include <Preferences.h>
@@ -25,7 +26,7 @@ extern float current_mq135_v;
 extern float current_mq2_v;
 extern float current_humidity_percent;
 
-extern bool state_needs_save;
+extern ThresholdPersistence threshold_persistence;
 extern SemaphoreHandle_t stateMutex;
 
 extern bool manual_sprinkler;
@@ -63,4 +64,4 @@ bool copyFreshPmsReadingLocked(uint32_t now_ms, PmsReading &out);
 void evaluateSafetyLoop();
 
 void initSystemState();
-void saveSystemState(float chamber_limit, float mq2_limit);
+bool saveSystemState(const SafetyThresholds &snapshot);

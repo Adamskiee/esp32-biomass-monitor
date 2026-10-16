@@ -1,6 +1,7 @@
 #include "Actuators.h"
 #include "SafetyThresholds.h"
 #include "SystemState.h"
+#include "ThresholdPersistence.h"
 
 #include <cmath>
 #include <cstdint>
@@ -41,6 +42,194 @@ ThresholdPatch patchFor(ThresholdField field, float value) {
   patch.values.values[index] = value;
   patch.fields = static_cast<uint16_t>(1u << index);
   return patch;
+}
+
+void expectSameThresholds(const char *name, const SafetyThresholds &actual,
+                          const SafetyThresholds &expected) {
+  for (size_t i = 0; i < expected.values.size(); ++i) {
+    EXPECT_TRUE(name, actual.values[i] == expected.values[i] ||
+                          (std::isnan(actual.values[i]) &&
+                           std::isnan(expected.values[i])));
+  }
+}
+
+void testThresholdRecordWireFormat() {
+  const char *name = "threshold record wire format";
+  const SafetyThresholds configured{{80, 2.5f, 1.5f, -10, 12, 25, 40, 30, 70}};
+  const std::array<uint8_t, 40> expected{
+      {1,   0,  0,  0,  0,  0,   160, 66, 0,  0,  32,  64, 0,   0,
+       192, 63, 0,  0,  32, 193, 0,   0,  64, 65, 0,   0,  200, 65,
+       0,   0,  32, 66, 0,  0,   240, 65, 0,  0,  140, 66}};
+  EXPECT_TRUE(name, encodeThresholdRecord(configured) == expected);
+  SafetyThresholds restored = defaultSafetyThresholds();
+  EXPECT_TRUE(
+      name, decodeThresholdRecord(expected.data(), expected.size(), restored));
+  expectSameThresholds(name, restored, configured);
+}
+
+void testThresholdRecordPreservesUnsetFields() {
+  const char *name = "threshold record preserves unset fields";
+  auto configured = defaultSafetyThresholds();
+  for (size_t field = 2; field <= 7; ++field) {
+    const auto bytes = encodeThresholdRecord(configured);
+    SafetyThresholds restored{};
+    EXPECT_TRUE(name,
+                decodeThresholdRecord(bytes.data(), bytes.size(), restored));
+    expectSameThresholds(name, restored, configured);
+    configured.values[field] = 1.0f;
+  }
+}
+
+void testThresholdRecordRejectsMalformedDataAtomically() {
+  const char *name = "threshold record rejects malformed data atomically";
+  const SafetyThresholds original{{90, 3, 2, 40, 20, 30, 50, 25, 75}};
+  SafetyThresholds accepted = original;
+  auto bytes = encodeThresholdRecord(defaultSafetyThresholds());
+  for (size_t length = 0; length < bytes.size(); ++length) {
+    EXPECT_FALSE(name, decodeThresholdRecord(bytes.data(), length, accepted));
+    expectSameThresholds(name, accepted, original);
+  }
+  EXPECT_FALSE(name,
+               decodeThresholdRecord(bytes.data(), bytes.size() + 1, accepted));
+  EXPECT_FALSE(name, decodeThresholdRecord(nullptr, bytes.size(), accepted));
+  for (size_t index = 0; index < 4; ++index) {
+    auto unsupported = bytes;
+    unsupported[index] = 2;
+    EXPECT_FALSE(name, decodeThresholdRecord(unsupported.data(),
+                                             unsupported.size(), accepted));
+    expectSameThresholds(name, accepted, original);
+  }
+  for (size_t field = 0; field < 9; ++field) {
+    auto invalid = defaultSafetyThresholds();
+    invalid.values[field] = std::numeric_limits<float>::infinity();
+    auto record = encodeThresholdRecord(invalid);
+    EXPECT_FALSE(name,
+                 decodeThresholdRecord(record.data(), record.size(), accepted));
+    expectSameThresholds(name, accepted, original);
+  }
+  for (const auto field : {0, 1, 7, 8}) {
+    auto invalid = defaultSafetyThresholds();
+    invalid.values[field] = field < 2 ? NAN : 50.0f;
+    auto record = encodeThresholdRecord(invalid);
+    EXPECT_FALSE(name,
+                 decodeThresholdRecord(record.data(), record.size(), accepted));
+    expectSameThresholds(name, accepted, original);
+  }
+  for (const auto field : {0, 1}) {
+    auto invalid = defaultSafetyThresholds();
+    invalid.values[field] = 0;
+    auto record = encodeThresholdRecord(invalid);
+    EXPECT_FALSE(name,
+                 decodeThresholdRecord(record.data(), record.size(), accepted));
+    expectSameThresholds(name, accepted, original);
+  }
+}
+
+void testPersistenceFirstSaveAndRateLimit() {
+  const char *name = "persistence first save and rate limit";
+  ThresholdPersistence persistence;
+  auto current = defaultSafetyThresholds();
+  SafetyThresholds snapshot{};
+  EXPECT_FALSE(name, persistence.beginSave(0, current, snapshot));
+  persistence.markChanged();
+  EXPECT_TRUE(name, persistence.beginSave(0, current, snapshot));
+  expectSameThresholds(name, snapshot, current);
+  EXPECT_FALSE(name, persistence.beginSave(60000, current, snapshot));
+  persistence.finishSave(true);
+  EXPECT_FALSE(name, persistence.beginSave(60000, current, snapshot));
+  current.values[0] = 90;
+  persistence.markChanged();
+  EXPECT_FALSE(name, persistence.beginSave(59999, current, snapshot));
+  EXPECT_TRUE(name, persistence.beginSave(60000, current, snapshot));
+  EXPECT_TRUE(name, snapshot.values[0] == 90);
+  persistence.finishSave(true);
+  EXPECT_FALSE(name, persistence.beginSave(120000, current, snapshot));
+}
+
+void testPersistenceRetriesFailedWrites() {
+  const char *name = "persistence retries failed writes";
+  ThresholdPersistence persistence;
+  auto current = defaultSafetyThresholds();
+  SafetyThresholds snapshot{};
+  persistence.markChanged();
+  EXPECT_TRUE(name, persistence.beginSave(100, current, snapshot));
+  persistence.finishSave(false);
+  EXPECT_FALSE(name, persistence.beginSave(60099, current, snapshot));
+  EXPECT_TRUE(name, persistence.beginSave(60100, current, snapshot));
+  persistence.finishSave(false);
+  current.values[1] = 3;
+  persistence.markChanged();
+  EXPECT_FALSE(name, persistence.beginSave(120099, current, snapshot));
+  EXPECT_TRUE(name, persistence.beginSave(120100, current, snapshot));
+  EXPECT_TRUE(name, snapshot.values[1] == 3);
+  persistence.finishSave(true);
+  EXPECT_FALSE(name, persistence.beginSave(180100, current, snapshot));
+}
+
+void testPersistenceRetainsChangesDuringSave() {
+  const char *name = "persistence retains changes during save";
+  for (bool succeeded : {false, true}) {
+    ThresholdPersistence persistence;
+    auto current = defaultSafetyThresholds();
+    SafetyThresholds snapshot{};
+    persistence.markChanged();
+    EXPECT_TRUE(name, persistence.beginSave(0, current, snapshot));
+    current.values[0] = 90;
+    persistence.markChanged();
+    current.values[1] = 3;
+    persistence.markChanged();
+    EXPECT_TRUE(name, snapshot.values[0] == 80 && snapshot.values[1] == 2.5f);
+    persistence.finishSave(succeeded);
+    EXPECT_FALSE(name, persistence.beginSave(59999, current, snapshot));
+    EXPECT_TRUE(name, persistence.beginSave(60000, current, snapshot));
+    expectSameThresholds(name, snapshot, current);
+    persistence.finishSave(true);
+    EXPECT_FALSE(name, persistence.beginSave(120000, current, snapshot));
+  }
+}
+
+void testPersistenceRateLimitAcrossRollover() {
+  const char *name = "persistence rate limit across rollover";
+  ThresholdPersistence persistence;
+  const auto current = defaultSafetyThresholds();
+  SafetyThresholds snapshot{};
+  persistence.markChanged();
+  EXPECT_TRUE(name,
+              persistence.beginSave(UINT32_MAX - 29999, current, snapshot));
+  persistence.finishSave(false);
+  EXPECT_FALSE(name, persistence.beginSave(29999, current, snapshot));
+  EXPECT_TRUE(name, persistence.beginSave(30000, current, snapshot));
+  persistence.finishSave(true);
+  persistence.markChanged();
+  EXPECT_FALSE(name, persistence.beginSave(89999, current, snapshot));
+  EXPECT_TRUE(name, persistence.beginSave(90000, current, snapshot));
+}
+
+void testThresholdUpdatesKeepOnlyRealChangesPending() {
+  const char *name = "threshold updates keep only real changes pending";
+  initSystemState();
+  SafetyThresholds snapshot{};
+  EXPECT_TRUE(name,
+              applyThresholdUpdate(patchFor(ThresholdField::Chamber, 80)) ==
+                  ThresholdUpdateResult::Accepted);
+  EXPECT_FALSE(name,
+               threshold_persistence.beginSave(0, safety_thresholds, snapshot));
+  EXPECT_TRUE(name,
+              applyThresholdUpdate(patchFor(ThresholdField::Chamber, 90)) ==
+                  ThresholdUpdateResult::Accepted);
+  EXPECT_TRUE(name,
+              threshold_persistence.beginSave(0, safety_thresholds, snapshot));
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2)) ==
+                        ThresholdUpdateResult::Accepted);
+  threshold_persistence.finishSave(true);
+  EXPECT_TRUE(name, threshold_persistence.beginSave(60000, safety_thresholds,
+                                                    snapshot));
+  EXPECT_TRUE(name, snapshot.values[0] == 90 && snapshot.values[2] == 2);
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2)) ==
+                        ThresholdUpdateResult::Accepted);
+  threshold_persistence.finishSave(true);
+  EXPECT_FALSE(name, threshold_persistence.beginSave(120000, safety_thresholds,
+                                                     snapshot));
 }
 
 void testThresholdDefaults() {
@@ -597,23 +786,25 @@ void testBuzzerUsesActiveLowRelay() {
 void testInvalidThresholdUpdateIsTransactional() {
   const char *name = "invalid threshold update is transactional";
   resetSafetyState();
-  state_needs_save = false;
+  SafetyThresholds snapshot{};
   const auto result = applyThresholdUpdate(true, 1000.0f, true, 1.5f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Invalid);
   EXPECT_TRUE(name, safety_thresholds.values[0] == 80.0f);
   EXPECT_TRUE(name, safety_thresholds.values[1] == 2.5f);
-  EXPECT_FALSE(name, state_needs_save);
+  EXPECT_FALSE(name, threshold_persistence.beginSave(
+                         test_millis, safety_thresholds, snapshot));
 }
 
 void testValidThresholdUpdateChangesRequestedFields() {
   const char *name = "valid threshold update changes requested fields";
   resetSafetyState();
-  state_needs_save = false;
+  SafetyThresholds snapshot{};
   const auto result = applyThresholdUpdate(true, 120.0f, false, 0.0f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name, safety_thresholds.values[0] == 120.0f);
   EXPECT_TRUE(name, safety_thresholds.values[1] == 2.5f);
-  EXPECT_TRUE(name, state_needs_save);
+  EXPECT_TRUE(name, threshold_persistence.beginSave(
+                        test_millis, safety_thresholds, snapshot));
 }
 
 void testLowerThresholdImmediatelyReevaluatesSafety() {
@@ -969,7 +1160,10 @@ void testInitResetsEveryConditionAndCache() {
   evaluateSafetyLoop();
   EXPECT_TRUE(name, catastrophic_latch);
   initSystemState();
-  EXPECT_FALSE(name, catastrophic_latch || manual_sprinkler || state_needs_save);
+  EXPECT_FALSE(name, catastrophic_latch || manual_sprinkler);
+  SafetyThresholds snapshot{};
+  EXPECT_FALSE(name, threshold_persistence.beginSave(
+                         test_millis, safety_thresholds, snapshot));
   EXPECT_TRUE(name, std::isnan(current_humidity_percent));
   PmsReading sample{};
   EXPECT_FALSE(name, copyFreshPmsReadingLocked(test_millis, sample));
@@ -1001,6 +1195,20 @@ void digitalWrite(uint8_t pin, uint8_t level) {
 }
 
 int main() {
+  run("threshold record wire format", testThresholdRecordWireFormat);
+  run("threshold record preserves unset fields",
+      testThresholdRecordPreservesUnsetFields);
+  run("threshold record rejects malformed data atomically",
+      testThresholdRecordRejectsMalformedDataAtomically);
+  run("persistence first save and rate limit",
+      testPersistenceFirstSaveAndRateLimit);
+  run("persistence retries failed writes", testPersistenceRetriesFailedWrites);
+  run("persistence retains changes during save",
+      testPersistenceRetainsChangesDuringSave);
+  run("persistence rate limit across rollover",
+      testPersistenceRateLimitAcrossRollover);
+  run("threshold updates keep only real changes pending",
+      testThresholdUpdatesKeepOnlyRealChangesPending);
   run("configured upper limits", testConfiguredUpperLimits);
   run("humidity recovery", testHumidityRecovery);
   run("environmental invalid readings", testEnvironmentalInvalidReadings);

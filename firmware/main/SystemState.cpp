@@ -13,7 +13,7 @@ float current_mq135_v = NAN;
 float current_mq2_v = NAN;
 float current_humidity_percent = NAN;
 
-bool state_needs_save = false;
+ThresholdPersistence threshold_persistence;
 
 bool manual_sprinkler = false;
 bool catastrophic_latch = false;
@@ -70,7 +70,7 @@ void resetRuntimeState() {
   current_mq135_v = NAN;
   current_mq2_v = NAN;
   current_humidity_percent = NAN;
-  state_needs_save = false;
+  threshold_persistence = ThresholdPersistence{};
   manual_sprinkler = false;
   catastrophic_latch = false;
   active_triggers_json = "[]";
@@ -96,23 +96,43 @@ void initSystemState() {
 
   preferences.begin("biomass", false);
 
+  xSemaphoreTake(stateMutex, portMAX_DELAY);
   resetRuntimeState();
 
-  safety_thresholds.values[0] = preferences.getFloat("chamber_temp", 80.0);
-  safety_thresholds.values[1] = preferences.getFloat("mq2_v", 2.5);
-  if (!validateStoredThresholds(safety_thresholds)) {
-    safety_thresholds = defaultSafetyThresholds();
+  std::array<uint8_t, THRESHOLD_RECORD_BYTES> record{};
+  const bool restored =
+      preferences.getBytesLength("thresholds_v1") == record.size() &&
+      preferences.getBytes("thresholds_v1", record.data(), record.size()) ==
+          record.size() &&
+      decodeThresholdRecord(record.data(), record.size(), safety_thresholds);
+  if (!restored) {
+    const char *legacy_keys[] = {"chamber_temp", "mq2_v"};
+    for (size_t i = 0; i < 2; ++i) {
+      ThresholdPatch patch{safety_thresholds, static_cast<uint16_t>(1u << i)};
+      patch.values.values[i] =
+          preferences.getFloat(legacy_keys[i], safety_thresholds.values[i]);
+      SafetyThresholds candidate;
+      if (validateThresholdPatch(safety_thresholds, patch, candidate)) {
+        safety_thresholds = candidate;
+      }
+    }
+    threshold_persistence.markChanged();
   }
+  xSemaphoreGive(stateMutex);
 }
 
-void saveSystemState(float chamber_limit, float mq2_limit) {
-  preferences.putFloat("chamber_temp", chamber_limit);
-  preferences.putFloat("mq2_v", mq2_limit);
+bool saveSystemState(const SafetyThresholds &snapshot) {
+  if (!validateStoredThresholds(snapshot)) {
+    return false;
+  }
+  const auto record = encodeThresholdRecord(snapshot);
+  return preferences.putBytes("thresholds_v1", record.data(), record.size()) ==
+         record.size();
 }
 #else
 SemaphoreHandle_t stateMutex = nullptr;
 void initSystemState() { resetRuntimeState(); }
-void saveSystemState(float chamber_limit, float mq2_limit) {}
+bool saveSystemState(const SafetyThresholds &snapshot) { return false; }
 #endif
 
 ThresholdUpdateResult applyThresholdUpdate(const ThresholdPatch &patch,
@@ -154,7 +174,7 @@ ThresholdUpdateResult applyThresholdUpdate(const ThresholdPatch &patch,
     *accepted = safety_thresholds;
   }
   if (changed) {
-    state_needs_save = true;
+    threshold_persistence.markChanged();
     evaluateSafetyLoop();
   }
 #ifdef ARDUINO
