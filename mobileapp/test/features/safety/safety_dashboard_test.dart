@@ -276,7 +276,7 @@ void main() {
         await tester.pump();
 
         expect(find.byType(CircularProgressIndicator), findsNothing);
-        expect(find.text('Biomass Monitor'), findsOneWidget);
+        expect(find.text('Biomass Monitor Safety Dashboard'), findsOneWidget);
         expect(find.text('Live Sensor Data'), findsOneWidget);
         expect(find.text('65.4 °C'), findsOneWidget);
         expect(find.text('1.25 V'), findsOneWidget);

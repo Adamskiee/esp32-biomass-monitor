@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'api_service.dart';
+import 'features/safety/safety_threshold_editor.dart';
+import 'features/safety/widgets/safety_threshold_group.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.apiService, this.onAlert});
@@ -29,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   double _mq2Limit = 1.5;
   bool _thresholdsDirty = false;
   bool _isSavingThresholds = false;
+  final SafetyThresholdEditor _thresholdEditor = SafetyThresholdEditor();
 
   @override
   void initState() {
@@ -146,6 +149,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       _isSavingThresholds = true;
     });
     try {
+      final errors = _thresholdEditor.validate();
+      if (errors.isNotEmpty) {
+        throw Exception(errors.values.first);
+      }
+      final changes = _thresholdEditor.changedValues();
+      if (changes.isNotEmpty) {
+        await widget.apiService.updateSafetyThresholds(changes);
+      }
       await widget.apiService.setThresholds(_tempLimit, _mq2Limit);
       if (!mounted) return;
       setState(() => _thresholdsDirty = false);
@@ -225,7 +236,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Biomass Monitor'),
+        title: const Text('Biomass Monitor Safety Dashboard'),
         actions: [
           if (_previousTriggers.isNotEmpty)
             IconButton(
@@ -360,6 +371,37 @@ class _DashboardScreenState extends State<DashboardScreen>
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
+          if (_state.containsKey('threshold_mq135_v')) ...[
+            SafetyThresholdGroup(
+              title: 'Temperature',
+              locked: _isOffline || _isSavingThresholds,
+              fields: {
+                'threshold_chamber_temp_c': _tempLimit.toStringAsFixed(1),
+                'threshold_temperature_c':
+                    '${_state['threshold_temperature_c'] ?? ''}',
+              },
+              onChanged: (field, value) => _thresholdEditor.edit(field, value),
+            ),
+            SafetyThresholdGroup(
+              title: 'Gas and Particulate Matter',
+              locked: _isOffline || _isSavingThresholds,
+              fields: {
+                'threshold_mq2_v': _mq2Limit.toStringAsFixed(2),
+                'threshold_mq135_v': '${_state['threshold_mq135_v'] ?? ''}',
+                'threshold_pm1_0_ug_m3':
+                    '${_state['threshold_pm1_0_ug_m3'] ?? ''}',
+                'threshold_pm2_5_ug_m3':
+                    '${_state['threshold_pm2_5_ug_m3'] ?? ''}',
+                'threshold_pm10_ug_m3':
+                    '${_state['threshold_pm10_ug_m3'] ?? ''}',
+                'threshold_humidity_min_percent':
+                    '${_state['threshold_humidity_min_percent'] ?? ''}',
+                'threshold_humidity_max_percent':
+                    '${_state['threshold_humidity_max_percent'] ?? ''}',
+              },
+              onChanged: (field, value) => _thresholdEditor.edit(field, value),
+            ),
+          ],
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),

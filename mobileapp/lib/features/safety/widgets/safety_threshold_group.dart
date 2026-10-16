@@ -6,11 +6,13 @@ class SafetyThresholdGroup extends StatelessWidget {
     required this.title,
     required this.fields,
     required this.locked,
+    this.onChanged,
   });
 
   final String title;
   final Map<String, String> fields;
   final bool locked;
+  final void Function(String field, String value)? onChanged;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -25,6 +27,7 @@ class SafetyThresholdGroup extends StatelessWidget {
               key: ValueKey(entry.key),
               enabled: !locked,
               initialValue: entry.value,
+              onChanged: (value) => onChanged?.call(entry.key, value),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
