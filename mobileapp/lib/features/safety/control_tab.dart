@@ -103,7 +103,7 @@ class ControlTab extends StatelessWidget {
                     size: 28,
                   ),
                   title: Text(
-                    "Biomass Monitor Safety Dashboard",
+                    "EcoBurn Safety Dashboard",
                     style: TextStyle(
                       color: theme.textTheme.bodyLarge?.color,
                       fontWeight: FontWeight.bold,

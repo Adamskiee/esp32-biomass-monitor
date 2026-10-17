@@ -2,7 +2,7 @@
 
 ## What does the app control?
 
-The Flutter app displays readings and actuator states reported by the ESP32.
+EcoBurn is the Flutter app for readings and actuator states reported by the ESP32.
 The firmware decides when safety rules activate the pump and sprinkler. The app
 can request manual sprinkler operation and update two safety thresholds, but a
 request does not become the displayed state until the ESP32 reports it.
@@ -108,6 +108,24 @@ flutter analyze
 flutter test
 ```
 
+## Where are the EcoBurn branding assets?
+
+`mobileapp/assets/branding/ecoburn-logo.png` is the supplied logo used on the
+login screen. `ecoburn-icon.png` is the symbol-only launcher artwork, with a
+dark green background and padding to keep the symbol readable at small sizes.
+Android and iOS launcher images are checked in so normal builds need no image
+generation dependencies. After replacing the launcher artwork, install
+ImageMagick and run from `mobileapp/`:
+
+```bash
+bash tool/generate_launcher_icons.sh
+```
+
+The Android application ID is `com.biomo.ecoburn`. Android treats it as a
+separate app from the earlier `com.biomo.biomassmonitor` package, so the old
+installation's preferences, history, and attempts do not transfer automatically.
+The Dart package name and iOS bundle identifier retain their existing values.
+
 ## How do I profile tab transitions?
 
 Debug builds include extra checks and are not performance evidence. Connect
@@ -127,7 +145,7 @@ jank or frame-budget spikes are not expected.
 
 ## How do I publish an Android release?
 
-Android requires every update for `com.biomo.biomassmonitor` to use the same
+Android requires every update for `com.biomo.ecoburn` to use the same
 signing key. Create the key outside the repository and keep an offline backup;
 losing it prevents future APKs from updating installations of the first release.
 
@@ -150,7 +168,7 @@ git push origin v1.2.3
 ```
 
 The workflow creates or updates the matching GitHub Release. It includes the
-firmware binary and `biomo-biomassmonitor-v1.2.3.apk`; a hardware archive is
+firmware binary and `ecoburn-v1.2.3.apk`; a hardware archive is
 included only when matching hardware files exist. A manual workflow run must
 target a valid tag in the same `vMAJOR.MINOR.PATCH` format.
 
@@ -160,14 +178,16 @@ Download the APK from the GitHub Release page. Android Build Tools can check
 the signature and the package metadata before installation:
 
 ```bash
-apksigner verify biomo-biomassmonitor-v1.2.3.apk
-aapt2 dump badging biomo-biomassmonitor-v1.2.3.apk
+apksigner verify ecoburn-v1.2.3.apk
+aapt2 dump badging ecoburn-v1.2.3.apk
 ```
 
-The output must identify `com.biomo.biomassmonitor`. Install later releases
-over the earlier APK on a device to confirm the retained signing key permits an
-update. APK distribution uses manual installation and does not provide Google
-Play or in-app updates.
+The output must identify `com.biomo.ecoburn`. Install later EcoBurn releases
+over the first EcoBurn APK on a device to confirm the retained signing key
+permits an update. The previous `com.biomo.biomassmonitor` APK cannot update to
+EcoBurn because Android treats the new application ID as a separate app. APK
+distribution uses manual installation and does not provide Google Play or
+in-app updates.
 
 ## What can prevent a release from working?
 

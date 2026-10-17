@@ -23,7 +23,7 @@ val releaseProperties =
     }
 
 android {
-    namespace = "com.biomo.biomassmonitor"
+    namespace = "com.biomo.ecoburn"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -37,7 +37,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.biomo.biomassmonitor"
+        applicationId = "com.biomo.ecoburn"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

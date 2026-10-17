@@ -78,8 +78,8 @@ void main() {
     );
     SharedPreferences.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
-      appName: 'Biomass Monitor',
-      packageName: 'com.biomo.biomassmonitor',
+      appName: 'EcoBurn',
+      packageName: 'com.biomo.ecoburn',
       version: '1.0.0',
       buildNumber: '1',
       buildSignature: '',
