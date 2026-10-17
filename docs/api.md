@@ -26,7 +26,7 @@ http://192.168.1.51/api
 ```
 
 The firmware does not provide mDNS, so `http://esp32.local` is not supported.
-The mobile dashboard uses the IP of the node selected in the app.
+The app uses its saved ESP32 address, including the port when connecting to the simulator.
 
 ### Transport security
 

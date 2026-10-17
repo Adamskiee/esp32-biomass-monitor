@@ -33,7 +33,7 @@ The core responsibility of the system is evaluating sensor data against safety t
 
 ### 4.1 Danger State
 The system enters a danger state if the following threshold condition is met:
-1.  **Temperature Threshold:** Chamber Temperature exceeds `safe_chamber_limit`.
+1.  **Temperature Threshold:** Chamber Temperature reaches or exceeds `safe_chamber_limit`.
 
 **Actions taken when in this state:**
 *   Status LED is set to **RED**.
@@ -73,3 +73,32 @@ If **NONE** of the conditions in Sections 4.1 through 4.3 are met, the system is
 The audible alarm operates on an independent rule focused strictly on overheating.
 *   **Condition:** The buzzer activates ONLY if the Chamber Temperature is a valid number AND strictly exceeds the `safe_chamber_limit`.
 *   *(Note: The buzzer does not sound for MQ2 gas thresholds or sensor disconnects).*
+
+## 5. Mobile safety configuration
+
+The admin-only Emergency Control & Local Alerts section on Control embeds the
+pump status, manual sprinkler switch, active conditions, and four threshold
+groups directly. Temperature has chamber and ambient upper limits, Gas has
+MQ-2 and MQ-135 upper limits, Particulate Matter has three upper limits, and
+Humidity has minimum and maximum. Each reading displays its confirmed saved
+limit, current value, and status; only chamber protection owns automatic outputs.
+
+Drafts survive polling, scrolling, offline periods, and failed writes. Every
+accepted observation refreshes saved settings independently of drafts. Apply
+submits changed fields and clears edits only after all submitted fields are
+confirmed by the device. Humidity validates against its latest saved partner.
+Unsupported fields are individually disabled; supported null limits remain
+editable. New MQ-2 limits cannot exceed 4.8 V, but an untouched legacy 5 V limit
+does not block unrelated edits. Configured limits cannot be cleared.
+
+Sensor faults take status priority; MQ warm-up instead shows a 300-second
+countdown. A catastrophic latch remains visible and locks manual control even
+with a chamber fault. Environmental alerts leave manual control enabled.
+Offline readings are stale and controls are disabled until reconnecting.
+The API remains authoritative if protection changes before a manual request.
+
+All production pollers share ordered observation acceptance and persistent
+activation keys. Ongoing conditions are recorded once across polls and restarts;
+recovery allows a later activation. Fault warnings group by hardware sensor.
+Muting sound cannot change device protection or local history. History requires
+a running connected app; there is no push delivery or device history.

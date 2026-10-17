@@ -4,8 +4,8 @@
 
 The Flutter app displays readings and actuator states reported by the ESP32.
 The firmware decides when safety rules activate the pump and sprinkler. The app
-can request manual sprinkler operation and update supported safety thresholds,
-but a request does not become the displayed state until the ESP32 confirms it.
+can request manual sprinkler operation and update supported safety thresholds.
+Pump Status and saved-limit labels use values confirmed by the device.
 
 ## How do I run it?
 
@@ -18,7 +18,8 @@ flutter run
 
 Enter the ESP32's current local IP address and log in with the credentials
 configured in `firmware/main/Secrets.h`. The app checks those credentials
-against the device before opening the dashboard. The safety dashboard polls
+against the device before opening the app. Open the admin-only **Control** tab
+and use **Emergency Control & Local Alerts** directly. Its safety panel polls
 `GET /api/state` every two seconds while the app is active. Its sprinkler switch
 sends `POST /api/control`, then refreshes from device state. A safety override
 returns `409` and the switch returns to the reported state.
@@ -29,12 +30,12 @@ the simulator started with `--host 0.0.0.0` and the computer's Wi-Fi IPv4
 address in the app. The simulator guide shows the exact command and a browser
 check for connection problems.
 
-The dashboard shows one read-only Pump Status indicator. Its manual sprinkler
-switch uses the reported boolean `pump_on`, so missing or malformed actuator
-telemetry displays UNAVAILABLE and disables control. The indicator reports the
-commanded relay output, so it does not confirm that the pump ran or that water
-flowed. Update the device and app together because older responses omit the
-required field.
+The pump card combines a read-only Pump Status indicator and the manual
+sprinkler switch. Both follow `pump_on`; unavailable or malformed pump telemetry
+displays UNAVAILABLE and disables manual control. The switch also locks while
+offline, saving limits, or under chamber protection. The indicator reports the
+commanded relay output, so it does not confirm that the pump ran or water flowed.
+Update the device and app together because older responses omit that field.
 
 The main telemetry view shows no live readings while the ESP32 is disconnected.
 It stores history and alerts locally in `biomass_iot.db` only from successful
@@ -61,8 +62,8 @@ temperature, MQ-135 and MQ-2 voltage, and PM1.0, PM2.5, and PM10 mass
 concentrations in µg/m³. `--` means the device has not provided that reading.
 Its session analytics show peak and average values for each metric. The
 current-session CSV export retains particulate fields as `PM1.0(ug/m3)`,
-`PM2.5(ug/m3)`, and `PM10(ug/m3)`. Particulate data is telemetry only and does
-not control the sprinkler or other safety outputs.
+`PM2.5(ug/m3)`, and `PM10(ug/m3)`. Configured particulate limits generate
+alerts and history entries; only chamber protection automatically runs the pump.
 
 The Home dashboard groups live and historical trends by unit so readings remain
 readable: ambient and chamber temperatures, MQ2 and MQ135 voltages, and PM1.0,
@@ -78,18 +79,55 @@ arrives while an older page is open, the app keeps that page stable and shows a
 New records available action that returns to the refreshed first page. Session
 analytics and CSV exports continue to use the current in-memory session.
 
-The safety dashboard groups configurable limits by temperature, gas,
-particulate matter, and humidity. It shows the current sensor reading beside
-each group and disables manual sprinkler control while a chamber-temperature
-safety trigger is active. New MQ-2 limits must be from 0.1 to 4.8 V because a
-higher value can conceal the sensor's rail-fault range. Firmware that does not
-report the extended threshold fields shows a firmware-update message instead
-of editable limits.
+## How do I configure sensor limits on Control?
 
-The safety dashboard sends edited fields to `POST /api/thresholds` and keeps
-the draft until the device returns its confirmed thresholds. The firmware also
-accepts `/api/settings` for older clients, with the same validation. See [the
-API reference](api.md) for ranges and examples.
+Under **Emergency Control & Local Alerts**, the Temperature, Gas, Particulate
+Matter, and Humidity groups provide nine numeric fields for eight readings.
+Each row shows its current reading, confirmed saved limit, and status. Chamber
+temperature says **Alerts + automatic sprinkler**; every other reading says
+**Alerts only**. Pump status and manual control share the card above the groups.
+
+1. Enter the limits selected for your operation. Configuration ranges validate
+   device settings; they are not exposure standards. New optional limits start
+   unset, with **Not configured** displayed until saved.
+2. Enter both humidity boundaries for the first configuration, with minimum
+   strictly below maximum. Later edits validate against the latest saved
+   opposite boundary. Limits already configured cannot be cleared.
+3. Select **Apply Thresholds**. Only changed fields are sent together. Inputs
+   lock during the request, and the device-confirmed values replace the draft
+   and saved labels after success. Failed writes or missing confirmation keep
+   the typed values so you can retry.
+
+Polling refreshes readings and saved labels while preserving edited text,
+including while scrolling or using the keyboard. For example, if you type a
+humidity minimum of 35% while another client changes the saved maximum to 34%,
+Apply rejects the invalid pair. Offline readings are marked stale and controls
+lock until reconnecting; the draft remains available.
+
+New MQ-2 limits must be 0.1 to 4.8 V because readings above 4.8 V are sensor
+faults. A saved legacy limit of 5 V remains visible and does not block editing
+other limits. Missing firmware fields are individually disabled with **Firmware
+update required**; an explicit null field remains editable. See the
+[API reference](api.md) for all configuration ranges.
+
+**Sensor fault** takes priority over a row's alert or unconfigured status.
+During the 300-second MQ warm-up, MQ rows instead show a countdown. A retained
+`catastrophic_latch` keeps chamber protection visible and manual control locked
+even when the chamber reading is faulty. Environmental alerts leave manual
+control available. The device rejects a manual command with 409 if chamber
+protection takes ownership after the most recent poll.
+
+Control and background telemetry share ordered observations and persistent
+activation keys, so an ongoing condition creates one history entry across
+polls and app restarts. Recovery permits a later activation to create another
+entry. DHT22 faults and PMS5003 faults are grouped by physical sensor. Muting app
+sound changes neither history nor firmware protection.
+
+Limits apply immediately in device memory. Flash writes occur at most once
+every 60 seconds, so power loss before persistence can lose a recent change.
+App history requires the app to be running and connected; there are no push
+notifications or device-side history. The standalone dashboard route remains
+available for compatibility and hosts the same controls.
 
 ## How do filtration attempts work?
 

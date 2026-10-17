@@ -39,17 +39,35 @@ confirm that the pump ran or water flowed.
 
 ## How do I configure safety limits?
 
-Open Control > Biomass Monitor Safety Dashboard before first use. Configure
+Open **Control > Emergency Control & Local Alerts** before first use. Configure
 chamber temperature, MQ-2, MQ-135, ambient temperature, PM1.0, PM2.5, PM10,
 and both humidity boundaries. These are operator settings, not exposure
 standards or calibrated measurements. Changes apply immediately and are saved
-to flash no more than once per minute.
+to flash no more than once per minute. Power loss before that write can lose a
+recent change.
+
+Each sensor row shows a reading, a saved limit, and its status. Enter both
+humidity boundaries for the first save and keep minimum below maximum.
+**Apply Thresholds** submits only edited fields; visible saved values change
+after device confirmation. A failed request retains edits. Polling may update
+the saved opposite humidity boundary while you edit, so validation always uses
+the latest device settings.
+
+New MQ-2 values cannot exceed 4.8 V; an existing 5 V limit stays readable.
+An explicit unset limit remains editable. **Firmware update required** disables
+only a field absent from older firmware. Offline readings are marked stale and
+controls lock until reconnection. Sensor faults take priority over alert or
+unconfigured statuses, except that MQ warm-up shows its remaining seconds.
 
 Only chamber temperature owns automatic sprinkler and buzzer behavior. Gas,
 ambient, particulate, and humidity conditions add device triggers and app
 history entries without taking pump ownership. The device evaluates conditions
 without the app, but app alerts require a connected running app. There are no
-push notifications or device-side alert history.
+push notifications or device-side alert history. Control and telemetry share
+one history recorder, retaining one entry per active condition across polls and
+app restarts. App mute suppresses sound without changing protection or history.
+Manual control remains locked for a catastrophic chamber latch even if the
+chamber reading fails; an environmental alert leaves manual control available.
 
 ## What should I check during operation?
 

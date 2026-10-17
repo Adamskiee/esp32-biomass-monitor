@@ -34,7 +34,7 @@ Use the network listener below when connecting a phone.
 1. Start the simulator on the computer running the Android emulator.
 2. Enter `10.0.2.2:8765` as the ESP32 address in the app. The emulator uses
    `10.0.2.2` to reach the host computer's loopback listener.
-3. Log in with `demo` / `demo` and open the dashboard.
+3. Log in with `demo` / `demo` and open Control, then Emergency Control & Local Alerts.
 
 ## How do I connect a physical phone?
 
