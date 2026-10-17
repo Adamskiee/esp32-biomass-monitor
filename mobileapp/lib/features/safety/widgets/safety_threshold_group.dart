@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../monitoring/sensor_data.dart';
 import '../safety_threshold_editor.dart';
+import 'safety_threshold_sliders.dart';
 
 class SafetyThresholdGroup extends StatelessWidget {
   const SafetyThresholdGroup({
@@ -40,6 +41,17 @@ class SafetyThresholdGroup extends StatelessWidget {
               reading: reading,
               activeTriggers: activeTriggers,
               locked: locked,
+              onChanged: onChanged,
+            ),
+          if (fields.contains('threshold_humidity_min_percent') &&
+              fields.contains('threshold_humidity_max_percent'))
+            SafetyHumidityRangeSlider(
+              minimumController: controllers['threshold_humidity_min_percent']!,
+              maximumController: controllers['threshold_humidity_max_percent']!,
+              enabled:
+                  !locked &&
+                  editor.saved.supports('threshold_humidity_min_percent') &&
+                  editor.saved.supports('threshold_humidity_max_percent'),
               onChanged: onChanged,
             ),
         ],
@@ -94,25 +106,55 @@ class _ThresholdRow extends StatelessWidget {
           Text(_status(supported, saved)),
           if (definition.field == 'threshold_mq2_v')
             const Text('New limits cannot exceed 4.8 V.'),
-          TextFormField(
-            key: ValueKey(definition.field),
-            controller: controller,
-            enabled: supported && !locked,
-            onChanged: (value) => onChanged(definition.field, value),
-            keyboardType: TextInputType.numberWithOptions(
-              decimal: true,
-              signed: definition.field == 'threshold_temperature_c',
+          if (definition.isHumidity)
+            _numericInput(supported, error)
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: SafetyThresholdSlider(
+                    key: ValueKey('${definition.field}_slider_control'),
+                    field: definition.field,
+                    label: definition.label,
+                    unit: definition.unit,
+                    controller: controller,
+                    saved: saved,
+                    minimum: definition.minimum,
+                    maximum: definition.maximum,
+                    step: definition.step,
+                    expandRange: definition.isParticulate,
+                    enabled: supported && !locked,
+                    onChanged: (value) => onChanged(definition.field, value),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(width: 112, child: _numericInput(supported, null)),
+              ],
             ),
-            decoration: InputDecoration(
-              labelText: 'Limit (${definition.unit})',
-              helperText: supported ? null : 'Firmware update required',
-              errorText: error,
+          if (!definition.isHumidity && error != null)
+            Text(
+              error,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
-          ),
         ],
       ),
     );
   }
+
+  Widget _numericInput(bool supported, String? error) => TextFormField(
+    key: ValueKey(definition.field),
+    controller: controller,
+    enabled: supported && !locked,
+    onChanged: (value) => onChanged(definition.field, value),
+    keyboardType: TextInputType.numberWithOptions(
+      decimal: true,
+      signed: definition.field == 'threshold_temperature_c',
+    ),
+    decoration: InputDecoration(
+      labelText: 'Limit (${definition.unit})',
+      errorText: error,
+    ),
+  );
 
   String _status(bool supported, double? saved) {
     if (!supported) return 'Firmware update required';
@@ -156,6 +198,30 @@ class _FieldDefinition {
   final Set<String> alertTriggers;
   final String faultTrigger;
   final bool isMq;
+
+  bool get isHumidity => field.startsWith('threshold_humidity_');
+  bool get isParticulate => field.startsWith('threshold_pm');
+
+  double get minimum => switch (field) {
+    'threshold_chamber_temp_c' => 20,
+    'threshold_temperature_c' => -40,
+    'threshold_mq2_v' || 'threshold_mq135_v' => 0.1,
+    _ => 1,
+  };
+
+  double get maximum => switch (field) {
+    'threshold_chamber_temp_c' => 150,
+    'threshold_temperature_c' => 80,
+    'threshold_mq2_v' => 4.8,
+    'threshold_mq135_v' => 5,
+    _ => 65535,
+  };
+
+  double get step => isMq
+      ? 0.1
+      : isParticulate
+      ? 1
+      : 0.5;
 }
 
 const _definitions = <String, _FieldDefinition>{

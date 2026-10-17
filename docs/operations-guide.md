@@ -48,6 +48,10 @@ recent change.
 
 Each sensor row shows a reading, a saved limit, and its status. Enter both
 humidity boundaries for the first save and keep minimum below maximum.
+Adjust upper limits with their slider or numeric input. Humidity has a
+two-handle range slider with exact minimum/maximum entry. Slider dragging uses
+0.5 °C, 0.1 V, 1 µg/m³, or 1% steps; type a value for finer precision.
+Particulate slider ranges expand when a typed or saved value exceeds 500 µg/m³.
 **Apply Thresholds** submits only edited fields; visible saved values change
 after device confirmation. A failed request retains edits. Polling may update
 the saved opposite humidity boundary while you edit, so validation always uses

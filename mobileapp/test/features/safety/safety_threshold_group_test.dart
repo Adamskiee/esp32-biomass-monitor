@@ -75,15 +75,20 @@ void main() {
     bool locked = false,
   }) => MaterialApp(
     home: Scaffold(
-      body: SafetyThresholdGroup(
-        title: title,
-        fields: fields,
-        editor: editor,
-        controllers: controllers,
-        reading: data ?? reading,
-        activeTriggers: triggers,
-        locked: locked,
-        onChanged: editor.edit,
+      body: SingleChildScrollView(
+        child: StatefulBuilder(
+          builder: (context, update) => SafetyThresholdGroup(
+            title: title,
+            fields: fields,
+            editor: editor,
+            controllers: controllers,
+            reading: data ?? reading,
+            activeTriggers: triggers,
+            locked: locked,
+            onChanged: (field, value) =>
+                update(() => editor.edit(field, value)),
+          ),
+        ),
       ),
     ),
   );
@@ -195,4 +200,243 @@ void main() {
       findsNWidgets(2),
     );
   });
+
+  Finder sliderFor(String field) => find.byKey(ValueKey('${field}_slider'));
+  String inputText(WidgetTester tester, String field) => tester
+      .widget<TextFormField>(find.byKey(ValueKey(field)))
+      .controller!
+      .text;
+
+  testWidgets('each upper limit offers a slider that writes a valid draft', (
+    tester,
+  ) async {
+    for (final entry in <String, (double, String)>{
+      chamber: (85.26, '85.5'),
+      ambient: (-10.26, '-10.5'),
+      mq2: (1.26, '1.3'),
+      mq135: (2.84, '2.8'),
+      pm1: (80.4, '80'),
+      pm25: (90.6, '91'),
+      pm10: (110.1, '110'),
+    }.entries) {
+      await tester.pumpWidget(subject(title: 'Threshold', fields: [entry.key]));
+      final slider = tester.widget<Slider>(sliderFor(entry.key));
+      slider.onChanged!(entry.value.$1);
+      await tester.pump();
+      expect(inputText(tester, entry.key), entry.value.$2);
+      expect(
+        editor.changedValues(),
+        containsPair(entry.key, double.parse(entry.value.$2)),
+      );
+    }
+  });
+
+  testWidgets('exact typing moves the slider without rounding the input', (
+    tester,
+  ) async {
+    await tester.pumpWidget(subject(title: 'Temperature', fields: [ambient]));
+    await tester.enterText(find.byKey(const ValueKey(ambient)), '-10.25');
+    await tester.pump();
+    expect(tester.widget<Slider>(sliderFor(ambient)).value, -10.25);
+    expect(inputText(tester, ambient), '-10.25');
+    expect(editor.changedValues(), {ambient: -10.25});
+    expect(
+      tester.widget<Slider>(sliderFor(ambient)).semanticFormatterCallback!(
+        -10.25,
+      ),
+      '-10.25 °C',
+    );
+  });
+
+  testWidgets(
+    'PM range expands for exact entry and stays stable while dragging down',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(title: 'Particulate Matter', fields: [pm25]),
+      );
+      expect(tester.widget<Slider>(sliderFor(pm25)).max, 500);
+      await tester.enterText(find.byKey(const ValueKey(pm25)), '1200.25');
+      await tester.pump();
+      final expanded = tester.widget<Slider>(sliderFor(pm25));
+      expect(expanded.max, greaterThanOrEqualTo(1200.25));
+      expect(expanded.value, 1200.25);
+      expanded.onChanged!(100);
+      await tester.pump();
+      expect(tester.widget<Slider>(sliderFor(pm25)).max, expanded.max);
+      expect(inputText(tester, pm25), '100');
+      await tester.enterText(find.byKey(const ValueKey(pm25)), '65535');
+      await tester.pump();
+      expect(tester.widget<Slider>(sliderFor(pm25)).max, 65535);
+      expect(editor.changedValues(), {pm25: 65535});
+    },
+  );
+
+  testWidgets('saved PM settings beyond the initial range stay visible', (
+    tester,
+  ) async {
+    editor.refresh(SafetyThresholds.fromJson({pm1: 900}));
+    controllers[pm1]!.text = '900';
+    await tester.pumpWidget(
+      subject(title: 'Particulate Matter', fields: [pm1]),
+    );
+    final slider = tester.widget<Slider>(sliderFor(pm1));
+    expect(slider.max, greaterThanOrEqualTo(900));
+    expect(slider.value, 900);
+    expect(editor.isDirty, isFalse);
+  });
+
+  testWidgets('unset limits remain unset until a slider is used', (
+    tester,
+  ) async {
+    editor.refresh(SafetyThresholds.fromJson({ambient: null}));
+    controllers[ambient]!.clear();
+    await tester.pumpWidget(subject(title: 'Temperature', fields: [ambient]));
+    expect(inputText(tester, ambient), isEmpty);
+    expect(editor.isDirty, isFalse);
+    expect(editor.changedValues(), isEmpty);
+    tester.widget<Slider>(sliderFor(ambient)).onChanged!(-5);
+    await tester.pump();
+    expect(inputText(tester, ambient), '-5');
+    expect(editor.changedValues(), {ambient: -5});
+    expect(find.text('Saved limit: Not configured'), findsOneWidget);
+  });
+
+  testWidgets('legacy MQ-2 setting stays intact until the slider is edited', (
+    tester,
+  ) async {
+    editor.refresh(SafetyThresholds.fromJson({mq2: 5}));
+    controllers[mq2]!.text = '5';
+    await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
+    final slider = tester.widget<Slider>(sliderFor(mq2));
+    expect(slider.max, 4.8);
+    expect(slider.value, 4.8);
+    expect(inputText(tester, mq2), '5');
+    expect(editor.isDirty, isFalse);
+    slider.onChanged!(4.8);
+    await tester.pump();
+    expect(editor.changedValues(), {mq2: 4.8});
+  });
+
+  testWidgets(
+    'invalid text is retained while slider positions remain bounded',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(title: 'Particulate Matter', fields: [pm25]),
+      );
+      for (final text in ['65536', '-1', 'NaN', 'Infinity', 'bad', '']) {
+        await tester.enterText(find.byKey(const ValueKey(pm25)), text);
+        await tester.pump();
+        final slider = tester.widget<Slider>(sliderFor(pm25));
+        expect(slider.value, inInclusiveRange(slider.min, slider.max));
+        expect(inputText(tester, pm25), text);
+        expect(editor.changedValues(), isEmpty);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
+  testWidgets(
+    'one humidity range slider synchronizes both bounds and keeps exact typing',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+      );
+      expect(find.byType(Slider), findsNothing);
+      final range = find.byType(RangeSlider);
+      expect(range, findsOneWidget);
+      tester.widget<RangeSlider>(range).onChanged!(const RangeValues(30, 81.7));
+      await tester.pump();
+      expect(inputText(tester, humidityMin), '30');
+      expect(inputText(tester, humidityMax), '82');
+      expect(editor.changedValues(), {humidityMax: 82});
+      await tester.enterText(find.byKey(const ValueKey(humidityMin)), '35.25');
+      await tester.pump();
+      expect(tester.widget<RangeSlider>(range).values.start, 35.25);
+      tester.widget<RangeSlider>(range).onChanged!(
+        const RangeValues(35.25, 90.4),
+      );
+      await tester.pump();
+      expect(inputText(tester, humidityMin), '35.25');
+      expect(inputText(tester, humidityMax), '90');
+    },
+  );
+
+  testWidgets(
+    'unset humidity pair is configured together only on interaction',
+    (tester) async {
+      editor.refresh(
+        SafetyThresholds.fromJson({humidityMin: null, humidityMax: null}),
+      );
+      controllers[humidityMin]!.clear();
+      controllers[humidityMax]!.clear();
+      await tester.pumpWidget(
+        subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+      );
+      expect(editor.changedValues(), isEmpty);
+      expect(inputText(tester, humidityMin), isEmpty);
+      expect(inputText(tester, humidityMax), isEmpty);
+      tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged!(
+        const RangeValues(20.4, 79.6),
+      );
+      await tester.pump();
+      expect(editor.changedValues(), {humidityMin: 20, humidityMax: 80});
+      expect(editor.validate(), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'reversed humidity typing stays visible with validation and a renderable slider',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+      );
+      await tester.enterText(find.byKey(const ValueKey(humidityMin)), '80');
+      await tester.pump();
+      final slider = tester.widget<RangeSlider>(find.byType(RangeSlider));
+      expect(slider.values.start, lessThanOrEqualTo(slider.values.end));
+      expect(slider.labels!.start, '70 %');
+      expect(slider.labels!.end, '80 %');
+      expect(inputText(tester, humidityMin), '80');
+      expect(inputText(tester, humidityMax), '70');
+      expect(editor.validate(), contains('humidity'));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'offline and unsupported controls disable sliders as well as typing',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(title: 'Gas', fields: [mq2], locked: true),
+      );
+      expect(tester.widget<Slider>(sliderFor(mq2)).onChanged, isNull);
+      await tester.pumpWidget(
+        subject(
+          title: 'Humidity',
+          fields: [humidityMin, humidityMax],
+          locked: true,
+        ),
+      );
+      expect(
+        tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged,
+        isNull,
+      );
+      editor.refresh(SafetyThresholds.fromJson({humidityMin: 30}));
+      await tester.pumpWidget(
+        subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+      );
+      expect(
+        tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey(humidityMin)))
+            .enabled,
+        isTrue,
+      );
+      await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
+      expect(tester.widget<Slider>(sliderFor(mq2)).onChanged, isNull);
+    },
+  );
 }

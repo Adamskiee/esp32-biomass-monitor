@@ -83,6 +83,12 @@ MQ-2 and MQ-135 upper limits, Particulate Matter has three upper limits, and
 Humidity has minimum and maximum. Each reading displays its confirmed saved
 limit, current value, and status; only chamber protection owns automatic outputs.
 
+Upper limits pair a slider with exact numeric entry. Humidity uses one
+two-handle range slider and minimum/maximum inputs. Dragging uses 0.5 C,
+0.1 V, 1 µg/m³, and 1% steps; numeric entry permits finer precision.
+Particulate sliders start at 1–500 µg/m³ and expand for larger typed or saved
+values up to 65535. Displaying a slider for an unset limit does not configure it.
+
 Drafts survive polling, scrolling, offline periods, and failed writes. Every
 accepted observation refreshes saved settings independently of drafts. Apply
 submits changed fields and clears edits only after all submitted fields are

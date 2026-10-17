@@ -36,6 +36,69 @@ Map<String, dynamic> snapshot() => {
 };
 
 void main() {
+  testWidgets(
+    'phone slider gesture updates a draft and saves only after Apply',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      final state = snapshot();
+      final writes = <Map<String, dynamic>>[];
+      final client = MockClient((request) async {
+        if (request.method == 'POST') {
+          final patch = jsonDecode(request.body) as Map<String, dynamic>;
+          writes.add(patch);
+          state.addAll(patch);
+          return http.Response(jsonEncode({'thresholds': state}), 200);
+        }
+        return http.Response(jsonEncode(state), 200);
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: SafetyControlsPanel(
+                apiService: ApiService(
+                  baseUrl: 'http://device/api',
+                  authorizationHeader: 'Basic test',
+                  client: client,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final slider = find.byKey(
+        const ValueKey('threshold_chamber_temp_c_slider'),
+      );
+      await tester.ensureVisible(slider);
+      await tester.tapAt(tester.getCenter(slider));
+      await tester.pump();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey(chamber)))
+            .controller!
+            .text,
+        '85',
+      );
+      expect(writes, isEmpty);
+      expect(find.text('Saved limit: 70 °C'), findsOneWidget);
+      await tester.ensureVisible(find.text('Apply Thresholds'));
+      await tester.tap(find.text('Apply Thresholds'));
+      await tester.pump();
+      expect(writes, [
+        {chamber: 85},
+      ]);
+      expect(find.text('Saved limit: 85 °C'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      client.close();
+    },
+  );
   testWidgets('mute resets after an accepted recovery before retriggering', (
     tester,
   ) async {

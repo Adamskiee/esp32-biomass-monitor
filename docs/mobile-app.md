@@ -87,9 +87,9 @@ Each row shows its current reading, confirmed saved limit, and status. Chamber
 temperature says **Alerts + automatic sprinkler**; every other reading says
 **Alerts only**. Pump status and manual control share the card above the groups.
 
-1. Enter the limits selected for your operation. Configuration ranges validate
-   device settings; they are not exposure standards. New optional limits start
-   unset, with **Not configured** displayed until saved.
+1. Drag a slider or type the limits selected for your operation. Configuration
+   ranges validate device settings; they are not exposure standards. New optional
+   limits start unset, with **Not configured** displayed until saved.
 2. Enter both humidity boundaries for the first configuration, with minimum
    strictly below maximum. Later edits validate against the latest saved
    opposite boundary. Limits already configured cannot be cleared.
@@ -97,6 +97,14 @@ temperature says **Alerts + automatic sprinkler**; every other reading says
    lock during the request, and the device-confirmed values replace the draft
    and saved labels after success. Failed writes or missing confirmation keep
    the typed values so you can retry.
+
+Each upper limit pairs a slider with exact numeric entry. Humidity uses one
+two-handle range slider and separate minimum/maximum inputs. Dragging uses
+0.5 °C, 0.1 V, 1 µg/m³, and 1% steps; typing retains finer precision.
+Particulate sliders initially span 1–500 µg/m³ and expand for larger typed or
+saved values, up to 65535. Their displayed range stays stable while dragging.
+These slider ranges do not restrict the API's accepted configuration ranges.
+An unset slider position does not configure a limit until you interact with it.
 
 Polling refreshes readings and saved labels while preserving edited text,
 including while scrolling or using the keyboard. For example, if you type a
