@@ -204,7 +204,7 @@ void main() {
 
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Biomass Monitor'), findsNothing);
+      expect(find.text('EcoBurn'), findsNothing);
 
       await tester.pumpWidget(const SizedBox.shrink());
       completer.complete(http.Response('{}', 200));
@@ -276,7 +276,7 @@ void main() {
         await tester.pump();
 
         expect(find.byType(CircularProgressIndicator), findsNothing);
-        expect(find.text('Biomass Monitor'), findsOneWidget);
+        expect(find.text('EcoBurn'), findsOneWidget);
         expect(find.text('Live Sensor Data'), findsOneWidget);
         expect(find.text('65.4 °C'), findsOneWidget);
         expect(find.text('1.25 V'), findsOneWidget);

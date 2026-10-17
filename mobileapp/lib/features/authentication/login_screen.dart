@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen>
         context.read<AppStateProvider>().canResumeWithBiometrics) {
       try {
         final bool didAuthenticate = await auth.authenticate(
-          localizedReason: 'Authenticate to access Biomass Terminal',
+          localizedReason: 'Authenticate to access EcoBurn',
         );
         if (didAuthenticate && mounted) {
           await context.read<AppStateProvider>().biometricLoginSuccess();
@@ -171,45 +171,17 @@ class _LoginScreenState extends State<LoginScreen>
                           curve: Curves.easeOutExpo,
                           builder: (context, val, child) =>
                               Transform.scale(scale: val, child: child),
-                          child: Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: theme.cardColor.withValues(alpha: 0.5),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppTheme.neonGreen.withValues(
-                                  alpha: 0.3,
-                                ),
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.neonGreen.withValues(
-                                    alpha: 0.2,
-                                  ),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              CupertinoIcons.flame_fill,
-                              size: 64,
-                              color: AppTheme.neonGreen,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset(
+                              'assets/branding/ecoburn-logo.png',
+                              width: 280,
+                              fit: BoxFit.contain,
+                              semanticLabel: 'EcoBurn',
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
-                        Text(
-                          "Biomass Core",
-                          style: TextStyle(
-                            color: theme.textTheme.bodyLarge?.color,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 24),
                         const Text(
                           "Telemetry & Command Protocol",
                           style: TextStyle(

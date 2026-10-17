@@ -187,7 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_state.isEmpty) {
       if (_errorMessage != null) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Biomass Monitor')),
+          appBar: AppBar(title: const Text('EcoBurn')),
           body: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -225,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Biomass Monitor'),
+        title: const Text('EcoBurn'),
         actions: [
           if (_previousTriggers.isNotEmpty)
             IconButton(

@@ -125,29 +125,33 @@ void main() {
   });
 
   testWidgets('desktop navigation uses the sidebar', (tester) async {
-    final messenger = tester.binding.defaultBinaryMessenger;
-    // Navigation assertions do not need the sidebar's remote font download.
-    messenger.setMockMessageHandler('flutter/assets', (message) async {
-      final asset = utf8.decode(message!.buffer.asUint8List());
-      if (asset == 'AssetManifest.bin') {
-        return const StandardMessageCodec().encodeMessage({
-          'Inter-Bold.ttf': [
-            {'asset': 'Inter-Bold.ttf'},
-          ],
-        });
-      }
-      if (asset == 'Inter-Bold.ttf') return ByteData(0);
-      return null;
-    });
-    addTearDown(() => messenger.setMockMessageHandler('flutter/assets', null));
     await initialize(tester);
     await mount(tester, size: const Size(1200, 900));
     expect(find.byType(BottomNavigationBar), findsNothing);
+    expect(find.text('ECOBURN'), findsOneWidget);
     expect(find.text('Home Dashboard'), findsOneWidget);
     expect(find.text('Air Quality Monitor'), findsOneWidget);
     expect(find.text('System Control'), findsOneWidget);
     expect(find.text('Active Alerts'), findsOneWidget);
     expect(find.text('Settings & Admin'), findsOneWidget);
+    await dispose(tester);
+  });
+
+  testWidgets('mobile header displays the EcoBurn icon', (tester) async {
+    await initialize(tester);
+    await mount(tester);
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/branding/ecoburn-icon.png',
+      ),
+      findsOneWidget,
+    );
+
     await dispose(tester);
   });
 
