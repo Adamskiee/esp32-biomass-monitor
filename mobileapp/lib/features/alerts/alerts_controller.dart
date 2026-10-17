@@ -108,18 +108,22 @@ class AlertsController extends ChangeNotifier {
       );
     }
     for (final sensor in sensorFaults.difference(_activeSensorFaults)) {
-      _activeSensorFaults.add(sensor);
-      await _store.setAlertState('sensor:$sensor', true);
-      await _recordAlert(
+      final alert = _newAlert(
         title: 'WARNING: $sensor Sensor Fault',
         description:
             '$sensor is not reporting valid data. Check the sensor connection.',
         severity: 'warning',
       );
+      if (await _store.recordActivation('sensor:$sensor', alert)) {
+        _activeSensorFaults.add(sensor);
+        _alerts.insert(0, alert);
+        _totalAlerts++;
+        _notifyListeners();
+      }
     }
     for (final sensor in _activeSensorFaults.difference(sensorFaults)) {
-      _activeSensorFaults.remove(sensor);
       await _store.setAlertState('sensor:$sensor', false);
+      _activeSensorFaults.remove(sensor);
       await _recordAlert(
         title: 'INFO: $sensor Sensor Recovered',
         description: '$sensor is reporting valid data again.',
@@ -183,6 +187,13 @@ class AlertsController extends ChangeNotifier {
             reading.humidityPercent == null) {
       faults.add('DHT22');
     }
+    if (triggers.contains('ambient_temp_sensor_fault') ||
+        triggers.contains('humidity_sensor_fault') ||
+        reading.reportsField('temperature_c') && reading.temperatureC == null ||
+        reading.reportsField('humidity_percent') &&
+            reading.humidityPercent == null) {
+      faults.add('DHT22');
+    }
     if (triggers.contains('temp_sensor_fault') ||
         reading.reportsField('chamber_temp_c') &&
             reading.chamberTempC == null) {
@@ -198,7 +209,8 @@ class AlertsController extends ChangeNotifier {
             reading.reportsField('mq2_v') && reading.mq2V == null)) {
       faults.add('MQ2');
     }
-    if ((reading.reportsField('pm1_0_ug_m3') ||
+    if (triggers.contains('pms_sensor_fault') ||
+        (reading.reportsField('pm1_0_ug_m3') ||
                 reading.reportsField('pm1_ug_m3')) &&
             reading.pm1_0UgM3 == null ||
         (reading.reportsField('pm2_5_ug_m3') ||
@@ -220,9 +232,9 @@ class AlertsController extends ChangeNotifier {
       description: description,
       severity: severity,
     );
+    await _store.insertAlert(alert);
     _alerts.insert(0, alert);
     _totalAlerts++;
-    await _store.insertAlert(alert);
     _notifyListeners();
   }
 

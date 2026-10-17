@@ -33,32 +33,21 @@ class SensorData {
   bool reportsField(String field) => _reportedFields.contains(field);
 
   factory SensorData.fromJson(Map<String, dynamic> json) => SensorData(
-    temperatureC: json['temperature_c'] != null
-        ? (json['temperature_c'] as num).toDouble()
-        : null,
-    humidityPercent: json['humidity_percent'] != null
-        ? (json['humidity_percent'] as num).toDouble()
-        : null,
-    chamberTempC: json['chamber_temp_c'] != null
-        ? (json['chamber_temp_c'] as num).toDouble()
-        : null,
-    mq135V: json['mq135_v'] != null
-        ? (json['mq135_v'] as num).toDouble()
-        : null,
-    mq2V: json['mq2_v'] != null ? (json['mq2_v'] as num).toDouble() : null,
+    temperatureC: _number(json['temperature_c']),
+    humidityPercent: _number(json['humidity_percent']),
+    chamberTempC: _number(json['chamber_temp_c']),
+    mq135V: _number(json['mq135_v']),
+    mq2V: _number(json['mq2_v']),
     mqWarmupRemainingSeconds:
         (json['mq_warmup_remaining_seconds'] as num?)?.toInt() ?? 0,
     mqWarmingUp: json['mq_warming_up'] == true,
-    pm1_0UgM3: (json['pm1_0_ug_m3'] ?? json['pm1_ug_m3']) != null
-        ? ((json['pm1_0_ug_m3'] ?? json['pm1_ug_m3']) as num).toDouble()
-        : null,
-    pm2_5UgM3: (json['pm2_5_ug_m3'] ?? json['pm25_ug_m3']) != null
-        ? ((json['pm2_5_ug_m3'] ?? json['pm25_ug_m3']) as num).toDouble()
-        : null,
-    pm10UgM3: json['pm10_ug_m3'] != null
-        ? (json['pm10_ug_m3'] as num).toDouble()
-        : null,
+    pm1_0UgM3: _number(json['pm1_0_ug_m3'] ?? json['pm1_ug_m3']),
+    pm2_5UgM3: _number(json['pm2_5_ug_m3'] ?? json['pm25_ug_m3']),
+    pm10UgM3: _number(json['pm10_ug_m3']),
     reportedFields: json.keys.toSet(),
     timestamp: DateTime.now(),
   );
 }
+
+double? _number(dynamic value) =>
+    value is num && value.isFinite ? value.toDouble() : null;

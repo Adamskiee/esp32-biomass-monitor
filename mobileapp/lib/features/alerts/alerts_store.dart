@@ -52,6 +52,28 @@ class AlertsStore {
     });
   }
 
+  Future<void> migrateLegacyGasHazard() async {
+    if (kIsWeb) return;
+    final database = await _database.database;
+    await database.transaction((transaction) async {
+      final legacy = await transaction.query(
+        'alert_states',
+        where: 'key = ? AND active = ?',
+        whereArgs: ['gas_hazard', 1],
+        limit: 1,
+      );
+      if (legacy.isEmpty) return;
+      await transaction.insert('alert_states', {
+        'key': 'trigger:high_mq2_gas',
+        'active': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await transaction.insert('alert_states', {
+        'key': 'gas_hazard',
+        'active': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   Future<List<AlertItem>> getAlerts({
     int limit = 20,
     int offset = 0,

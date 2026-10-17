@@ -50,4 +50,18 @@ void main() {
 
     expect(reading.isMqWarmingUp, isTrue);
   });
+
+  test('treats invalid numeric values as unavailable readings', () {
+    final reading = SensorData.fromJson({
+      'temperature_c': 'hot',
+      'chamber_temp_c': double.nan,
+      'mq2_v': double.infinity,
+      'pm2_5_ug_m3': false,
+    });
+
+    expect(reading.temperatureC, isNull);
+    expect(reading.chamberTempC, isNull);
+    expect(reading.mq2V, isNull);
+    expect(reading.pm2_5UgM3, isNull);
+  });
 }

@@ -189,6 +189,36 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test('records explicit DHT22 and PMS5003 faults without readings', () async {
+    final directory = await Directory.systemTemp.createTemp('alerts-');
+    final database = AppDatabase(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: '${directory.path}/biomass_iot.db',
+    );
+    final controller = AlertsController(AlertsStore(database));
+
+    await controller.recordTriggers(SensorData(timestamp: DateTime.now()), [
+      'ambient_temp_sensor_fault',
+      'humidity_sensor_fault',
+      'pms_sensor_fault',
+    ]);
+
+    expect(
+      controller.alerts.where(
+        (alert) => alert.title == 'WARNING: DHT22 Sensor Fault',
+      ),
+      hasLength(1),
+    );
+    expect(
+      controller.alerts.where(
+        (alert) => alert.title == 'WARNING: PMS5003 Sensor Fault',
+      ),
+      hasLength(1),
+    );
+    await database.close();
+    await directory.delete(recursive: true);
+  });
+
   test('retains active MQ sensor faults while the sensors warm up', () async {
     final directory = await Directory.systemTemp.createTemp('alerts-');
     final database = AppDatabase(
