@@ -28,6 +28,7 @@ class DatabaseHelper implements DatabaseProvider {
     Database db = await database;
     return await db.insert('sensor_data', {
       'temperature_c': data.temperatureC,
+      'humidity_percent': data.humidityPercent,
       'chamber_temp_c': data.chamberTempC,
       'mq135_v': data.mq135V,
       'mq2_v': data.mq2V,
@@ -50,6 +51,7 @@ class DatabaseHelper implements DatabaseProvider {
     return List.generate(maps.length, (i) {
       return SensorData(
         temperatureC: maps[i]['temperature_c'] as double?,
+        humidityPercent: (maps[i]['humidity_percent'] as num?)?.toDouble(),
         chamberTempC: maps[i]['chamber_temp_c'] as double?,
         mq135V: maps[i]['mq135_v'] as double?,
         mq2V: maps[i]['mq2_v'] as double?,
@@ -90,15 +92,27 @@ class DatabaseHelper implements DatabaseProvider {
       int end = (i + step < maps.length) ? i + step : maps.length;
       var chunk = maps.sublist(i, end);
 
-      double sumTempC = 0, sumChamberC = 0, sumMq135 = 0, sumMq2 = 0;
+      double sumTempC = 0,
+          sumHumidity = 0,
+          sumChamberC = 0,
+          sumMq135 = 0,
+          sumMq2 = 0;
       double sumPm1 = 0, sumPm25 = 0, sumPm10 = 0;
-      int countTempC = 0, countChamberC = 0, countMq135 = 0, countMq2 = 0;
+      int countTempC = 0,
+          countHumidity = 0,
+          countChamberC = 0,
+          countMq135 = 0,
+          countMq2 = 0;
       int countPm1 = 0, countPm25 = 0, countPm10 = 0;
 
       for (var row in chunk) {
         if (row['temperature_c'] != null) {
           sumTempC += row['temperature_c'] as double;
           countTempC++;
+        }
+        if (row['humidity_percent'] != null) {
+          sumHumidity += (row['humidity_percent'] as num).toDouble();
+          countHumidity++;
         }
         if (row['chamber_temp_c'] != null) {
           sumChamberC += row['chamber_temp_c'] as double;
@@ -129,6 +143,9 @@ class DatabaseHelper implements DatabaseProvider {
       aggregated.add(
         SensorData(
           temperatureC: countTempC > 0 ? sumTempC / countTempC : null,
+          humidityPercent: countHumidity > 0
+              ? sumHumidity / countHumidity
+              : null,
           chamberTempC: countChamberC > 0 ? sumChamberC / countChamberC : null,
           mq135V: countMq135 > 0 ? sumMq135 / countMq135 : null,
           mq2V: countMq2 > 0 ? sumMq2 / countMq2 : null,

@@ -21,6 +21,7 @@ extern float threshold_chamber_temp_c;
 extern float threshold_mq2_v;
 // Cached Sensor Readings (API reads these instead of blocking)
 extern float current_temp_c;
+extern float current_humidity_percent;
 extern float current_chamber_c;
 extern float current_mq135_v;
 extern float current_mq2_v;
@@ -48,8 +49,9 @@ ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit, float mq2_limit);
 ManualSprinklerResult applyManualSprinklerCommand(bool enabled);
-void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
-                           float mq2_v, bool mq_sensors_warming_up = false);
+void processSensorReadings(float temperature_c, float humidity_percent,
+                           float chamber_c, float mq135_v, float mq2_v,
+                           bool mq_sensors_warming_up = false);
 void startMqWarmup(uint32_t now_ms);
 uint32_t mqWarmupRemainingSeconds(uint32_t now_ms);
 bool mqSensorsAreWarmingUp();

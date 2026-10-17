@@ -122,6 +122,7 @@ void main() {
       SensorData(
         chamberTempC: 58.4,
         temperatureC: 31.2,
+        humidityPercent: 54.5,
         mq135V: 0.75,
         mq2V: 1.75,
         pm1_0UgM3: 8,
@@ -141,6 +142,7 @@ void main() {
       300,
     );
     expect(find.textContaining('Ambient Temp: 31.2 °C'), findsOneWidget);
+    expect(find.textContaining('Humidity: 54.5 %'), findsOneWidget);
     expect(find.textContaining('MQ-135: 0.75 V'), findsOneWidget);
     expect(find.textContaining('PM1.0: 8 µg/m³'), findsOneWidget);
   });
@@ -153,8 +155,9 @@ void main() {
     expect(find.text('Particulate Matter'), findsOneWidget);
     expect(find.text('Chamber Temperature'), findsOneWidget);
     expect(find.text('Ambient Temperature'), findsOneWidget);
-    expect(find.text('Peak'), findsNWidgets(7));
-    expect(find.text('Average'), findsNWidgets(7));
+    expect(find.text('Humidity'), findsOneWidget);
+    expect(find.text('Peak'), findsNWidgets(8));
+    expect(find.text('Average'), findsNWidgets(8));
   });
 
   testWidgets('shows ten records per page with navigation controls', (

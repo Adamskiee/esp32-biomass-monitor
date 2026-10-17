@@ -23,6 +23,7 @@ class SensorHistoryStore implements SensorHistoryReader {
     if (kIsWeb) return 0;
     return (await _database.database).insert('sensor_data', {
       'temperature_c': data.temperatureC,
+      'humidity_percent': data.humidityPercent,
       'chamber_temp_c': data.chamberTempC,
       'mq135_v': data.mq135V,
       'mq2_v': data.mq2V,
@@ -94,6 +95,7 @@ class SensorHistoryStore implements SensorHistoryReader {
       data.add(
         SensorData(
           temperatureC: _average(chunk, 'temperature_c'),
+          humidityPercent: _average(chunk, 'humidity_percent'),
           chamberTempC: _average(chunk, 'chamber_temp_c'),
           mq135V: _average(chunk, 'mq135_v'),
           mq2V: _average(chunk, 'mq2_v'),
@@ -109,6 +111,7 @@ class SensorHistoryStore implements SensorHistoryReader {
 
   SensorData _sensorDataFromRow(Map<String, Object?> row) => SensorData(
     temperatureC: (row['temperature_c'] as num?)?.toDouble(),
+    humidityPercent: (row['humidity_percent'] as num?)?.toDouble(),
     chamberTempC: (row['chamber_temp_c'] as num?)?.toDouble(),
     mq135V: (row['mq135_v'] as num?)?.toDouble(),
     mq2V: (row['mq2_v'] as num?)?.toDouble(),

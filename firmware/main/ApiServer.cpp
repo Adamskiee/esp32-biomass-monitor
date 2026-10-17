@@ -45,6 +45,10 @@ void initApiServer() {
       doc["temperature_c"] = nullptr;
     else
       doc["temperature_c"] = current_temp_c;
+    if (isnan(current_humidity_percent))
+      doc["humidity_percent"] = nullptr;
+    else
+      doc["humidity_percent"] = current_humidity_percent;
     if (isnan(current_chamber_c))
       doc["chamber_temp_c"] = nullptr;
     else
