@@ -12,4 +12,11 @@ void main() {
     expect(thresholds.supports('threshold_pm2_5_ug_m3'), isFalse);
     expect(thresholds.value('threshold_pm2_5_ug_m3'), isNull);
   });
+  test('non-finite saved settings remain unavailable', () {
+    final thresholds = SafetyThresholds.fromJson({
+      'threshold_mq2_v': double.infinity,
+    });
+    expect(thresholds.supports('threshold_mq2_v'), isTrue);
+    expect(thresholds.value('threshold_mq2_v'), isNull);
+  });
 }

@@ -122,15 +122,23 @@ class AlertsController extends ChangeNotifier {
       }
     }
     for (final sensor in _activeSensorFaults.difference(sensorFaults)) {
-      await _store.setAlertState('sensor:$sensor', false);
-      _activeSensorFaults.remove(sensor);
-      await _recordAlert(
+      final alert = _newAlert(
         title: 'INFO: $sensor Sensor Recovered',
         description: '$sensor is reporting valid data again.',
         severity: 'info',
       );
+      await _store.recordRecovery('sensor:$sensor', alert);
+      _activeSensorFaults.remove(sensor);
+      _alerts.insert(0, alert);
+      _totalAlerts++;
+      _notifyListeners();
     }
     final conditions = triggers
+        .where(
+          (trigger) =>
+              !reading.isMqWarmingUp ||
+              (trigger != 'high_mq2_gas' && trigger != 'high_mq135_gas'),
+        )
         .map(safetyConditionFor)
         .whereType<SafetyCondition>()
         .map((condition) => condition.trigger)
@@ -150,13 +158,14 @@ class AlertsController extends ChangeNotifier {
       }
     }
     for (final trigger in _activeConditions.difference(conditions).toList()) {
-      _activeConditions.remove(trigger);
       await _store.setAlertState('trigger:$trigger', false);
+      _activeConditions.remove(trigger);
     }
   }
 
   Future<void> _loadAlertStates() async {
     if (_hasLoadedAlertStates) return;
+    await _store.migrateLegacyGasHazard();
     final states = await _store.getActiveAlertStates();
     _activeSensorFaults
       ..clear()
@@ -172,21 +181,11 @@ class AlertsController extends ChangeNotifier {
             .where((state) => state.startsWith('trigger:'))
             .map((state) => state.substring('trigger:'.length)),
       );
-    if (states.contains('gas_hazard')) {
-      _activeConditions.add('high_mq2_gas');
-      await _store.setAlertState('gas_hazard', false);
-      await _store.setAlertState('trigger:high_mq2_gas', true);
-    }
     _hasLoadedAlertStates = true;
   }
 
   Set<String> _sensorFaults(SensorData reading, List<String> triggers) {
     final faults = <String>{};
-    if (reading.reportsField('temperature_c') && reading.temperatureC == null ||
-        reading.reportsField('humidity_percent') &&
-            reading.humidityPercent == null) {
-      faults.add('DHT22');
-    }
     if (triggers.contains('ambient_temp_sensor_fault') ||
         triggers.contains('humidity_sensor_fault') ||
         reading.reportsField('temperature_c') && reading.temperatureC == null ||
@@ -200,8 +199,8 @@ class AlertsController extends ChangeNotifier {
       faults.add('Thermocouple');
     }
     if (!reading.isMqWarmingUp &&
-        reading.reportsField('mq135_v') &&
-        reading.mq135V == null) {
+        (triggers.contains('mq135_sensor_fault') ||
+            reading.reportsField('mq135_v') && reading.mq135V == null)) {
       faults.add('MQ135');
     }
     if (!reading.isMqWarmingUp &&
@@ -220,22 +219,6 @@ class AlertsController extends ChangeNotifier {
       faults.add('PMS5003');
     }
     return faults;
-  }
-
-  Future<void> _recordAlert({
-    required String title,
-    required String description,
-    required String severity,
-  }) async {
-    final alert = _newAlert(
-      title: title,
-      description: description,
-      severity: severity,
-    );
-    await _store.insertAlert(alert);
-    _alerts.insert(0, alert);
-    _totalAlerts++;
-    _notifyListeners();
   }
 
   AlertItem _newAlert({

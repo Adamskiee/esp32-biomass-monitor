@@ -33,21 +33,40 @@ class SensorData {
   bool reportsField(String field) => _reportedFields.contains(field);
 
   factory SensorData.fromJson(Map<String, dynamic> json) => SensorData(
-    temperatureC: _number(json['temperature_c']),
-    humidityPercent: _number(json['humidity_percent']),
+    temperatureC: _number(json['temperature_c'], minimum: -40, maximum: 80),
+    humidityPercent: _number(
+      json['humidity_percent'],
+      minimum: 0,
+      maximum: 100,
+    ),
     chamberTempC: _number(json['chamber_temp_c']),
     mq135V: _number(json['mq135_v']),
-    mq2V: _number(json['mq2_v']),
+    mq2V: _number(json['mq2_v'], maximum: 4.8),
     mqWarmupRemainingSeconds:
         (json['mq_warmup_remaining_seconds'] as num?)?.toInt() ?? 0,
     mqWarmingUp: json['mq_warming_up'] == true,
-    pm1_0UgM3: _number(json['pm1_0_ug_m3'] ?? json['pm1_ug_m3']),
-    pm2_5UgM3: _number(json['pm2_5_ug_m3'] ?? json['pm25_ug_m3']),
-    pm10UgM3: _number(json['pm10_ug_m3']),
+    pm1_0UgM3: _number(
+      json['pm1_0_ug_m3'] ?? json['pm1_ug_m3'],
+      minimum: 0,
+      maximum: 65535,
+    ),
+    pm2_5UgM3: _number(
+      json['pm2_5_ug_m3'] ?? json['pm25_ug_m3'],
+      minimum: 0,
+      maximum: 65535,
+    ),
+    pm10UgM3: _number(json['pm10_ug_m3'], minimum: 0, maximum: 65535),
     reportedFields: json.keys.toSet(),
     timestamp: DateTime.now(),
   );
 }
 
-double? _number(dynamic value) =>
-    value is num && value.isFinite ? value.toDouble() : null;
+double? _number(dynamic value, {double? minimum, double? maximum}) {
+  if (value is! num ||
+      !value.isFinite ||
+      minimum != null && value < minimum ||
+      maximum != null && value > maximum) {
+    return null;
+  }
+  return value.toDouble();
+}

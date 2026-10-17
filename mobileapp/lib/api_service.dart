@@ -85,8 +85,17 @@ class ApiService {
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final thresholds = body['thresholds'];
-    return thresholds is Map<String, dynamic>
+    final confirmed = thresholds is Map<String, dynamic>
         ? SafetyThresholds.fromJson(thresholds)
-        : fetchThresholds();
+        : await fetchThresholds();
+    if (changes.keys.any(
+      (field) =>
+          !confirmed.supports(field) ||
+          confirmed.value(field) == null ||
+          !confirmed.value(field)!.isFinite,
+    )) {
+      throw Exception('Device did not confirm every submitted limit.');
+    }
+    return confirmed;
   }
 }

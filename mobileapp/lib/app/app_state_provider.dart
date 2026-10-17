@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/storage/app_database.dart';
+import '../api_service.dart';
 import '../database_helper.dart';
 import '../features/alerts/alert_item.dart';
 import '../features/alerts/alerts_controller.dart';
@@ -50,6 +51,8 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   final List<SensorData> _history = [];
   int _telemetryRevision = 0;
   Timer? _pollingTimer;
+  bool _isDisposed = false;
+  int _sessionRevision = 0;
 
   AppStateProvider(
     this._prefs, {
@@ -64,7 +67,9 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     _safetyObservationRecorder = SafetyObservationRecorder(_alertsController!);
     unawaited(_alertsController!.load());
     _deviceAddresses = DeviceAddressStore(_prefs);
-    _deviceAddresses.migrateLegacyNodes().then((_) => notifyListeners());
+    _deviceAddresses.migrateLegacyNodes().then((_) {
+      if (!_isDisposed) notifyListeners();
+    });
     _loadHistory();
   }
 
@@ -85,6 +90,12 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   AlertsController get alertsController => _alertsController!;
   SafetyObservationRecorder get safetyObservationRecorder =>
       _safetyObservationRecorder;
+
+  ApiService createSafetyApiService() => ApiService(
+    baseUrl: 'http://$deviceIp/api',
+    authorizationHeader: authorizationHeader,
+    client: _client,
+  );
 
   List<AlertItem> get alerts => _alertsController?.alerts ?? const [];
   int get alertCount => _alertsController?.totalAlerts ?? 0;
@@ -161,6 +172,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     try {
       final dbHelper = DatabaseHelper();
       final dbData = await dbHelper.getSensorData(limit: 60);
+      if (_isDisposed) return;
       final mergedHistory = mergeSensorHistory(
         persisted: dbData.reversed.toList(),
         live: _history,
@@ -194,6 +206,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       return false;
     }
     _isAdmin = true;
+    _sessionRevision++;
     _currentUser = user;
     _password = password;
     _isAuthenticated = true;
@@ -209,6 +222,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   }
 
   void logout() {
+    _sessionRevision++;
     _isAuthenticated = false;
     _pollingTimer?.cancel();
     notifyListeners();
@@ -220,8 +234,9 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   }
 
   Future<void> saveDeviceIp(String ipAddress) async {
+    if (ipAddress != deviceIp) _sessionRevision++;
     await _deviceAddresses.saveDeviceIp(ipAddress);
-    notifyListeners();
+    if (!_isDisposed) notifyListeners();
   }
 
   Future<void> forceRefresh() async {
@@ -240,6 +255,8 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   }
 
   Future<void> pollOnce() async {
+    if (_isDisposed) return;
+    final sessionRevision = _sessionRevision;
     final observationTicket = _safetyObservationRecorder.begin();
     try {
       final response = await _client
@@ -248,6 +265,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
             headers: {'Authorization': _basicAuthHeader},
           )
           .timeout(const Duration(seconds: 2));
+      if (_isDisposed || sessionRevision != _sessionRevision) return;
       if (response.statusCode == 200) {
         final reportedState =
             json.decode(response.body) as Map<String, dynamic>;
@@ -263,7 +281,9 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
           observationTicket,
           reportedState,
         );
-        if (!accepted) return;
+        if (!accepted || _isDisposed || sessionRevision != _sessionRevision) {
+          return;
+        }
         _currentData = reading;
         _isHardwareConnected = true;
         if (triggers.contains('high_mq2_gas') &&
@@ -272,9 +292,12 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
           HapticFeedback.heavyImpact();
         }
       } else {
+        if (!_safetyObservationRecorder.isCurrent(observationTicket)) return;
         _isHardwareConnected = false;
       }
     } catch (_) {
+      if (_isDisposed || sessionRevision != _sessionRevision) return;
+      if (!_safetyObservationRecorder.isCurrent(observationTicket)) return;
       _isHardwareConnected = false;
     }
     if (!_isHardwareConnected) {
@@ -293,10 +316,14 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     notifyListeners();
   }
 
-  void _onAlertsChanged() => notifyListeners();
+  void _onAlertsChanged() {
+    if (!_isDisposed) notifyListeners();
+  }
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _sessionRevision++;
     _pollingTimer?.cancel();
     _alertsController?.removeListener(_onAlertsChanged);
     if (_ownsAlertsController) _alertsController?.dispose();

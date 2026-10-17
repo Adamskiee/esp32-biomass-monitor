@@ -15,7 +15,10 @@ class PmsReadings extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Particulate Matter', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text(
+          'Particulate Matter',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
         _reading('PM1.0', format(data.pm1_0UgM3)),
         _reading('PM2.5', format(data.pm2_5UgM3)),
@@ -24,7 +27,6 @@ class PmsReadings extends StatelessWidget {
     );
   }
 
-  Widget _reading(String label, String value) => Row(
-    children: [Text('$label: '), Text(value)],
-  );
+  Widget _reading(String label, String value) =>
+      Row(children: [Text('$label: '), Text(value)]);
 }

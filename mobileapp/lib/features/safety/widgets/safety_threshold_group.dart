@@ -71,7 +71,11 @@ class _ThresholdRow extends StatelessWidget {
     final supported = editor.saved.supports(definition.field);
     final saved = editor.saved.value(definition.field);
     final errors = editor.validate();
-    final error = errors[definition.field] ?? errors['humidity'];
+    final error =
+        errors[definition.field] ??
+        (definition.field.startsWith('threshold_humidity_')
+            ? errors['humidity']
+            : null);
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(
@@ -112,11 +116,13 @@ class _ThresholdRow extends StatelessWidget {
 
   String _status(bool supported, double? saved) {
     if (!supported) return 'Firmware update required';
-    if (definition.isMq && reading.isMqWarmingUp)
+    if (definition.isMq && reading.isMqWarmingUp) {
       return 'Warming up: ${reading.mqWarmupRemainingSeconds} s';
+    }
     if (activeTriggers.contains(definition.faultTrigger) ||
-        definition.reading(reading) == null)
+        definition.reading(reading) == null) {
       return 'Sensor fault';
+    }
     if (activeTriggers.any(definition.alertTriggers.contains)) return 'Alert';
     if (saved == null) return 'Not configured';
     return 'Normal';

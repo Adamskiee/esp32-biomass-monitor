@@ -177,4 +177,22 @@ void main() {
     expect(editable.keyboardType.signed, isTrue);
     expect(editable.keyboardType.decimal, isTrue);
   });
+
+  testWidgets('humidity pairing errors appear only beside humidity inputs', (
+    tester,
+  ) async {
+    editor.edit(humidityMin, '75');
+    await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
+    expect(
+      find.text('Maximum humidity must exceed minimum humidity.'),
+      findsNothing,
+    );
+    await tester.pumpWidget(
+      subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+    );
+    expect(
+      find.text('Maximum humidity must exceed minimum humidity.'),
+      findsNWidgets(2),
+    );
+  });
 }

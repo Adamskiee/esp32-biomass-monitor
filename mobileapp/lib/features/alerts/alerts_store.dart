@@ -74,6 +74,24 @@ class AlertsStore {
     });
   }
 
+  Future<void> recordRecovery(String key, AlertItem alert) async {
+    if (kIsWeb) return;
+    final database = await _database.database;
+    await database.transaction((transaction) async {
+      await transaction.insert('alerts', {
+        'id': alert.id,
+        'title': alert.title,
+        'description': alert.description,
+        'severity': alert.severity,
+        'time': alert.timestamp?.toIso8601String(),
+      });
+      await transaction.insert('alert_states', {
+        'key': key,
+        'active': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   Future<List<AlertItem>> getAlerts({
     int limit = 20,
     int offset = 0,

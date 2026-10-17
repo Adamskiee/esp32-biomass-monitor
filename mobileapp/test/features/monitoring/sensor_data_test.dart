@@ -64,4 +64,20 @@ void main() {
     expect(reading.mq2V, isNull);
     expect(reading.pm2_5UgM3, isNull);
   });
+
+  test(
+    'rejects out-of-range environmental readings instead of reporting Normal',
+    () {
+      final reading = SensorData.fromJson({
+        'temperature_c': 100,
+        'humidity_percent': -1,
+        'mq2_v': 4.9,
+        'pm10_ug_m3': -1,
+      });
+      expect(reading.temperatureC, isNull);
+      expect(reading.humidityPercent, isNull);
+      expect(reading.mq2V, isNull);
+      expect(reading.pm10UgM3, isNull);
+    },
+  );
 }

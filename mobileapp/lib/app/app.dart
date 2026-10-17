@@ -1,4 +1,3 @@
-import 'package:biomass_iot_app/api_service.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_shell.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
@@ -28,10 +27,8 @@ class MyApp extends StatelessWidget {
         '/dashboard': (context) {
           final state = context.read<AppStateProvider>();
           return DashboardScreen(
-            apiService: ApiService(
-              baseUrl: 'http://${state.deviceIp}/api',
-              authorizationHeader: state.authorizationHeader,
-            ),
+            observationRecorder: state.safetyObservationRecorder,
+            apiService: state.createSafetyApiService(),
           );
         },
       },

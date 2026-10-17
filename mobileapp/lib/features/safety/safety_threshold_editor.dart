@@ -7,10 +7,16 @@ class SafetyThresholdEditor {
   void refresh(SafetyThresholds saved) => _saved = saved;
   void edit(String field, String text) => _drafts[field] = text;
   SafetyThresholds get saved => _saved;
-  String textFor(String field) => _drafts[field] ?? _format(_saved.value(field));
+  String textFor(String field) =>
+      _drafts[field] ?? _format(_saved.value(field));
   bool hasDraft(String field) => _drafts.containsKey(field);
   bool get hasDrafts => _drafts.isNotEmpty;
-  bool get isDirty => _drafts.keys.any(_saved.supports);
+  bool get isDirty => _drafts.entries.any(
+    (entry) =>
+        _saved.supports(entry.key) &&
+        (double.tryParse(entry.value) == null ||
+            double.tryParse(entry.value) != _saved.value(entry.key)),
+  );
 
   Map<String, String> validate() {
     final errors = <String, String>{};
@@ -21,7 +27,8 @@ class SafetyThresholdEditor {
       final value = double.tryParse(entry.value);
       if (value == null || !value.isFinite) {
         errors[entry.key] = 'Enter a finite number.';
-      } else if (!_isWithinRange(entry.key, value)) {
+      } else if (value != _saved.value(entry.key) &&
+          !_isWithinRange(entry.key, value)) {
         errors[entry.key] = _rangeError(entry.key);
       }
     }

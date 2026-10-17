@@ -12,6 +12,149 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   setUpAll(sqfliteFfiInit);
 
+  group('persistent safety transitions', () {
+    late Directory directory;
+    late AppDatabase database;
+    late AlertsStore store;
+    late AlertsController controller;
+    setUp(() async {
+      directory = await Directory.systemTemp.createTemp('safety-transitions-');
+      database = AppDatabase(
+        databaseFactory: databaseFactoryFfi,
+        databasePath: '${directory.path}/app.db',
+      );
+      store = AlertsStore(database);
+      await database.database;
+      controller = AlertsController(store);
+    });
+    tearDown(() async {
+      controller.dispose();
+      await database.close();
+      await directory.delete(recursive: true);
+    });
+
+    for (final trigger in [
+      'high_chamber_temp',
+      'catastrophic_latch',
+      'high_mq2_gas',
+      'high_mq135_gas',
+      'high_ambient_temp',
+      'high_pm1_0',
+      'high_pm2_5',
+      'high_pm10',
+      'low_humidity',
+      'high_humidity',
+    ]) {
+      test(
+        '$trigger survives repeats, concurrency, restart, recovery, and retrigger',
+        () async {
+          final reading = SensorData(timestamp: DateTime.now());
+          await Future.wait([
+            controller.recordTriggers(reading, [trigger]),
+            controller.recordTriggers(reading, [trigger]),
+          ]);
+          final restarted = AlertsController(store);
+          await restarted.recordTriggers(reading, [trigger]);
+          expect(await store.getAlertCount(), 1);
+          await restarted.recordTriggers(reading, []);
+          await restarted.recordTriggers(reading, [trigger]);
+          expect(await store.getAlertCount(), 2);
+          restarted.dispose();
+        },
+      );
+    }
+
+    for (final trigger in ['high_pm2_5', 'pms_sensor_fault']) {
+      test(
+        'failed $trigger insertion remains retryable with no activation key',
+        () async {
+          final db = await database.database;
+          await db.execute(
+            "CREATE TEMP TRIGGER fail_alert BEFORE INSERT ON alerts BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+          );
+          final reading = SensorData(timestamp: DateTime.now());
+          await expectLater(
+            controller.recordTriggers(reading, [trigger]),
+            throwsA(anything),
+          );
+          expect(await store.getActiveAlertStates(), isEmpty);
+          expect(controller.alerts, isEmpty);
+          await db.execute('DROP TRIGGER fail_alert');
+          await controller.recordTriggers(reading, [trigger]);
+          expect(await store.getAlertCount(), 1);
+        },
+      );
+    }
+
+    test('failed recovery insertion keeps a fault active for retry', () async {
+      final reading = SensorData(timestamp: DateTime.now());
+      await controller.recordTriggers(reading, ['pms_sensor_fault']);
+      final db = await database.database;
+      await db.execute(
+        "CREATE TEMP TRIGGER fail_alert BEFORE INSERT ON alerts BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+      );
+      await expectLater(
+        controller.recordTriggers(reading, []),
+        throwsA(anything),
+      );
+      expect(await store.getActiveAlertStates(), contains('sensor:PMS5003'));
+      await db.execute('DROP TRIGGER fail_alert');
+      await controller.recordTriggers(reading, []);
+      expect(await store.getAlertCount(), 2);
+    });
+
+    test(
+      'legacy migration is atomic and does not duplicate active gas',
+      () async {
+        final db = await database.database;
+        await store.setAlertState('gas_hazard', true);
+        await db.execute(
+          "CREATE TEMP TRIGGER fail_migration BEFORE INSERT ON alert_states WHEN NEW.key = 'trigger:high_mq2_gas' BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+        );
+        await expectLater(
+          controller.recordTriggers(SensorData(timestamp: DateTime.now()), [
+            'high_mq2_gas',
+          ]),
+          throwsA(anything),
+        );
+        expect(await store.getActiveAlertStates(), {'gas_hazard'});
+        await db.execute('DROP TRIGGER fail_migration');
+        await controller.recordTriggers(SensorData(timestamp: DateTime.now()), [
+          'high_mq2_gas',
+        ]);
+        expect(await store.getAlertCount(), 0);
+        expect(await store.getActiveAlertStates(), {'trigger:high_mq2_gas'});
+      },
+    );
+
+    test(
+      'explicit MQ135 fault is recorded without readings and warm-up suppresses MQ conditions',
+      () async {
+        await controller.recordTriggers(
+          SensorData.fromJson({'mq_warming_up': true}),
+          [
+            'mq135_sensor_fault',
+            'mq2_sensor_fault',
+            'high_mq2_gas',
+            'high_mq135_gas',
+          ],
+        );
+        expect(await store.getAlertCount(), 0);
+        await controller.recordTriggers(SensorData(timestamp: DateTime.now()), [
+          'mq135_sensor_fault',
+        ]);
+        expect(controller.alerts.single.title, 'WARNING: MQ135 Sensor Fault');
+      },
+    );
+
+    test('unknown triggers never invent a condition', () async {
+      await controller.recordTriggers(SensorData(timestamp: DateTime.now()), [
+        'unknown',
+      ]);
+      expect(await store.getAlertCount(), 0);
+    });
+  });
+
   test('maps configured threshold triggers to readable conditions', () {
     final reading = SensorData(humidityPercent: 29, timestamp: DateTime.now());
 

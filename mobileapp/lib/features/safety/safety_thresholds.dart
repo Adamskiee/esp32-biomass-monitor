@@ -19,7 +19,9 @@ class SafetyThresholds {
     final supported = fields.where(json.containsKey).toSet();
     return SafetyThresholds({
       for (final field in supported)
-        field: json[field] is num ? (json[field] as num).toDouble() : null,
+        field: json[field] is num && (json[field] as num).isFinite
+            ? (json[field] as num).toDouble()
+            : null,
     }, supported);
   }
 

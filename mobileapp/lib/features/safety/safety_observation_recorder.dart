@@ -10,6 +10,7 @@ class SafetyObservationRecorder {
   Future<void> _queue = Future.value();
 
   int begin() => ++_issued;
+  bool isCurrent(int ticket) => ticket >= _accepted;
 
   Future<bool> accept(int ticket, Map<String, dynamic> state) async {
     var accepted = false;

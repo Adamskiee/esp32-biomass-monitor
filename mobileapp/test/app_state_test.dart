@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:biomass_iot_app/app/app_state_provider.dart';
@@ -6,6 +7,9 @@ import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:biomass_iot_app/api_service.dart';
+import 'package:biomass_iot_app/features/safety/widgets/safety_controls_panel.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -22,7 +26,7 @@ void main() {
   });
 
   setUp(() {
-    databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
+    databaseFactory = databaseFactorySqflitePlugin;
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(
@@ -61,6 +65,203 @@ void main() {
   });
 
   test(
+    'a poll from the previous device cannot update history or alerts',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final response = Completer<http.Response>();
+      final directory = await Directory.systemTemp.createTemp('session-poll-');
+      final database = AppDatabase(
+        databaseFactory: databaseFactoryFfi,
+        databasePath: '${directory.path}/app.db',
+      );
+      final controller = AlertsController(AlertsStore(database));
+      final client = MockClient((_) => response.future);
+      final state = AppStateProvider(
+        prefs,
+        client: client,
+        alertsController: controller,
+      );
+      final poll = state.pollOnce();
+      await state.saveDeviceIp('192.168.1.23');
+      response.complete(
+        http.Response(
+          '{"chamber_temp_c":100,"active_triggers":["high_chamber_temp"]}',
+          200,
+        ),
+      );
+      await poll;
+      expect(state.telemetryRevision, 0);
+      expect(await AlertsStore(database).getAlertCount(), 0);
+      state.dispose();
+      controller.dispose();
+      client.close();
+      await database.close();
+      await directory.delete(recursive: true);
+    },
+  );
+
+  testWidgets(
+    'panel and provider reject old recovery and persist one shared activation',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final older = Completer<http.Response>();
+      var requests = 0;
+      final active = jsonEncode({
+        'pm2_5_ug_m3': 90,
+        'threshold_pm2_5_ug_m3': 60,
+        'pump_on': false,
+        'active_triggers': ['high_pm2_5'],
+      });
+      final client = MockClient((_) async {
+        requests++;
+        if (requests == 2) return older.future;
+        return http.Response(active, 200);
+      });
+      late Directory directory;
+      late AppDatabase database;
+      late AlertsStore store;
+      late AlertsController controller;
+      late AppStateProvider state;
+      var sounds = 0;
+      await tester.runAsync(() async {
+        directory = await Directory.systemTemp.createTemp('shared-panel-');
+        database = AppDatabase(
+          databaseFactory: databaseFactoryFfi,
+          databasePath: '${directory.path}/app.db',
+        );
+        store = AlertsStore(database);
+        controller = AlertsController(store);
+        await controller.load();
+        await controller.recordTriggers(
+          SensorData(pm2_5UgM3: 90, timestamp: DateTime.now()),
+          ['high_pm2_5'],
+        );
+        state = AppStateProvider(
+          prefs,
+          client: client,
+          alertsController: controller,
+        );
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: SafetyControlsPanel(
+                apiService: ApiService(
+                  baseUrl: 'http://device/api',
+                  authorizationHeader: 'Basic test',
+                  client: client,
+                ),
+                observationRecorder: state.safetyObservationRecorder,
+                onAlert: () => sounds++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+      expect(find.text('High PM2.5'), findsOneWidget);
+      expect(sounds, 1);
+      await tester.tap(find.byTooltip('Mute app alerts'));
+      await tester.pump(const Duration(seconds: 2));
+      final providerPoll = state.pollOnce();
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await tester.pump();
+        await tester.runAsync(
+          () async => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+      }
+      await providerPoll;
+      older.complete(http.Response('{"active_triggers":[]}', 200));
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+      expect(find.text('High PM2.5'), findsOneWidget);
+      expect(find.text('No active alerts'), findsNothing);
+      expect(sounds, 1);
+      await tester.runAsync(() async {
+        expect(await store.getAlertCount(), 1);
+      });
+      await tester.pumpWidget(const SizedBox.shrink());
+      state.dispose();
+      controller.dispose();
+      client.close();
+      await tester.runAsync(() async {
+        await database.close();
+        await directory.delete(recursive: true);
+      });
+    },
+  );
+
+  for (final olderFails in [false, true]) {
+    test(
+      'older poll cannot overwrite accepted telemetry, failure=$olderFails',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final older = Completer<http.Response>();
+        final newer = Completer<http.Response>();
+        var requests = 0;
+        final client = MockClient(
+          (_) => ++requests == 1 ? older.future : newer.future,
+        );
+        final directory = await Directory.systemTemp.createTemp(
+          'ordered-provider-',
+        );
+        final database = AppDatabase(
+          databaseFactory: databaseFactoryFfi,
+          databasePath: '${directory.path}/app.db',
+        );
+        final controller = AlertsController(AlertsStore(database));
+        final state = AppStateProvider(
+          prefs,
+          client: client,
+          alertsController: controller,
+        );
+        await state.saveDeviceIp('127.0.0.1');
+        final first = state.pollOnce();
+        final second = state.pollOnce();
+        newer.complete(
+          http.Response(
+            '{"chamber_temp_c":90,"active_triggers":["high_chamber_temp"]}',
+            200,
+          ),
+        );
+        await second;
+        older.complete(
+          olderFails
+              ? http.Response('Offline', 503)
+              : http.Response(
+                  '{"chamber_temp_c":40,"active_triggers":[]}',
+                  200,
+                ),
+        );
+        await first;
+        expect(state.isHardwareConnected, isTrue);
+        expect(state.currentData.chamberTempC, 90);
+        expect(
+          state.history.where((reading) => reading.chamberTempC == 40),
+          isEmpty,
+        );
+        expect(state.telemetryRevision, 1);
+        expect(await AlertsStore(database).getAlertCount(), 1);
+        state.dispose();
+        controller.dispose();
+        client.close();
+        await database.close();
+        await directory.delete(recursive: true);
+      },
+    );
+  }
+
+  test(
     'login accepts device credentials and uses the saved device IP',
     () async {
       SharedPreferences.setMockInitialValues({});
@@ -90,7 +291,7 @@ void main() {
     },
   );
 
-  testWidgets('offline polls do not create sensor history', (tester) async {
+  test('offline polls do not create sensor history', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     var online = true;
@@ -103,8 +304,7 @@ void main() {
     expect(await state.login('operator', 'secret'), isTrue);
     online = false;
 
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pump();
+    await state.pollOnce();
     expect(state.isHardwareConnected, isFalse);
     expect(state.currentData.chamberTempC, isNull);
     expect(state.history, isEmpty);
