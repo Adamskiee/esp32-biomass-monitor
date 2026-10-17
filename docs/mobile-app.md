@@ -4,8 +4,8 @@
 
 The Flutter app displays readings and actuator states reported by the ESP32.
 The firmware decides when safety rules activate the pump and sprinkler. The app
-can request manual sprinkler operation and update two safety thresholds, but a
-request does not become the displayed state until the ESP32 reports it.
+can request manual sprinkler operation and update supported safety thresholds,
+but a request does not become the displayed state until the ESP32 confirms it.
 
 ## How do I run it?
 
@@ -78,9 +78,18 @@ arrives while an older page is open, the app keeps that page stable and shows a
 New records available action that returns to the refreshed first page. Session
 analytics and CSV exports continue to use the current in-memory session.
 
-The safety dashboard sends threshold changes to `POST /api/thresholds`. The
-firmware also accepts `/api/settings` for older clients, with the same
-validation. See [the API reference](api.md) for ranges and examples.
+The safety dashboard groups configurable limits by temperature, gas,
+particulate matter, and humidity. It shows the current sensor reading beside
+each group and disables manual sprinkler control while a chamber-temperature
+safety trigger is active. New MQ-2 limits must be from 0.1 to 4.8 V because a
+higher value can conceal the sensor's rail-fault range. Firmware that does not
+report the extended threshold fields shows a firmware-update message instead
+of editable limits.
+
+The safety dashboard sends edited fields to `POST /api/thresholds` and keeps
+the draft until the device returns its confirmed thresholds. The firmware also
+accepts `/api/settings` for older clients, with the same validation. See [the
+API reference](api.md) for ranges and examples.
 
 ## How do filtration attempts work?
 

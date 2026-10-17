@@ -265,6 +265,13 @@ void main() {
               'sprinkler_on': false,
               'threshold_chamber_temp_c': 70.0,
               'threshold_mq2_v': 1.8,
+              'threshold_mq135_v': 1.0,
+              'threshold_temperature_c': 45.0,
+              'threshold_pm1_0_ug_m3': 50.0,
+              'threshold_pm2_5_ug_m3': 60.0,
+              'threshold_pm10_ug_m3': 70.0,
+              'threshold_humidity_min_percent': 30.0,
+              'threshold_humidity_max_percent': 70.0,
               'active_triggers': [],
             }),
             200,
@@ -285,11 +292,10 @@ void main() {
         expect(find.text('PM2.5: 34.5 µg/m³'), findsOneWidget);
         expect(find.text('PM10: 56 µg/m³'), findsOneWidget);
 
-        await tester.scrollUntilVisible(find.text('70.0 °C'), 100);
+        await tester.scrollUntilVisible(find.text('Chamber limit (°C)'), 100);
         expect(find.text('Manual Sprinkler'), findsOneWidget);
         expect(find.text('Safety Thresholds'), findsOneWidget);
-        expect(find.text('70.0 °C'), findsOneWidget);
-        expect(find.text('1.80 V'), findsOneWidget);
+        expect(find.text('Chamber limit (°C)'), findsOneWidget);
 
         final switchFinder = find.byType(Switch);
         expect(switchFinder, findsOneWidget);
@@ -535,11 +541,11 @@ void main() {
       await tester.tap(find.byType(Switch));
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
-      expect(posts, 1);
+      expect(posts, 0);
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
-      expect(fetches, 2);
-      expect(posts, 1);
+      expect(fetches, 3);
+      expect(posts, 0);
       expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -694,7 +700,7 @@ void main() {
   });
 
   group('DashboardScreen Lifecycle and Threshold Controls', () {
-    testWidgets('locks threshold sliders while saving', (tester) async {
+    testWidgets('locks threshold inputs while saving', (tester) async {
       final pendingSave = Completer<http.Response>();
       client = MockClient((request) async {
         if (request.method == 'POST') return pendingSave.future;
@@ -706,6 +712,13 @@ void main() {
             'active_triggers': [],
             'threshold_chamber_temp_c': 60.0,
             'threshold_mq2_v': 1.5,
+            'threshold_mq135_v': 1.0,
+            'threshold_temperature_c': 45.0,
+            'threshold_pm1_0_ug_m3': 50.0,
+            'threshold_pm2_5_ug_m3': 60.0,
+            'threshold_pm10_ug_m3': 70.0,
+            'threshold_humidity_min_percent': 30.0,
+            'threshold_humidity_max_percent': 70.0,
           }),
           200,
         );
@@ -713,19 +726,26 @@ void main() {
 
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      await tester.scrollUntilVisible(find.text('Temperature'), 100);
+      final chamberInput = find
+          .byKey(
+            const ValueKey('threshold_chamber_temp_c'),
+            skipOffstage: false,
+          )
+          .last;
+      await tester.ensureVisible(chamberInput);
+      await tester.enterText(chamberInput, '65');
       await tester.pump();
-      tester.widget<Slider>(find.byType(Slider).first).onChanged!(65.0);
+      await tester.drag(find.byType(ListView), const Offset(0, -1200));
       await tester.pump();
-      await tester.scrollUntilVisible(find.text('Apply Thresholds'), 100);
-      await tester.tap(find.text('Apply Thresholds'));
+      final apply = find.text('Apply Thresholds');
+      await tester.tap(apply);
       await tester.pump();
-      expect(
-        tester.widget<Slider>(find.byType(Slider).first).onChanged,
-        isNull,
-      );
+      expect(tester.widget<TextFormField>(chamberInput).enabled, isFalse);
 
-      pendingSave.complete(http.Response('{"status":"ok"}', 200));
+      pendingSave.complete(
+        http.Response('{"thresholds":{"threshold_chamber_temp_c":65}}', 200),
+      );
       await tester.pump();
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -774,11 +794,13 @@ void main() {
       );
       await tester.pumpWidget(buildTestableWidget(buildDashboard()));
       await tester.pump();
-      await tester.scrollUntilVisible(find.text('70.0 °C'), 100);
+      await tester.drag(find.byType(ListView), const Offset(0, -700));
+      await tester.pump();
+      expect(find.text('Firmware update required'), findsOneWidget);
       chamberLimit = 90.0;
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
-      expect(find.text('90.0 °C'), findsOneWidget);
+      expect(find.text('Firmware update required'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -821,56 +843,74 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
-    testWidgets('updates safety thresholds via ApiService.setThresholds', (
-      tester,
-    ) async {
-      double? savedTemp;
-      double? savedMq2;
+    testWidgets(
+      'updates edited safety thresholds only after device confirmation',
+      (tester) async {
+        double? savedTemp;
+        double? savedMq2;
 
-      client = MockClient((request) async {
-        if (request.method == 'GET') {
-          return http.Response(
-            jsonEncode({
-              'chamber_temp_c': 50.0,
-              'mq2_v': 0.5,
-              'sprinkler_on': false,
-              'threshold_chamber_temp_c': 60.0,
-              'threshold_mq2_v': 1.5,
-              'active_triggers': [],
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        } else if (request.url.path.endsWith('/thresholds')) {
-          final data = jsonDecode(request.body);
-          savedTemp = (data['threshold_chamber_temp_c'] as num).toDouble();
-          savedMq2 = (data['threshold_mq2_v'] as num).toDouble();
-          return http.Response('{"status":"ok"}', 200);
-        }
-        return http.Response('OK', 200);
-      });
+        client = MockClient((request) async {
+          if (request.method == 'GET') {
+            return http.Response(
+              jsonEncode({
+                'chamber_temp_c': 50.0,
+                'mq2_v': 0.5,
+                'sprinkler_on': false,
+                'threshold_chamber_temp_c': 60.0,
+                'threshold_mq2_v': 1.5,
+                'threshold_mq135_v': 1.0,
+                'threshold_temperature_c': 45.0,
+                'threshold_pm1_0_ug_m3': 50.0,
+                'threshold_pm2_5_ug_m3': 60.0,
+                'threshold_pm10_ug_m3': 70.0,
+                'threshold_humidity_min_percent': 30.0,
+                'threshold_humidity_max_percent': 70.0,
+                'active_triggers': [],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          } else if (request.url.path.endsWith('/thresholds')) {
+            final data = jsonDecode(request.body);
+            savedTemp = (data['threshold_chamber_temp_c'] as num).toDouble();
+            savedMq2 = (data['threshold_mq2_v'] as num?)?.toDouble();
+            return http.Response(
+              '{"thresholds":{"threshold_chamber_temp_c":65,"threshold_mq2_v":1.5}}',
+              200,
+            );
+          }
+          return http.Response('OK', 200);
+        });
 
-      await tester.pumpWidget(buildTestableWidget(buildDashboard()));
-      await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, -600));
-      await tester.pump();
-      tester.widget<Slider>(find.byType(Slider).first).onChanged!(65.0);
-      await tester.pump();
+        await tester.pumpWidget(buildTestableWidget(buildDashboard()));
+        await tester.pump();
+        await tester.scrollUntilVisible(find.text('Temperature'), 100);
+        final chamberInput = find
+            .byKey(
+              const ValueKey('threshold_chamber_temp_c'),
+              skipOffstage: false,
+            )
+            .last;
+        await tester.ensureVisible(chamberInput);
+        await tester.enterText(chamberInput, '65');
+        await tester.pump();
 
-      final applyButton = find.widgetWithText(
-        ElevatedButton,
-        'Apply Thresholds',
-      );
-      expect(applyButton, findsOneWidget);
-      await tester.scrollUntilVisible(applyButton, 100);
-      await tester.tap(applyButton);
-      await tester.pump();
+        await tester.drag(find.byType(ListView), const Offset(0, -1200));
+        await tester.pump();
+        final applyButton = find.widgetWithText(
+          ElevatedButton,
+          'Apply Thresholds',
+        );
+        expect(applyButton, findsOneWidget);
+        await tester.tap(applyButton);
+        await tester.pump();
 
-      expect(savedTemp, 65.0);
-      expect(savedMq2, 1.5);
-      expect(find.text('Thresholds updated successfully'), findsOneWidget);
+        expect(savedTemp, 65.0);
+        expect(savedMq2, isNull);
+        expect(find.text('Thresholds updated successfully'), findsOneWidget);
 
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
   });
 }

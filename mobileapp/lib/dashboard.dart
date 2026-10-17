@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'api_service.dart';
 import 'features/safety/safety_threshold_editor.dart';
+import 'features/safety/safety_thresholds.dart';
 import 'features/safety/widgets/safety_threshold_group.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -27,8 +28,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isOffline = false;
   String? _errorMessage;
 
-  double _tempLimit = 60.0;
-  double _mq2Limit = 1.5;
   bool _thresholdsDirty = false;
   bool _isSavingThresholds = false;
   final SafetyThresholdEditor _thresholdEditor = SafetyThresholdEditor();
@@ -102,9 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         _isOffline = false;
         _previousTriggers = triggers;
         if (!_thresholdsDirty) {
-          _tempLimit =
-              (state['threshold_chamber_temp_c'] as num?)?.toDouble() ?? 60.0;
-          _mq2Limit = (state['threshold_mq2_v'] as num?)?.toDouble() ?? 1.5;
+          _thresholdEditor.refresh(SafetyThresholds.fromJson(state));
         }
       });
     } catch (e) {
@@ -154,12 +151,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         throw Exception(errors.values.first);
       }
       final changes = _thresholdEditor.changedValues();
-      if (changes.isNotEmpty) {
-        await widget.apiService.updateSafetyThresholds(changes);
-      }
-      await widget.apiService.setThresholds(_tempLimit, _mq2Limit);
+      if (changes.isEmpty) return;
+      final confirmed = await widget.apiService.updateSafetyThresholds(changes);
       if (!mounted) return;
-      setState(() => _thresholdsDirty = false);
+      setState(() {
+        _thresholdEditor.confirm(confirmed);
+        _thresholdsDirty = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thresholds updated successfully')),
       );
@@ -233,6 +231,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         : pumpOn == false
         ? Colors.grey
         : Colors.orange;
+    final activeTriggers = List<String>.from(_state['active_triggers'] ?? []);
+    final sprinklerLocked =
+        activeTriggers.contains('high_chamber_temp') ||
+        activeTriggers.contains('catastrophic_chamber_temp');
+    SafetyThresholdField thresholdField(String key, String label) =>
+        SafetyThresholdField(
+          label: label,
+          value: (_state[key] as num?)?.toString() ?? '',
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -359,7 +366,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               value: pumpOn == true,
               onChanged:
-                  _isOffline || pumpOn == null || _queuedSprinklerState != null
+                  _isOffline ||
+                      sprinklerLocked ||
+                      pumpOn == null ||
+                      _queuedSprinklerState != null
                   ? null
                   : (val) => setState(() => _queuedSprinklerState = val),
             ),
@@ -374,111 +384,124 @@ class _DashboardScreenState extends State<DashboardScreen>
           if (_state.containsKey('threshold_mq135_v')) ...[
             SafetyThresholdGroup(
               title: 'Temperature',
+              currentReading: 'Chamber: ${_state['chamber_temp_c'] ?? '--'} °C',
               locked: _isOffline || _isSavingThresholds,
               fields: {
-                'threshold_chamber_temp_c': _tempLimit.toStringAsFixed(1),
-                'threshold_temperature_c':
-                    '${_state['threshold_temperature_c'] ?? ''}',
+                'threshold_chamber_temp_c': thresholdField(
+                  'threshold_chamber_temp_c',
+                  'Chamber limit (°C)',
+                ),
+                'threshold_temperature_c': thresholdField(
+                  'threshold_temperature_c',
+                  'Ambient limit (°C)',
+                ),
               },
-              onChanged: (field, value) => _thresholdEditor.edit(field, value),
+              onChanged: _editThreshold,
             ),
             SafetyThresholdGroup(
-              title: 'Gas and Particulate Matter',
+              title: 'Gas',
+              currentReading:
+                  'MQ-2: ${_state['mq2_v'] ?? '--'} V, MQ-135: ${_state['mq135_v'] ?? '--'} V',
               locked: _isOffline || _isSavingThresholds,
               fields: {
-                'threshold_mq2_v': _mq2Limit.toStringAsFixed(2),
-                'threshold_mq135_v': '${_state['threshold_mq135_v'] ?? ''}',
-                'threshold_pm1_0_ug_m3':
-                    '${_state['threshold_pm1_0_ug_m3'] ?? ''}',
-                'threshold_pm2_5_ug_m3':
-                    '${_state['threshold_pm2_5_ug_m3'] ?? ''}',
-                'threshold_pm10_ug_m3':
-                    '${_state['threshold_pm10_ug_m3'] ?? ''}',
-                'threshold_humidity_min_percent':
-                    '${_state['threshold_humidity_min_percent'] ?? ''}',
-                'threshold_humidity_max_percent':
-                    '${_state['threshold_humidity_max_percent'] ?? ''}',
+                'threshold_mq2_v': thresholdField(
+                  'threshold_mq2_v',
+                  'MQ-2 limit (V)',
+                ),
+                'threshold_mq135_v': thresholdField(
+                  'threshold_mq135_v',
+                  'MQ-135 limit (V)',
+                ),
               },
-              onChanged: (field, value) => _thresholdEditor.edit(field, value),
+              onChanged: _editThreshold,
             ),
-          ],
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Safe Chamber Limit:'),
-                      Text(
-                        '${_tempLimit.toStringAsFixed(1)} °C',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: _tempLimit.clamp(20.0, 150.0),
-                    min: 20.0,
-                    max: 150.0,
-                    divisions: 130,
-                    label: '${_tempLimit.toStringAsFixed(1)} °C',
-                    onChanged: _isOffline || _isSavingThresholds
-                        ? null
-                        : (val) => setState(() {
-                            _tempLimit = val;
-                            _thresholdsDirty = true;
-                          }),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Safe MQ-2 Limit:'),
-                      Text(
-                        '${_mq2Limit.toStringAsFixed(2)} V',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: _mq2Limit.clamp(0.1, 5.0),
-                    min: 0.1,
-                    max: 5.0,
-                    divisions: 49,
-                    label: '${_mq2Limit.toStringAsFixed(2)} V',
-                    onChanged: _isOffline || _isSavingThresholds
-                        ? null
-                        : (val) => setState(() {
-                            _mq2Limit = val;
-                            _thresholdsDirty = true;
-                          }),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: _isSavingThresholds
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: const Text('Apply Thresholds'),
-                      onPressed:
-                          _isOffline || _isSavingThresholds || !_thresholdsDirty
-                          ? null
-                          : _saveThresholds,
-                    ),
-                  ),
-                ],
+            SafetyThresholdGroup(
+              title: 'Particulate matter',
+              currentReading: 'PM2.5: ${_state['pm2_5_ug_m3'] ?? '--'} µg/m³',
+              locked: _isOffline || _isSavingThresholds,
+              fields: {
+                'threshold_pm1_0_ug_m3': thresholdField(
+                  'threshold_pm1_0_ug_m3',
+                  'PM1.0 limit (µg/m³)',
+                ),
+                'threshold_pm2_5_ug_m3': thresholdField(
+                  'threshold_pm2_5_ug_m3',
+                  'PM2.5 limit (µg/m³)',
+                ),
+                'threshold_pm10_ug_m3': thresholdField(
+                  'threshold_pm10_ug_m3',
+                  'PM10 limit (µg/m³)',
+                ),
+              },
+              onChanged: _editThreshold,
+            ),
+            SafetyThresholdGroup(
+              title: 'Humidity',
+              currentReading: 'Current: ${_state['humidity_percent'] ?? '--'}%',
+              locked: _isOffline || _isSavingThresholds,
+              fields: {
+                'threshold_humidity_min_percent': thresholdField(
+                  'threshold_humidity_min_percent',
+                  'Minimum humidity (%)',
+                ),
+                'threshold_humidity_max_percent': thresholdField(
+                  'threshold_humidity_max_percent',
+                  'Maximum humidity (%)',
+                ),
+              },
+              onChanged: _editThreshold,
+            ),
+            _thresholdSaveCard(),
+          ] else
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.system_update),
+                title: Text('Firmware update required'),
+                subtitle: Text(
+                  'Install firmware with configurable safety thresholds to edit these limits.',
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
+
+  void _editThreshold(String field, String value) {
+    setState(() {
+      _thresholdEditor.edit(field, value);
+      _thresholdsDirty = _thresholdEditor.hasDrafts;
+    });
+  }
+
+  Widget _thresholdSaveCard() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Changes are applied only after the device confirms them.',
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: _isSavingThresholds
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save),
+              label: const Text('Apply Thresholds'),
+              onPressed: _isOffline || _isSavingThresholds || !_thresholdsDirty
+                  ? null
+                  : _saveThresholds,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

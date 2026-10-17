@@ -240,7 +240,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   }
 
   Future<void> pollOnce() async {
-    var triggers = <String>[];
     final observationTicket = _safetyObservationRecorder.begin();
     try {
       final response = await _client
@@ -252,15 +251,26 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       if (response.statusCode == 200) {
         final reportedState =
             json.decode(response.body) as Map<String, dynamic>;
-        _currentData = SensorData.fromJson(reportedState);
-        await _safetyObservationRecorder.accept(
+        final reading = SensorData.fromJson(reportedState);
+        final triggers =
+            (reportedState['active_triggers'] as List<dynamic>? ?? [])
+                .whereType<String>()
+                .toList();
+        final hadMq2Hazard = alerts.any(
+          (alert) => alert.title.contains('High MQ-2 Gas Reading'),
+        );
+        final accepted = await _safetyObservationRecorder.accept(
           observationTicket,
           reportedState,
         );
-        triggers = (reportedState['active_triggers'] as List<dynamic>? ?? [])
-            .whereType<String>()
-            .toList();
+        if (!accepted) return;
+        _currentData = reading;
         _isHardwareConnected = true;
+        if (triggers.contains('high_mq2_gas') &&
+            reading.mq2V != null &&
+            !hadMq2Hazard) {
+          HapticFeedback.heavyImpact();
+        }
       } else {
         _isHardwareConnected = false;
       }
@@ -280,15 +290,6 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
     );
     _telemetryRevision++;
 
-    final hadGasHazard = alerts.any(
-      (alert) => alert.title.contains('Gas Hazard'),
-    );
-    await alertsController.recordTriggers(_currentData, triggers);
-    if (triggers.contains('high_mq2_gas') &&
-        _currentData.mq2V != null &&
-        !hadGasHazard) {
-      HapticFeedback.heavyImpact();
-    }
     notifyListeners();
   }
 
