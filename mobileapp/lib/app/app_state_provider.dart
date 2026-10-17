@@ -94,6 +94,8 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
         "avgMq2": "0.0",
         "maxAmbientTemp": "0.0",
         "avgAmbientTemp": "0.0",
+        "maxHumidity": "0.0",
+        "avgHumidity": "0.0",
         "maxMq135": "0.0",
         "avgMq135": "0.0",
         "maxPm1_0": "0.0",
@@ -127,6 +129,10 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       _history.map((reading) => reading.temperatureC),
       1,
     );
+    final humidity = summarise(
+      _history.map((reading) => reading.humidityPercent),
+      1,
+    );
     final mq2 = summarise(_history.map((reading) => reading.mq2V), 2);
     final mq135 = summarise(_history.map((reading) => reading.mq135V), 2);
     final pm1_0 = summarise(_history.map((reading) => reading.pm1_0UgM3), 1);
@@ -141,6 +147,8 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       "avgMq2": mq2['avg']!,
       "maxAmbientTemp": ambient['max']!,
       "avgAmbientTemp": ambient['avg']!,
+      "maxHumidity": humidity['max']!,
+      "avgHumidity": humidity['avg']!,
       "maxMq135": mq135['max']!,
       "avgMq135": mq135['avg']!,
       "maxPm1_0": pm1_0['max']!,

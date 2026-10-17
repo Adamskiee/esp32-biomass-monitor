@@ -10,6 +10,7 @@ float threshold_chamber_temp_c = 80.0;
 float threshold_mq2_v = 2.5;
 
 float current_temp_c = NAN;
+float current_humidity_percent = NAN;
 float current_chamber_c = NAN;
 float current_mq135_v = NAN;
 float current_mq2_v = NAN;
@@ -134,13 +135,15 @@ uint32_t mqWarmupRemainingSeconds(uint32_t now_ms) {
 
 bool mqSensorsAreWarmingUp() { return mq_sensors_are_warming_up; }
 
-void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
-                           float mq2_v, bool mq_sensors_warming_up) {
+void processSensorReadings(float temperature_c, float humidity_percent,
+                           float chamber_c, float mq135_v, float mq2_v,
+                           bool mq_sensors_warming_up) {
   if (stateMutex != nullptr) {
     xSemaphoreTake(stateMutex, portMAX_DELAY);
   }
 
   current_temp_c = temperature_c;
+  current_humidity_percent = humidity_percent;
   current_chamber_c = chamber_c;
   mq_sensors_are_warming_up = mq_sensors_warming_up;
   current_mq135_v = mq_sensors_warming_up ? NAN : mq135_v;

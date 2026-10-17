@@ -36,6 +36,7 @@ class SimulatorState:
             self._scenario = "normal"
             self._tick = 0
             self._temperature_c = 25.0
+            self._humidity_percent = 54.0
             self._chamber_temp_c = 45.0
             self._mq135_v = 1.2
             self._mq2_v = 1.0
@@ -95,6 +96,7 @@ class SimulatorState:
             if self._scenario == "normal":
                 drift = (self._tick % 5) * 0.1
                 self._temperature_c = 25.0 + drift
+                self._humidity_percent = 54.0 + drift
                 self._chamber_temp_c = 45.0 + drift
                 self._mq135_v = 1.2 + drift / 10
                 self._mq2_v = 1.0 + drift / 10
@@ -115,6 +117,7 @@ class SimulatorState:
                 triggers.append("mq2_sensor_fault")
             return {
                 "temperature_c": self._temperature_c,
+                "humidity_percent": self._humidity_percent,
                 "chamber_temp_c": self._chamber_temp_c,
                 "mq135_v": None if mq_warming_up else self._mq135_v,
                 "mq2_v": None if mq_warming_up else self._mq2_v,

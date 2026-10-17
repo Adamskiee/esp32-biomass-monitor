@@ -52,7 +52,7 @@ class SimulatorStateTests(unittest.TestCase):
         first = self.state.snapshot()
         second = self.state.snapshot()
         self.assertEqual(set(first), {
-            "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
+            "temperature_c", "humidity_percent", "chamber_temp_c", "mq135_v", "mq2_v",
             "mq_warming_up", "mq_warmup_remaining_seconds",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
@@ -62,6 +62,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertEqual(first["threshold_mq2_v"], 2.5)
         self.assertEqual(first["active_triggers"], [])
         self.assertNotEqual(first["temperature_c"], second["temperature_c"])
+        self.assertIsInstance(first["humidity_percent"], float)
 
     def test_pms_fields_in_all_online_scenarios(self):
         for scenario in ("normal", "gas", "heat", "temp-fault", "mq2-fault"):

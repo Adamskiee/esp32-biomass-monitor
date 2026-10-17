@@ -31,6 +31,7 @@ void loop() {
     float t_mq135 = readMQ135Voltage();
     float t_mq2 = readMQ2Voltage();
     float t_temp = readTemperature();
+    float t_humidity = readHumidity();
     float t_chamber = readThermocouple();
 
     char tempStr[16];
@@ -40,15 +41,15 @@ void loop() {
       snprintf(tempStr, sizeof(tempStr), "%.1fC", t_temp);
     }
 
-    Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %s | Chamber: %.1fC\n",
-                  t_mq135, t_mq2, tempStr, t_chamber);
+    Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %s | Humidity: %.1f%% | Chamber: %.1fC\n",
+                  t_mq135, t_mq2, tempStr, t_humidity, t_chamber);
 
     bool do_save = false;
     static float safe_chamber_limit = 80.0;
     static float safe_mq2_limit = 2.5;
 
     const bool mq_sensors_warming_up = mqWarmupRemainingSeconds(now) > 0;
-    processSensorReadings(t_temp, t_chamber, t_mq135, t_mq2,
+    processSensorReadings(t_temp, t_humidity, t_chamber, t_mq135, t_mq2,
                           mq_sensors_warming_up);
 
     PmsReading pms_reading{};

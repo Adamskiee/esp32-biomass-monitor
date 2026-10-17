@@ -25,6 +25,7 @@ void main() {
   late MockClient client;
   late SharedPreferences prefs;
   var temperature = 26.5;
+  var humidity = 54.5;
   var mq135 = 0.75;
   var mq2 = 1.25;
   double? pm1 = 8.0;
@@ -56,6 +57,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     temperature = 26.5;
+    humidity = 54.5;
     mq135 = 0.75;
     mq2 = 1.25;
     pm1 = 8.0;
@@ -65,6 +67,7 @@ void main() {
       (request) async => http.Response(
         jsonEncode({
           'temperature_c': temperature,
+          'humidity_percent': humidity,
           'chamber_temp_c': 65.4,
           'mq135_v': mq135,
           'mq2_v': mq2,
@@ -214,6 +217,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('26.5 °C'), findsOneWidget);
+    expect(find.text('54.5 %'), findsOneWidget);
     expect(find.text('PM1.0'), findsNWidgets(2));
     expect(find.text('8.0 µg/m³'), findsOneWidget);
     expect(find.text('PM2.5'), findsNWidgets(2));
@@ -221,6 +225,7 @@ void main() {
     expect(find.text('PM10'), findsNWidgets(2));
     expect(find.text('18.0 µg/m³'), findsOneWidget);
     temperature = 29.5;
+    humidity = 56.0;
     mq135 = 0.95;
     mq2 = 1.55;
     pm1 = 9.0;
@@ -232,7 +237,7 @@ void main() {
     expect(find.text('29.5 °C'), findsOneWidget);
     expect(find.text('26.5 °C'), findsNothing);
     await tester.scrollUntilVisible(find.byType(LineChart).last, 150);
-    expect(find.byType(LineChart), findsNWidgets(3));
+    expect(find.byType(LineChart), findsNWidgets(4));
     final charts = tester
         .widgetList<LineChart>(find.byType(LineChart))
         .toList();
@@ -242,7 +247,8 @@ void main() {
     ]);
     expect(charts[0].data.lineBarsData, hasLength(2));
     expect(charts[1].data.lineBarsData, hasLength(2));
-    expect(charts[2].data.lineBarsData, hasLength(3));
+    expect(charts[2].data.lineBarsData, hasLength(1));
+    expect(charts[3].data.lineBarsData, hasLength(3));
     expect(charts[1].data.lineBarsData[0].spots, const [
       FlSpot(0, 1.25),
       FlSpot(1, 1.55),
@@ -252,14 +258,18 @@ void main() {
       FlSpot(1, 0.95),
     ]);
     expect(charts[2].data.lineBarsData[0].spots, const [
+      FlSpot(0, 54.5),
+      FlSpot(1, 56),
+    ]);
+    expect(charts[3].data.lineBarsData[0].spots, const [
       FlSpot(0, 8),
       FlSpot(1, 9),
     ]);
-    expect(charts[2].data.lineBarsData[1].spots, const [
+    expect(charts[3].data.lineBarsData[1].spots, const [
       FlSpot(0, 12),
       FlSpot(1, 13),
     ]);
-    expect(charts[2].data.lineBarsData[2].spots, const [
+    expect(charts[3].data.lineBarsData[2].spots, const [
       FlSpot(0, 18),
       FlSpot(1, 19),
     ]);
@@ -312,7 +322,7 @@ void main() {
     await tester.scrollUntilVisible(find.byType(LineChart).last, 150);
     final particulateChart = tester
         .widgetList<LineChart>(find.byType(LineChart))
-        .toList()[2];
+        .toList()[3];
     expect(particulateChart.data.lineBarsData[0].spots, const [
       FlSpot(0, 8),
       FlSpot.nullSpot,
@@ -451,7 +461,7 @@ void main() {
     await tester.pump();
     expect(state.telemetryRevision, 0);
     expect(state.history, hasLength(1));
-    expect(find.byType(LineChart), findsNWidgets(3));
+    expect(find.byType(LineChart), findsNWidgets(4));
     await dispose(tester);
   });
 }

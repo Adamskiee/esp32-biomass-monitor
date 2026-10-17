@@ -42,7 +42,7 @@ void resetSafetyState() {
   current_mq2_v = 0.5f;
   manual_sprinkler = false;
   catastrophic_latch = false;
-  processSensorReadings(25.0f, 25.0f, 0.5f, 0.5f, false);
+  processSensorReadings(25.0f, 50.0f, 25.0f, 0.5f, 0.5f, false);
   initActuators();
 }
 
@@ -132,9 +132,16 @@ void testLedFollowsLatchedTemperatureDanger() {
 void testProcessingSensorReadingsEvaluatesSafety() {
   const char *name = "processing sensor readings evaluates safety";
   resetSafetyState();
-  processSensorReadings(28.0f, 85.0f, 1.2f, 0.5f);
+  processSensorReadings(28.0f, 50.0f, 85.0f, 1.2f, 0.5f);
   EXPECT_TRUE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
+}
+
+void testProcessingSensorReadingsCachesHumidity() {
+  const char *name = "processing sensor readings caches humidity";
+  resetSafetyState();
+  processSensorReadings(28.0f, 54.5f, 25.0f, 1.2f, 0.5f);
+  EXPECT_TRUE(name, current_humidity_percent == 54.5f);
 }
 
 void testTemperatureDangerReassertsSprinklerRequest() {
@@ -185,15 +192,15 @@ void testMqWarmupCountsDownForFiveMinutes() {
 void testMq2DangerIsIgnoredWhileSensorsWarmUp() {
   const char *name = "MQ2 danger is ignored while sensors warm up";
   resetSafetyState();
-  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, true);
+  processSensorReadings(28.0f, 50.0f, 25.0f, 1.2f, 3.0f, true);
   EXPECT_TRUE(name, mqSensorsAreWarmingUp());
   EXPECT_TRUE(name, std::isnan(current_mq2_v));
   EXPECT_TRUE(name, active_triggers_json == "[]");
 
-  processSensorReadings(28.0f, 25.0f, 1.2f, NAN, true);
+  processSensorReadings(28.0f, 50.0f, 25.0f, 1.2f, NAN, true);
   EXPECT_TRUE(name, active_triggers_json == "[]");
 
-  processSensorReadings(28.0f, 25.0f, 1.2f, 3.0f, false);
+  processSensorReadings(28.0f, 50.0f, 25.0f, 1.2f, 3.0f, false);
   EXPECT_FALSE(name, mqSensorsAreWarmingUp());
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
 }
@@ -485,6 +492,8 @@ int main() {
       testLedFollowsLatchedTemperatureDanger);
   run("processing sensor readings evaluates safety",
       testProcessingSensorReadingsEvaluatesSafety);
+  run("processing sensor readings caches humidity",
+      testProcessingSensorReadingsCachesHumidity);
   run("temperature danger reasserts sprinkler request",
       testTemperatureDangerReassertsSprinklerRequest);
   run("temperature hysteresis", testTemperatureHysteresis);

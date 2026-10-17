@@ -48,7 +48,7 @@ class ServerTests(unittest.TestCase):
         status, _, state = self.request("/api/state")
         self.assertEqual(status, 200)
         self.assertEqual(set(state), {
-            "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
+            "temperature_c", "humidity_percent", "chamber_temp_c", "mq135_v", "mq2_v",
             "mq_warming_up", "mq_warmup_remaining_seconds",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
