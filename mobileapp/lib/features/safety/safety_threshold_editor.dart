@@ -6,12 +6,18 @@ class SafetyThresholdEditor {
 
   void refresh(SafetyThresholds saved) => _saved = saved;
   void edit(String field, String text) => _drafts[field] = text;
+  SafetyThresholds get saved => _saved;
+  String textFor(String field) => _drafts[field] ?? _format(_saved.value(field));
+  bool hasDraft(String field) => _drafts.containsKey(field);
   bool get hasDrafts => _drafts.isNotEmpty;
-  bool get isDirty => changedValues().isNotEmpty;
+  bool get isDirty => _drafts.keys.any(_saved.supports);
 
   Map<String, String> validate() {
     final errors = <String, String>{};
     for (final entry in _drafts.entries) {
+      if (!_saved.supports(entry.key)) {
+        continue;
+      }
       final value = double.tryParse(entry.value);
       if (value == null || !value.isFinite) {
         errors[entry.key] = 'Enter a finite number.';
@@ -35,6 +41,15 @@ class SafetyThresholdEditor {
   double? _valueFor(String field) => _drafts.containsKey(field)
       ? double.tryParse(_drafts[field]!)
       : _saved.value(field);
+
+  String _format(double? value) {
+    if (value == null) {
+      return '';
+    }
+    return value == value.truncateToDouble()
+        ? value.truncate().toString()
+        : value.toString();
+  }
 
   bool _isWithinRange(String field, double value) => switch (field) {
     'threshold_chamber_temp_c' => value >= 20 && value <= 150,
@@ -60,12 +75,17 @@ class SafetyThresholdEditor {
     _ => 'Use a value from 0 to 100%.',
   };
 
-  Map<String, double> changedValues() => {
-    for (final entry in _drafts.entries)
-      if (double.tryParse(entry.value) != null &&
-          double.tryParse(entry.value) != _saved.value(entry.key))
-        entry.key: double.parse(entry.value),
-  };
+  Map<String, double> changedValues() {
+    if (validate().isNotEmpty) {
+      return {};
+    }
+    return {
+      for (final entry in _drafts.entries)
+        if (_saved.supports(entry.key))
+          if (double.tryParse(entry.value) case final value?)
+            if (value != _saved.value(entry.key)) entry.key: value,
+    };
+  }
 
   void confirm(SafetyThresholds saved) {
     _saved = saved;
