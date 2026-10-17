@@ -7,6 +7,8 @@ import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
+import 'package:biomass_iot_app/features/safety/widgets/safety_controls_panel.dart';
+import 'package:biomass_iot_app/features/safety/control_tab.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -72,6 +74,15 @@ void main() {
           'pm2_5_ug_m3': pm25,
           'pm10_ug_m3': pm10,
           'pump_on': false,
+          'threshold_chamber_temp_c': 70,
+          'threshold_mq2_v': 2.5,
+          'threshold_mq135_v': null,
+          'threshold_temperature_c': null,
+          'threshold_pm1_0_ug_m3': null,
+          'threshold_pm2_5_ug_m3': null,
+          'threshold_pm10_ug_m3': null,
+          'threshold_humidity_min_percent': null,
+          'threshold_humidity_max_percent': null,
           'active_triggers': [],
         }),
         200,
@@ -123,6 +134,50 @@ void main() {
     );
     await dispose(tester);
   });
+
+  testWidgets(
+    'non-admin Control retains network information without safety controls',
+    (tester) async {
+      await initialize(tester);
+      await mount(tester, child: const ControlTab());
+      expect(find.text('IP Address'), findsOneWidget);
+      expect(find.text('Emergency Control & Local Alerts'), findsNothing);
+      expect(find.byType(SafetyControlsPanel), findsNothing);
+      await dispose(tester);
+    },
+  );
+
+  testWidgets(
+    'authenticated Control embeds all thresholds and retains service during telemetry rebuilds',
+    (tester) async {
+      await initialize(tester);
+      expect(await state.login('operator', 'secret'), isTrue);
+      await mount(tester);
+      await tester.tap(find.text('Control'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      expect(find.text('Emergency Control & Local Alerts'), findsOneWidget);
+      expect(find.text('Biomass Monitor Safety Dashboard'), findsNothing);
+      expect(find.text('IP Address'), findsOneWidget);
+      final panel = find.byType(SafetyControlsPanel);
+      final api = tester.widget<SafetyControlsPanel>(panel).apiService;
+      expect(find.byType(TextFormField), findsNWidgets(9));
+      final input = find.byKey(const ValueKey('threshold_chamber_temp_c'));
+      await tester.ensureVisible(input);
+      await tester.enterText(input, '85');
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(
+        identical(tester.widget<SafetyControlsPanel>(panel).apiService, api),
+        isTrue,
+      );
+      expect(tester.widget<TextFormField>(input).controller!.text, '85');
+      await tester.ensureVisible(find.text('Apply Thresholds'));
+      expect(find.text('Apply Thresholds'), findsOneWidget);
+      await dispose(tester);
+    },
+  );
 
   testWidgets('desktop navigation uses the sidebar', (tester) async {
     final messenger = tester.binding.defaultBinaryMessenger;

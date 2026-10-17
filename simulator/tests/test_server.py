@@ -9,6 +9,14 @@ from urllib.request import Request, urlopen
 from simulator.model import SimulatorState
 from simulator.server import make_handler
 
+DEFAULT_THRESHOLDS = {
+    "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+    "threshold_mq135_v": None, "threshold_temperature_c": None,
+    "threshold_pm1_0_ug_m3": None, "threshold_pm2_5_ug_m3": None,
+    "threshold_pm10_ug_m3": None, "threshold_humidity_min_percent": None,
+    "threshold_humidity_max_percent": None,
+}
+
 
 class ServerTests(unittest.TestCase):
     def setUp(self):
@@ -48,15 +56,16 @@ class ServerTests(unittest.TestCase):
         status, _, state = self.request("/api/state")
         self.assertEqual(status, 200)
         self.assertEqual(set(state), {
-            "temperature_c", "chamber_temp_c", "mq135_v", "mq2_v",
+            "temperature_c", "humidity_percent", "chamber_temp_c", "mq135_v", "mq2_v",
             "mq_warming_up", "mq_warmup_remaining_seconds",
             "pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3",
             "threshold_chamber_temp_c", "threshold_mq2_v", "pump_on",
             "manual_sprinkler", "active_triggers",
+            *DEFAULT_THRESHOLDS,
         })
         status, _, settings = self.request("/api/settings")
         self.assertEqual(status, 200)
-        self.assertEqual(settings, {"threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5})
+        self.assertEqual(settings, DEFAULT_THRESHOLDS)
 
     def test_control_and_both_threshold_routes_apply_valid_writes(self):
         status, _, body = self.request("/api/control", "POST", {"sprinkler": True})
@@ -67,8 +76,10 @@ class ServerTests(unittest.TestCase):
             ("/api/settings", "threshold_mq2_v", 3.0),
         ):
             status, _, body = self.request(route, "POST", {field: value})
-            self.assertEqual((status, body), (200, {"status": "ok"}))
+            self.assertEqual(status, 200)
+            self.assertEqual(body, {"status": "ok", "thresholds": self.request("/api/settings")[2]})
         self.assertEqual(self.request("/api/settings")[2], {
+            **DEFAULT_THRESHOLDS,
             "threshold_chamber_temp_c": 120.0, "threshold_mq2_v": 3.0,
         })
 
@@ -105,14 +116,15 @@ class ServerTests(unittest.TestCase):
         })
         self.assertEqual(status, 400)
         self.assertEqual(self.request("/api/settings")[2], {
+            **DEFAULT_THRESHOLDS,
             "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
         })
 
     def test_malformed_json_and_oversized_body_leave_control_unchanged(self):
-        for body in (b"{bad", b" " * 257):
+        for body, expected in ((b"{bad", 400), (b" " * 257, 413)):
             with self.subTest(body=body[:10]):
                 status, _, _ = self.request("/api/control", "POST", body)
-                self.assertEqual(status, 400)
+                self.assertEqual(status, expected)
                 self.assertFalse(self.state.snapshot()["manual_sprinkler"])
 
     def test_rejected_threshold_body_does_not_mutate_settings(self):
@@ -127,6 +139,39 @@ class ServerTests(unittest.TestCase):
             with self.subTest(body=body):
                 self.assertEqual(self.request("/api/control", "POST", body)[0], 400)
                 self.assertFalse(self.state.snapshot()["pump_on"])
+
+    def test_full_threshold_body_confirmation_and_route_specific_caps(self):
+        configured = dict(zip(DEFAULT_THRESHOLDS, (80, 2.5, 2, 35, 25, 50, 100, 30, 70)))
+        raw = json.dumps(configured).encode()
+        self.assertGreater(len(raw), 256)
+        for route in ("/api/thresholds", "/api/settings"):
+            for size in (len(raw), 1024):
+                with self.subTest(route=route, size=size):
+                    status, _, body = self.request(route, "POST", raw.ljust(size, b" "))
+                    self.assertEqual(status, 200)
+                    self.assertEqual(body, {"status": "ok", "thresholds": configured})
+            self.assertEqual(self.request(route, "POST", raw.ljust(1025, b" "))[0], 413)
+            self.assertEqual(self.request("/api/settings")[2], configured)
+        control = b'{"sprinkler":true}'
+        self.assertEqual(self.request("/api/control", "POST", control.ljust(256, b" "))[0], 200)
+        self.assertEqual(self.request("/api/control", "POST", control.ljust(257, b" "))[0], 413)
+
+    def test_settings_reads_and_confirmations_do_not_advance_telemetry(self):
+        for route in ("/api/thresholds", "/api/settings"):
+            self.request("/api/settings")
+            self.request(route, "POST", {"threshold_mq2_v": 3})
+        self.assertEqual(self.request("/api/state")[2]["temperature_c"], 25)
+
+    def test_both_routes_reject_unknown_non_numeric_and_invalid_ranges_atomically(self):
+        for route in ("/api/thresholds", "/api/settings"):
+            for patch in ({"unknown": 1}, {"threshold_mq135_v": None},
+                          {"threshold_mq135_v": True}, {"threshold_temperature_c": "20"},
+                          {"threshold_temperature_c": -41}, {"threshold_pm1_0_ug_m3": 0},
+                          {"threshold_pm2_5_ug_m3": 65536},
+                          {"threshold_humidity_min_percent": 30}):
+                with self.subTest(route=route, patch=patch):
+                    self.assertEqual(self.request(route, "POST", {"threshold_mq2_v": 3, **patch})[0], 400)
+                    self.assertEqual(self.request("/api/settings")[2], DEFAULT_THRESHOLDS)
 
     def test_safety_block_returns_conflict(self):
         self.state.select_scenario("heat")

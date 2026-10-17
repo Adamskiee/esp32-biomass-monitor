@@ -1,6 +1,7 @@
 import 'package:biomass_iot_app/features/alerts/alert_item.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
+import 'package:biomass_iot_app/features/safety/safety_condition.dart';
 import 'package:flutter/foundation.dart';
 
 class AlertsController extends ChangeNotifier {
@@ -18,7 +19,7 @@ class AlertsController extends ChangeNotifier {
   String? _errorMessage;
   bool _isDisposed = false;
   final Set<String> _activeSensorFaults = {};
-  bool _isGasHazardActive = false;
+  final Set<String> _activeConditions = {};
   bool _hasLoadedAlertStates = false;
   Future<void> _triggerQueue = Future.value();
   int _nextAlertSequence = 0;
@@ -107,43 +108,64 @@ class AlertsController extends ChangeNotifier {
       );
     }
     for (final sensor in sensorFaults.difference(_activeSensorFaults)) {
-      _activeSensorFaults.add(sensor);
-      await _store.setAlertState('sensor:$sensor', true);
-      await _recordAlert(
+      final alert = _newAlert(
         title: 'WARNING: $sensor Sensor Fault',
         description:
             '$sensor is not reporting valid data. Check the sensor connection.',
         severity: 'warning',
       );
+      if (await _store.recordActivation('sensor:$sensor', alert)) {
+        _activeSensorFaults.add(sensor);
+        _alerts.insert(0, alert);
+        _totalAlerts++;
+        _notifyListeners();
+      }
     }
     for (final sensor in _activeSensorFaults.difference(sensorFaults)) {
-      _activeSensorFaults.remove(sensor);
-      await _store.setAlertState('sensor:$sensor', false);
-      await _recordAlert(
+      final alert = _newAlert(
         title: 'INFO: $sensor Sensor Recovered',
         description: '$sensor is reporting valid data again.',
         severity: 'info',
       );
+      await _store.recordRecovery('sensor:$sensor', alert);
+      _activeSensorFaults.remove(sensor);
+      _alerts.insert(0, alert);
+      _totalAlerts++;
+      _notifyListeners();
     }
-    final hasGasHazard =
-        triggers.contains('high_mq2_gas') && reading.mq2V != null;
-    if (hasGasHazard && !_isGasHazardActive) {
-      _isGasHazardActive = true;
-      await _store.setAlertState('gas_hazard', true);
-      await _recordAlert(
-        title: 'CRITICAL: Gas Hazard',
-        description:
-            'ESP32 reported a high MQ-2 reading (${reading.mq2V!.toStringAsFixed(2)} V).',
-        severity: 'critical',
+    final conditions = triggers
+        .where(
+          (trigger) =>
+              !reading.isMqWarmingUp ||
+              (trigger != 'high_mq2_gas' && trigger != 'high_mq135_gas'),
+        )
+        .map(safetyConditionFor)
+        .whereType<SafetyCondition>()
+        .map((condition) => condition.trigger)
+        .toSet();
+    for (final trigger in conditions.difference(_activeConditions)) {
+      final condition = safetyConditionFor(trigger)!;
+      final alert = _newAlert(
+        title: '${condition.severity.toUpperCase()}: ${condition.title}',
+        description: condition.describe(reading),
+        severity: condition.severity,
       );
-    } else if (!hasGasHazard && _isGasHazardActive) {
-      _isGasHazardActive = false;
-      await _store.setAlertState('gas_hazard', false);
+      if (await _store.recordActivation('trigger:$trigger', alert)) {
+        _activeConditions.add(trigger);
+        _alerts.insert(0, alert);
+        _totalAlerts++;
+        _notifyListeners();
+      }
+    }
+    for (final trigger in _activeConditions.difference(conditions).toList()) {
+      await _store.setAlertState('trigger:$trigger', false);
+      _activeConditions.remove(trigger);
     }
   }
 
   Future<void> _loadAlertStates() async {
     if (_hasLoadedAlertStates) return;
+    await _store.migrateLegacyGasHazard();
     final states = await _store.getActiveAlertStates();
     _activeSensorFaults
       ..clear()
@@ -152,13 +174,21 @@ class AlertsController extends ChangeNotifier {
             .where((state) => state.startsWith('sensor:'))
             .map((state) => state.substring('sensor:'.length)),
       );
-    _isGasHazardActive = states.contains('gas_hazard');
+    _activeConditions
+      ..clear()
+      ..addAll(
+        states
+            .where((state) => state.startsWith('trigger:'))
+            .map((state) => state.substring('trigger:'.length)),
+      );
     _hasLoadedAlertStates = true;
   }
 
   Set<String> _sensorFaults(SensorData reading, List<String> triggers) {
     final faults = <String>{};
-    if (reading.reportsField('temperature_c') && reading.temperatureC == null ||
+    if (triggers.contains('ambient_temp_sensor_fault') ||
+        triggers.contains('humidity_sensor_fault') ||
+        reading.reportsField('temperature_c') && reading.temperatureC == null ||
         reading.reportsField('humidity_percent') &&
             reading.humidityPercent == null) {
       faults.add('DHT22');
@@ -169,8 +199,8 @@ class AlertsController extends ChangeNotifier {
       faults.add('Thermocouple');
     }
     if (!reading.isMqWarmingUp &&
-        reading.reportsField('mq135_v') &&
-        reading.mq135V == null) {
+        (triggers.contains('mq135_sensor_fault') ||
+            reading.reportsField('mq135_v') && reading.mq135V == null)) {
       faults.add('MQ135');
     }
     if (!reading.isMqWarmingUp &&
@@ -178,7 +208,8 @@ class AlertsController extends ChangeNotifier {
             reading.reportsField('mq2_v') && reading.mq2V == null)) {
       faults.add('MQ2');
     }
-    if ((reading.reportsField('pm1_0_ug_m3') ||
+    if (triggers.contains('pms_sensor_fault') ||
+        (reading.reportsField('pm1_0_ug_m3') ||
                 reading.reportsField('pm1_ug_m3')) &&
             reading.pm1_0UgM3 == null ||
         (reading.reportsField('pm2_5_ug_m3') ||
@@ -190,23 +221,19 @@ class AlertsController extends ChangeNotifier {
     return faults;
   }
 
-  Future<void> _recordAlert({
+  AlertItem _newAlert({
     required String title,
     required String description,
     required String severity,
-  }) async {
+  }) {
     final timestamp = DateTime.now();
-    final alert = AlertItem(
+    return AlertItem(
       id: '${timestamp.microsecondsSinceEpoch}-${_nextAlertSequence++}',
       title: title,
       description: description,
       severity: severity,
       timestamp: timestamp,
     );
-    _alerts.insert(0, alert);
-    _totalAlerts++;
-    await _store.insertAlert(alert);
-    _notifyListeners();
   }
 
   Future<void> removeAlert(String id) async {
@@ -222,7 +249,7 @@ class AlertsController extends ChangeNotifier {
     _totalAlerts = 0;
     await _store.clearAlerts();
     _activeSensorFaults.clear();
-    _isGasHazardActive = false;
+    _activeConditions.clear();
     _notifyListeners();
   }
 

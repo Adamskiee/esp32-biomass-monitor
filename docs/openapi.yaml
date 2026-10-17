@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Biomass Monitor API
   description: Authenticated local API for ESP32 telemetry and safety control.
-  version: 2.0.0
+  version: 3.0.0
 servers:
   - url: /
 components:
@@ -12,34 +12,38 @@ components:
       scheme: basic
   schemas:
     SystemState:
+      allOf:
+        - $ref: '#/components/schemas/ThresholdSettings'
       type: object
       required:
         - pump_on
+        - manual_sprinkler
+        - temperature_c
+        - chamber_temp_c
+        - humidity_percent
+        - mq135_v
+        - mq2_v
+        - mq_warming_up
+        - mq_warmup_remaining_seconds
+        - pm1_0_ug_m3
+        - pm2_5_ug_m3
+        - pm10_ug_m3
+        - active_triggers
       properties:
         temperature_c:
           type: number
           format: float
           nullable: true
+          minimum: -40
+          maximum: 80
+          description: DHT-22 ambient temperature in °C. Invalid or non-finite readings are null.
         humidity_percent:
           type: number
           format: float
           nullable: true
-          description: DHT-22 relative humidity in percent.
-        pm1_ug_m3:
-          type: number
-          format: float
-          nullable: true
-          description: PMS5003 environmental PM1.0 concentration in µg/m³.
-        pm25_ug_m3:
-          type: number
-          format: float
-          nullable: true
-          description: PMS5003 environmental PM2.5 concentration in µg/m³.
-        pm10_ug_m3:
-          type: number
-          format: float
-          nullable: true
-          description: PMS5003 environmental PM10 concentration in µg/m³.
+          minimum: 0
+          maximum: 100
+          description: DHT-22 relative humidity in percent. Invalid or non-finite readings are null.
         chamber_temp_c:
           type: number
           format: float
@@ -48,12 +52,13 @@ components:
           type: number
           format: float
           nullable: true
-          description: MQ-135 voltage. Null during the five-minute MQ warm-up after device startup.
+          description: MQ-135 voltage. Null when non-finite or during the five-minute MQ warm-up after device startup.
         mq2_v:
           type: number
           format: float
           nullable: true
-          description: MQ-2 voltage. Null during the five-minute MQ warm-up after device startup.
+          maximum: 4.8
+          description: MQ-2 voltage. Null when non-finite, above the 4.8 V rail-short boundary, or during the five-minute MQ warm-up after device startup.
         mq_warming_up:
           type: boolean
           description: True while the MQ-135 and MQ-2 heaters complete their five-minute warm-up after device startup.
@@ -61,7 +66,7 @@ components:
           type: integer
           minimum: 0
           maximum: 300
-          description: Seconds remaining before MQ readings and MQ2 gas alerts become active.
+          description: Seconds remaining before both MQ readings, gas alerts, and gas fault reporting become active.
         pm1_0_ug_m3:
           type: number
           format: float
@@ -77,12 +82,6 @@ components:
           format: float
           nullable: true
           description: Environmental PM10 mass concentration in µg/m³. Null before a valid reading or after ten seconds without one.
-        threshold_chamber_temp_c:
-          type: number
-          format: float
-        threshold_mq2_v:
-          type: number
-          format: float
         pump_on:
           type: boolean
           description: Commanded pump relay output. This reports the relay command, not verified pump operation or water flow.
@@ -95,12 +94,34 @@ components:
             enum:
               - high_chamber_temp
               - high_mq2_gas
+              - high_mq135_gas
+              - high_ambient_temp
+              - high_pm1_0
+              - high_pm2_5
+              - high_pm10
+              - low_humidity
+              - high_humidity
               - temp_sensor_fault
               - mq2_sensor_fault
+              - mq135_sensor_fault
+              - ambient_temp_sensor_fault
+              - humidity_sensor_fault
+              - pms_sensor_fault
               - catastrophic_latch
-    Thresholds:
+          description: Only chamber danger and the catastrophic latch force the pump. Other conditions are alerts only. Faults do not require configured thresholds. Missing or stale PMS data produces one pms_sensor_fault.
+    ThresholdPatch:
       type: object
       minProperties: 1
+      additionalProperties: false
+      description: >-
+        Nonempty partial update, maximum 1024 bytes. Only finite JSON numbers
+        are accepted; booleans, strings, null, and unknown keys are rejected.
+        Omitted fields retain their values. Both humidity boundaries are required
+        on first configuration; later partial updates must keep minimum strictly
+        below the saved maximum. An invalid field rejects the entire patch.
+        Changes apply immediately and reevaluate valid cached readings. They
+        cannot clear the catastrophic latch. Flash saves occur at most once per
+        60 seconds, so power loss before persistence may lose accepted edits.
       properties:
         threshold_chamber_temp_c:
           type: number
@@ -112,6 +133,139 @@ components:
           format: float
           minimum: 0.1
           maximum: 5.0
+          description: Configured MQ-2 alert limit. Rail-short faults above 4.8 V take precedence, so limits above 4.8 V cannot produce a valid threshold crossing.
+        threshold_mq135_v:
+          type: number
+          format: float
+          minimum: 0.1
+          maximum: 5.0
+        threshold_temperature_c:
+          type: number
+          format: float
+          minimum: -40
+          maximum: 80
+        threshold_pm1_0_ug_m3:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 65535
+        threshold_pm2_5_ug_m3:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 65535
+        threshold_pm10_ug_m3:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 65535
+        threshold_humidity_min_percent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        threshold_humidity_max_percent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Must be strictly greater than the humidity minimum after merging the patch.
+    ThresholdSettings:
+      type: object
+      required:
+        - threshold_chamber_temp_c
+        - threshold_mq2_v
+        - threshold_mq135_v
+        - threshold_temperature_c
+        - threshold_pm1_0_ug_m3
+        - threshold_pm2_5_ug_m3
+        - threshold_pm10_ug_m3
+        - threshold_humidity_min_percent
+        - threshold_humidity_max_percent
+      description: >-
+        Complete saved configuration. Chamber and MQ-2 retain upgraded saved
+        values or default to 80 °C and 2.5 V. Other limits start null and do not
+        evaluate threshold alerts until configured. Humidity boundaries are
+        either both null or minimum is strictly below maximum. Configured limits
+        cannot be cleared via the API. Missing fields on older firmware mean
+        unsupported, which differs from explicit null. Ranges are configuration
+        bounds, not health standards; MQ voltages are not calibrated gas levels.
+        Upper alerts activate at or above the limit and clear at or below 95%.
+        Ambient recovery instead subtracts the greater of 0.5 °C or 5% of the
+        absolute limit. Humidity alerts activate strictly outside the range and
+        recover inside it by the smaller of two percentage points or one quarter
+        of the range width. Only chamber protection owns automatic pump control.
+      properties:
+        threshold_chamber_temp_c:
+          type: number
+          format: float
+          minimum: 20
+          maximum: 150
+        threshold_mq2_v:
+          type: number
+          format: float
+          minimum: 0.1
+          maximum: 5
+        threshold_mq135_v:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.1
+          maximum: 5
+        threshold_temperature_c:
+          type: number
+          format: float
+          nullable: true
+          minimum: -40
+          maximum: 80
+        threshold_pm1_0_ug_m3:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 65535
+        threshold_pm2_5_ug_m3:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 65535
+        threshold_pm10_ug_m3:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 65535
+        threshold_humidity_min_percent:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          maximum: 100
+        threshold_humidity_max_percent:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          maximum: 100
+    ThresholdSuccessResponse:
+      type: object
+      required:
+        - status
+        - thresholds
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        thresholds:
+          $ref: '#/components/schemas/ThresholdSettings'
     SprinklerCommand:
       type: object
       required:
@@ -160,6 +314,7 @@ paths:
   /api/control:
     post:
       summary: Request manual sprinkler state
+      description: JSON body limit is 256 bytes. Automatic chamber safety and the catastrophic latch cannot be overridden.
       requestBody:
         required: true
         content:
@@ -187,6 +342,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Body exceeds 256 bytes
         '503':
           description: State mutex unavailable
           content:
@@ -195,28 +352,31 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/thresholds:
     post:
-      summary: Update one or both safety thresholds transactionally
+      summary: Update any supported subset of safety thresholds transactionally
+      description: Maximum JSON body size is 1024 bytes.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Thresholds'
+              $ref: '#/components/schemas/ThresholdPatch'
       responses:
         '200':
-          description: Thresholds accepted
+          description: Complete configuration accepted by this request, independent of later updates
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/ThresholdSuccessResponse'
         '400':
-          description: Missing, malformed, or out-of-range threshold
+          description: Empty, malformed, unknown, nonnumeric, null, out-of-range, or incorrectly ordered threshold
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+        '413':
+          description: Body exceeds 1024 bytes
         '503':
           description: State mutex unavailable
           content:
@@ -232,7 +392,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Thresholds'
+                $ref: '#/components/schemas/ThresholdSettings'
         '401':
           description: Unauthorized
         '503':
@@ -243,15 +403,20 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: Update thresholds through the compatibility route
+      description: Same validation, 1024-byte body limit, and response as POST /api/thresholds.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Thresholds'
+              $ref: '#/components/schemas/ThresholdPatch'
       responses:
         '200':
-          description: Thresholds accepted
+          description: Complete configuration accepted by this request, independent of later updates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdSuccessResponse'
         '400':
           description: Invalid request body
           content:
@@ -260,6 +425,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+        '413':
+          description: Body exceeds 1024 bytes
         '503':
           description: State mutex unavailable
           content:

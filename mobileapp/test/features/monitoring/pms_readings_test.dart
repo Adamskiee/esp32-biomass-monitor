@@ -9,7 +9,14 @@ void main() {
       MaterialApp(
         home: Column(
           children: [
-            PmsReadings(data: SensorData(pm1_0UgM3: 0, pm2_5UgM3: 12, pm10UgM3: 18, timestamp: DateTime.now())),
+            PmsReadings(
+              data: SensorData(
+                pm1_0UgM3: 0,
+                pm2_5UgM3: 12,
+                pm10UgM3: 18,
+                timestamp: DateTime.now(),
+              ),
+            ),
             PmsReadings(data: SensorData(timestamp: DateTime.now())),
           ],
         ),

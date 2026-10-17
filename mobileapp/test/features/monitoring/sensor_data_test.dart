@@ -50,4 +50,34 @@ void main() {
 
     expect(reading.isMqWarmingUp, isTrue);
   });
+
+  test('treats invalid numeric values as unavailable readings', () {
+    final reading = SensorData.fromJson({
+      'temperature_c': 'hot',
+      'chamber_temp_c': double.nan,
+      'mq2_v': double.infinity,
+      'pm2_5_ug_m3': false,
+    });
+
+    expect(reading.temperatureC, isNull);
+    expect(reading.chamberTempC, isNull);
+    expect(reading.mq2V, isNull);
+    expect(reading.pm2_5UgM3, isNull);
+  });
+
+  test(
+    'rejects out-of-range environmental readings instead of reporting Normal',
+    () {
+      final reading = SensorData.fromJson({
+        'temperature_c': 100,
+        'humidity_percent': -1,
+        'mq2_v': 4.9,
+        'pm10_ug_m3': -1,
+      });
+      expect(reading.temperatureC, isNull);
+      expect(reading.humidityPercent, isNull);
+      expect(reading.mq2V, isNull);
+      expect(reading.pm10UgM3, isNull);
+    },
+  );
 }

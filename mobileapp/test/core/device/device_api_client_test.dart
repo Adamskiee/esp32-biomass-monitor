@@ -104,16 +104,27 @@ void main() {
 
   group('setThresholds', () {
     test('posts documented threshold fields', () async {
-      late http.Request recordedRequest;
+      final requests = <http.Request>[];
       final service = createService(
         MockClient((request) async {
-          recordedRequest = request;
+          requests.add(request);
+          if (request.method == 'GET') {
+            return http.Response(
+              jsonEncode({
+                'threshold_chamber_temp_c': 55.0,
+                'threshold_mq2_v': 2.0,
+              }),
+              200,
+            );
+          }
           return http.Response(jsonEncode({'status': 'ok'}), 200);
         }),
       );
 
       await service.setThresholds(55.0, 2.0);
 
+      expect(requests, hasLength(2));
+      final recordedRequest = requests.first;
       expect(recordedRequest.method, 'POST');
       expect(
         recordedRequest.url,
@@ -124,6 +135,46 @@ void main() {
         'threshold_chamber_temp_c': 55.0,
         'threshold_mq2_v': 2.0,
       });
+      expect(requests.last.method, 'GET');
+      expect(requests.last.url.path, '/api/settings');
+      expect(requests.last.headers['Authorization'], authorizationHeader);
+    });
+
+    test('uses nested confirmed values without fetching settings', () async {
+      final requests = <http.Request>[];
+      final service = createService(
+        MockClient((request) async {
+          requests.add(request);
+          return http.Response(
+            jsonEncode({
+              'status': 'ok',
+              'thresholds': {'threshold_mq2_v': 2.0},
+            }),
+            200,
+          );
+        }),
+      );
+
+      final saved = await service.updateSafetyThresholds({
+        'threshold_mq2_v': 2.0,
+      });
+
+      expect(requests, hasLength(1));
+      expect(jsonDecode(requests.single.body), {'threshold_mq2_v': 2.0});
+      expect(saved.value('threshold_mq2_v'), 2.0);
+      expect(saved.supports('threshold_mq135_v'), isFalse);
+    });
+
+    test('propagates a failed legacy settings confirmation', () async {
+      final service = createService(
+        MockClient((request) async {
+          return request.method == 'POST'
+              ? http.Response('{"status":"ok"}', 200)
+              : http.Response('Unavailable', 503);
+        }),
+      );
+
+      await expectLater(service.setThresholds(55.0, 2.0), throwsException);
     });
 
     test('throws when threshold validation fails', () async {
