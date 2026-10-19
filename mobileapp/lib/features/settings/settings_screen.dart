@@ -289,25 +289,34 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => _showAboutDialog(context, theme),
                       ),
                     ),
+                    const Divider(height: 1),
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 8,
+                        ),
+                        leading: const Icon(
+                          CupertinoIcons.wifi,
+                          color: AppTheme.neonBlue,
+                        ),
+                        title: Text(
+                          "Network & Hardware Diagnostics",
+                          style: TextStyle(
+                            color: theme.textTheme.bodyLarge?.color,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          CupertinoIcons.chevron_right,
+                          color: Colors.grey,
+                          size: 18,
+                        ),
+                        onTap: () => _showDiagnosticsDialog(context, theme),
+                      ),
+                    ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Material(
-                type: MaterialType.transparency,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  leading: const Icon(CupertinoIcons.wifi, color: Colors.grey),
-                  title: const Text(
-                    "Network & Hardware Diagnostics",
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                  ),
-                  trailing: const Icon(
-                    CupertinoIcons.chevron_right,
-                    color: Colors.grey,
-                    size: 18,
-                  ),
-                  onTap: () => _showDiagnosticsDialog(context, theme),
                 ),
               ),
               const SizedBox(height: 40),

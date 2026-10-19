@@ -1,4 +1,5 @@
 import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/features/settings/settings_controller.dart';
 import 'package:biomass_iot_app/features/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -144,6 +145,13 @@ void main() {
 
     expect(find.text('Active Connection'), findsNothing);
     expect(find.text('192.168.1.10'), findsNothing);
+    expect(
+      find.ancestor(
+        of: find.text('Network & Hardware Diagnostics'),
+        matching: find.byType(GlowingCard),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Network & Hardware Diagnostics'));
     await tester.pumpAndSettle();
