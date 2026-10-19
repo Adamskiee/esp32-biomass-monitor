@@ -152,6 +152,10 @@ void main() {
       ),
       findsOneWidget,
     );
+    final dividers = tester.widgetList<Divider>(find.byType(Divider)).toList();
+    expect(dividers, hasLength(2));
+    expect(dividers.last.indent, 24);
+    expect(dividers.last.endIndent, 24);
 
     await tester.tap(find.text('Network & Hardware Diagnostics'));
     await tester.pumpAndSettle();

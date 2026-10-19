@@ -289,7 +289,7 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => _showAboutDialog(context, theme),
                       ),
                     ),
-                    const Divider(height: 1),
+                    const Divider(height: 1, indent: 24, endIndent: 24),
                     Material(
                       type: MaterialType.transparency,
                       child: ListTile(
