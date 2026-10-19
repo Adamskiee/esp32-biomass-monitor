@@ -79,7 +79,11 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
     setState(() {
       _isLoading = false;
-      if (!accepted) _errorMsg = 'Device unavailable or credentials invalid.';
+      if (!accepted) {
+        _errorMsg =
+            state.loginErrorMessage ??
+            'Could not connect to the device. Please try again.';
+      }
     });
   }
 
