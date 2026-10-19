@@ -92,13 +92,20 @@ log. If there are no readings or sharing fails, the app displays a message.
 ## How do I configure sensor limits on Control?
 
 Under **Emergency Control & Local Alerts**, the Temperature, Gas, Particulate
-Matter, and Humidity groups provide nine numeric fields for eight readings.
-Each row shows its current reading, confirmed saved limit, and status. Chamber
-temperature says **Alerts + automatic sprinkler**; every other reading says
-**Alerts only**. Pump status and manual control share the card above the groups.
+Matter, and Humidity groups list eight sensor readings. Each sensor starts
+collapsed; its slider, numeric input, and Default button appear only when opened.
+Only the open sensor shows its current reading and editable limit. Closed
+sensors show their names and any status badges. Normal readings have no badge;
+alerts, faults, and setup states remain visible.
+Humidity shares one reading and status across its minimum and maximum controls.
+Chamber temperature says **Alerts + automatic sprinkler**; groups containing only
+alerting sensors show **Alerts only** once. Pump status and manual control
+share the card above the groups.
 
-1. Drag a slider or type the limits selected for your operation. Configuration
-   ranges validate device settings; they are not exposure standards. Current
+1. Tap a sensor row to open its slider and numeric input. Opening another
+   sensor closes the previous one. Only the open sensor can be edited, which
+   prevents accidental slider changes while browsing the list.
+   Configuration ranges validate device settings; they are not exposure standards. Current
    firmware provides defaults for every limit and fills previously unset fields
    at startup while preserving saved values. See the [default table](api.md#post-apithresholds).
 2. Keep humidity minimum strictly below maximum. Either boundary can be edited;
@@ -106,12 +113,24 @@ temperature says **Alerts + automatic sprinkler**; every other reading says
    cannot be cleared.
 3. Select **Apply Thresholds**. Only changed fields are sent together. Inputs
    lock during the request, and the device-confirmed values replace the draft
-   and saved labels after success. Failed writes or missing confirmation keep
-   the typed values so you can retry.
+   after success. Failed writes or missing confirmation keep the typed values
+   so you can retry. A successful save closes the open sensor.
 
-Each upper limit pairs a slider with exact numeric entry. Humidity uses one
-two-handle range slider and separate minimum/maximum inputs. Dragging uses
-0.5 °C, 0.1 V, 1 µg/m³, and 1% steps; typing retains finer precision.
+**Default** restores the project setting for that sensor as a draft. Humidity
+has one **Default** button that restores both bounds to 30% and 60%, avoiding
+an invalid range when the existing bounds differ. Select **Apply Thresholds**
+to save restored defaults. These values match the [firmware defaults](api.md#post-apithresholds).
+Default is unavailable while controls are locked or the sensor setting is
+unsupported by the firmware.
+
+Each upper limit pairs a slider with exact numeric entry. Tap its row again
+to close it. Closing a sensor preserves its draft, including when another
+sensor opens. Humidity opens both bounds together. Controls are unavailable
+during saving or disconnection, and **Apply Thresholds** saves all edited sensors.
+On narrow screens or with larger text, the input moves below the slider to
+keep both usable.
+Humidity uses one two-handle range slider and separate minimum/maximum inputs.
+Dragging uses 0.5 °C, 0.1 V, 1 µg/m³, and 1% steps; typing retains finer precision.
 Particulate sliders initially span 1–500 µg/m³ and expand for larger typed or
 saved values, up to 65535. Their displayed range stays stable while dragging.
 These slider ranges do not restrict the API's accepted configuration ranges.
@@ -119,10 +138,12 @@ On earlier firmware, an unset slider position does not configure a limit until
 you interact with it. Such fields display **Not configured** until saved;
 configure both humidity boundaries together if both are unset.
 
-Polling refreshes readings and saved labels while preserving edited text,
+Polling refreshes readings and unedited limits while preserving edited text,
 including while scrolling or using the keyboard. For example, if you type a
 humidity minimum of 35% while another client changes the saved maximum to 34%,
-Apply rejects the invalid pair. Offline readings are marked stale and controls
+Apply rejects the invalid pair, reopens Humidity, and shows the error. Other
+validation errors also reopen the first invalid sensor and identify it in the
+message. Offline readings are marked stale and controls
 lock until reconnecting; the draft remains available.
 
 New MQ-2 limits must be 0.1 to 4.8 V because readings above 4.8 V are sensor

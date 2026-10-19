@@ -167,7 +167,13 @@ void main() {
       expect(find.text('IP Address'), findsNothing);
       final panel = find.byType(SafetyControlsPanel);
       final api = tester.widget<SafetyControlsPanel>(panel).apiService;
-      expect(find.byType(TextFormField), findsNWidgets(9));
+      expect(find.byType(TextFormField), findsNothing);
+      final header = find.byKey(
+        const ValueKey('threshold_chamber_temp_c_header'),
+      );
+      await tester.ensureVisible(header);
+      await tester.tap(header);
+      await tester.pump();
       final input = find.byKey(const ValueKey('threshold_chamber_temp_c'));
       await tester.ensureVisible(input);
       await tester.enterText(input, '85');

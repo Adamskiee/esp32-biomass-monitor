@@ -36,6 +36,22 @@ Map<String, dynamic> snapshot() => {
 };
 
 void main() {
+  Finder input(String key) => find.byKey(ValueKey(key));
+
+  Future<void> openSensor(WidgetTester tester, String field) async {
+    final id = field == minimum || field == maximum ? 'humidity_range' : field;
+    if (find.byKey(ValueKey(field)).evaluate().isNotEmpty) return;
+    final header = find.byKey(ValueKey('${id}_header'));
+    await tester.ensureVisible(header);
+    await tester.tap(header);
+    await tester.pump();
+  }
+
+  Future<void> revealInput(WidgetTester tester, String field) async {
+    await openSensor(tester, field);
+    await tester.ensureVisible(input(field));
+  }
+
   testWidgets(
     'phone slider gesture updates a draft and saves only after Apply',
     (tester) async {
@@ -72,10 +88,11 @@ void main() {
         ),
       );
       await tester.pump();
-      final slider = find.byKey(
-        const ValueKey('threshold_chamber_temp_c_slider'),
-      );
+      expect(find.byType(Slider), findsNothing);
+      await openSensor(tester, chamber);
+      final slider = find.byKey(const ValueKey('${chamber}_slider'));
       await tester.ensureVisible(slider);
+      expect(tester.widget<Slider>(slider).value, 70);
       await tester.tapAt(tester.getCenter(slider));
       await tester.pump();
       expect(
@@ -86,14 +103,15 @@ void main() {
         '85',
       );
       expect(writes, isEmpty);
-      expect(find.text('Saved limit: 70 °C'), findsOneWidget);
+
       await tester.ensureVisible(find.text('Apply Thresholds'));
       await tester.tap(find.text('Apply Thresholds'));
       await tester.pump();
       expect(writes, [
         {chamber: 85},
       ]);
-      expect(find.text('Saved limit: 85 °C'), findsOneWidget);
+
+      expect(slider, findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       client.close();
@@ -153,7 +171,11 @@ void main() {
     });
   });
 
-  Future<void> mount(WidgetTester tester, {VoidCallback? onAlert}) async {
+  Future<void> mount(
+    WidgetTester tester, {
+    VoidCallback? onAlert,
+    String? openField = chamber,
+  }) async {
     service = ApiService(
       baseUrl: 'http://device/api',
       authorizationHeader: 'Basic test',
@@ -169,6 +191,7 @@ void main() {
       ),
     );
     await tester.pump();
+    if (openField != null) await openSensor(tester, openField);
   }
 
   Future<void> finish(WidgetTester tester) async {
@@ -176,7 +199,6 @@ void main() {
     client.close();
   }
 
-  Finder input(String key) => find.byKey(ValueKey(key));
   String text(WidgetTester tester, String key) =>
       tester.widget<TextFormField>(input(key)).controller!.text;
   Future<void> apply(WidgetTester tester) async {
@@ -187,28 +209,73 @@ void main() {
   }
 
   testWidgets(
-    'renders nine fields and grouped readings without standalone cards',
+    'sensors start collapsed and opening another preserves the previous draft',
     (tester) async {
-      await mount(tester);
-      expect(find.byType(TextFormField), findsNWidgets(9));
-      expect(find.text('Current: 25 °C'), findsOneWidget);
-      expect(find.text('Current: 8 µg/m³'), findsOneWidget);
-      expect(find.text('Current: 12 µg/m³'), findsOneWidget);
-      expect(find.text('Current: 18 µg/m³'), findsOneWidget);
-      expect(find.text('Live Sensor Data'), findsNothing);
-      expect(find.text('Particulate Matter'), findsOneWidget);
-      expect(find.text('Alerts + automatic sprinkler'), findsOneWidget);
-      expect(find.text('Saved limit: 5 V'), findsOneWidget);
-      expect(tester.widget<TextFormField>(input(ambient)).enabled, isTrue);
+      await mount(tester, openField: null);
+      expect(find.byType(Slider, skipOffstage: false), findsNothing);
+      expect(find.byType(RangeSlider), findsNothing);
+      expect(find.byType(TextFormField, skipOffstage: false), findsNothing);
+      expect(find.textContaining('Current:'), findsNothing);
+      expect(find.text('Edit'), findsNothing);
+      final chamberHeader = find.byKey(const ValueKey('${chamber}_header'));
+      await tester.ensureVisible(chamberHeader);
+      await tester.tap(chamberHeader);
+      await tester.pump();
+      expect(find.byType(Slider, skipOffstage: false), findsOneWidget);
+      expect(find.byType(TextFormField, skipOffstage: false), findsOneWidget);
+      expect(find.text('Current: 50 °C'), findsOneWidget);
+      expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNotNull);
+      await tester.enterText(input(chamber), '85');
+      final humidityHeader = find.byKey(
+        const ValueKey('humidity_range_header'),
+      );
+      await tester.ensureVisible(humidityHeader);
+      await tester.tap(humidityHeader);
+      await tester.pump();
+      expect(find.byType(Slider, skipOffstage: false), findsNothing);
+      expect(find.byType(RangeSlider), findsOneWidget);
+      expect(find.byType(TextFormField, skipOffstage: false), findsNWidgets(2));
+      expect(find.text('Current: 50 °C'), findsNothing);
+      expect(find.text('Current: 50 %'), findsOneWidget);
+      await tester.ensureVisible(chamberHeader);
+      await tester.tap(chamberHeader);
+      await tester.pump();
+      expect(find.byType(RangeSlider), findsNothing);
+      expect(text(tester, chamber), '85');
+      expect(writes, isEmpty);
+      await apply(tester);
+      expect(writes, [
+        {chamber: 85},
+      ]);
+      expect(find.byType(Slider, skipOffstage: false), findsNothing);
       await finish(tester);
     },
   );
+
+  testWidgets('renders sensor summaries before revealing their controls', (
+    tester,
+  ) async {
+    await mount(tester, openField: null);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Current: 25 °C'), findsNothing);
+    expect(find.text('Current: 8 µg/m³'), findsNothing);
+    expect(find.text('Current: 12 µg/m³'), findsNothing);
+    expect(find.text('Current: 18 µg/m³'), findsNothing);
+    expect(find.text('Live Sensor Data'), findsNothing);
+    expect(find.text('Particulate Matter'), findsOneWidget);
+    expect(find.text('Alerts + automatic sprinkler'), findsOneWidget);
+
+    await revealInput(tester, ambient);
+    expect(find.text('Current: 25 °C'), findsOneWidget);
+    expect(tester.widget<TextFormField>(input(ambient)).enabled, isTrue);
+    await finish(tester);
+  });
 
   testWidgets(
     'refreshes saved values while preserving draft and validates latest partner',
     (tester) async {
       await mount(tester);
-      await tester.ensureVisible(input(minimum));
+      await revealInput(tester, minimum);
       await tester.enterText(input(minimum), '35');
       state[maximum] = 34;
       state[chamber] = 90;
@@ -216,9 +283,10 @@ void main() {
       await tester.pump();
       expect(text(tester, minimum), '35');
       expect(text(tester, maximum), '34');
+      await openSensor(tester, chamber);
       expect(text(tester, chamber), '90');
-      expect(find.text('Saved limit: 34 %'), findsOneWidget);
       await apply(tester);
+      expect(find.byType(RangeSlider), findsOneWidget);
       expect(writes, isEmpty);
       expect(text(tester, minimum), '35');
       await finish(tester);
@@ -226,17 +294,77 @@ void main() {
   );
 
   testWidgets(
+    'Apply reopens an invalid sensor after another sensor was selected',
+    (tester) async {
+      await mount(tester);
+      await tester.enterText(input(chamber), 'bad');
+      await openSensor(tester, minimum);
+      await apply(tester);
+      expect(find.byKey(const ValueKey(chamber)), findsOneWidget);
+      expect(find.byType(RangeSlider), findsNothing);
+      expect(
+        find.textContaining('Chamber temperature: Enter a finite number.'),
+        findsOneWidget,
+      );
+      expect(writes, isEmpty);
+      await finish(tester);
+    },
+  );
+
+  testWidgets('Apply reopens humidity for an invalid individual bound', (
+    tester,
+  ) async {
+    await mount(tester, openField: minimum);
+    await tester.enterText(input(maximum), 'bad');
+    await openSensor(tester, chamber);
+    await apply(tester);
+    expect(find.byType(RangeSlider), findsOneWidget);
+    expect(text(tester, maximum), 'bad');
+    expect(find.text('Enter a finite number.'), findsOneWidget);
+    expect(writes, isEmpty);
+    await finish(tester);
+  });
+
+  testWidgets('Default stages a value and only Apply writes it to the device', (
+    tester,
+  ) async {
+    await mount(tester);
+    final reset = find.byKey(const ValueKey('${chamber}_slider_default'));
+    await tester.ensureVisible(reset);
+    await tester.tap(reset);
+    await tester.pump();
+    expect(text(tester, chamber), '80');
+    expect(state[chamber], 70);
+    expect(writes, isEmpty);
+    expect(
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('${chamber}_slider')))
+          .onChanged,
+      isNotNull,
+    );
+    await tester.pump(const Duration(seconds: 2));
+    expect(text(tester, chamber), '80');
+    await apply(tester);
+    expect(writes, [
+      {chamber: 80},
+    ]);
+    expect(state[chamber], 80);
+    await finish(tester);
+  });
+
+  testWidgets(
     'posts only changes and replaces typed representation with confirmation',
     (tester) async {
       await mount(tester);
-      await tester.ensureVisible(input(chamber));
+      await revealInput(tester, chamber);
       await tester.enterText(input(chamber), '85.00');
       await apply(tester);
       expect(writes, [
         {chamber: 85},
       ]);
+      await openSensor(tester, chamber);
       expect(text(tester, chamber), '85');
-      expect(find.text('Saved limit: 85 °C'), findsOneWidget);
+
       await finish(tester);
     },
   );
@@ -249,12 +377,12 @@ void main() {
       ),
     );
     await mount(tester);
-    await tester.ensureVisible(input(chamber));
+    await revealInput(tester, chamber);
     await tester.enterText(input(chamber), '85');
     await apply(tester);
     expect(text(tester, chamber), '85');
     expect(find.textContaining('Failed to update thresholds'), findsOneWidget);
-    expect(find.text('Saved limit: 70 °C'), findsOneWidget);
+
     await finish(tester);
   });
 
@@ -264,7 +392,7 @@ void main() {
       state['active_triggers'] = ['catastrophic_latch', 'temp_sensor_fault'];
       state['chamber_temp_c'] = null;
       state['pump_on'] = true;
-      await mount(tester, onAlert: () {});
+      await mount(tester, onAlert: () {}, openField: null);
       expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
       expect(
         find.textContaining('Catastrophic Chamber Temperature'),
@@ -287,7 +415,7 @@ void main() {
     (tester) async {
       var sounds = 0;
       state['active_triggers'] = ['high_pm2_5'];
-      await mount(tester, onAlert: () => sounds++);
+      await mount(tester, onAlert: () => sounds++, openField: null);
       expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNotNull);
       expect(sounds, 1);
       await tester.tap(find.byTooltip('Mute app alerts'));
@@ -309,7 +437,7 @@ void main() {
           : http.Response('Offline', 503),
     );
     await mount(tester);
-    await tester.ensureVisible(input(chamber));
+    await revealInput(tester, chamber);
     await tester.enterText(input(chamber), '85');
     online = false;
     await tester.pump(const Duration(seconds: 2));
@@ -339,14 +467,15 @@ void main() {
         return http.Response(jsonEncode(state), 200);
       });
       await mount(tester);
-      await tester.ensureVisible(input(chamber));
+      await revealInput(tester, chamber);
       await tester.enterText(input(chamber), '85');
       await tester.pump(const Duration(seconds: 2));
       await apply(tester);
       pending.complete(http.Response(jsonEncode(snapshot()), 200));
       await tester.pump();
+      await openSensor(tester, chamber);
       expect(text(tester, chamber), '85');
-      expect(find.text('Saved limit: 85 °C'), findsOneWidget);
+
       await finish(tester);
     },
   );
@@ -386,7 +515,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetViewInsets);
       await mount(tester);
-      await tester.ensureVisible(input(ambient));
+      await revealInput(tester, ambient);
       await tester.enterText(input(ambient), '-10.5');
       await tester.ensureVisible(find.text('Apply Thresholds'));
       await tester.pump();
@@ -411,7 +540,7 @@ void main() {
         }
         return http.Response(jsonEncode(state), 200);
       });
-      await mount(tester, onAlert: () {});
+      await mount(tester, onAlert: () {}, openField: null);
       await tester.tap(find.byType(Switch));
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
@@ -439,7 +568,7 @@ void main() {
         return http.Response(jsonEncode(state), 200);
       });
       await mount(tester);
-      await tester.ensureVisible(input(chamber));
+      await revealInput(tester, chamber);
       await tester.enterText(input(chamber), '85');
       await apply(tester);
       expect(tester.widget<TextFormField>(input(chamber)).enabled, isFalse);
@@ -449,7 +578,7 @@ void main() {
       pending.complete(http.Response('Write failed', 503));
       await tester.pump();
       expect(text(tester, chamber), '85');
-      expect(find.text('Saved limit: 70 °C'), findsOneWidget);
+
       await finish(tester);
     },
   );
@@ -471,9 +600,10 @@ void main() {
         return http.Response(jsonEncode(state), 200);
       });
       await mount(tester);
-      await tester.ensureVisible(input(chamber));
+      await revealInput(tester, chamber);
       await tester.enterText(input(chamber), '85');
       await apply(tester);
+      await revealInput(tester, minimum);
       expect(tester.widget<TextFormField>(input(minimum)).enabled, isTrue);
       expect(text(tester, minimum), '30');
       await finish(tester);
@@ -516,7 +646,7 @@ void main() {
         return http.Response(jsonEncode(state), 200);
       });
       await mount(tester);
-      await tester.ensureVisible(input(chamber));
+      await revealInput(tester, chamber);
       await tester.enterText(input(chamber), '85');
       await tester.pump();
       await tester.ensureVisible(find.byType(Switch));

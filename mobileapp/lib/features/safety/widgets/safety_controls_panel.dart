@@ -53,6 +53,9 @@ class SafetyControlsPanel extends StatefulWidget {
 class _SafetyControlsPanelState extends State<SafetyControlsPanel>
     with WidgetsBindingObserver {
   final _editor = SafetyThresholdEditor();
+  final _thresholdGroupKeys = {
+    for (final title in _groups.keys) title: GlobalKey(),
+  };
   late final Map<String, TextEditingController> _controllers = {
     for (final field in _groups.values.expand((fields) => fields))
       field: TextEditingController(),
@@ -69,6 +72,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
   bool? _queuedSprinkler;
   String? _error;
   int _settingsRevision = 0;
+  String? _expandedThreshold;
 
   @override
   void initState() {
@@ -184,10 +188,27 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
 
   Future<void> _save() async {
     if (_offline || _saving || _posting) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     final errors = _editor.validate();
     if (errors.isNotEmpty) {
-      setState(() {});
-      _message(errors.values.first);
+      final error = errors.entries.first;
+      final field =
+          error.key == 'humidity' || error.key.startsWith('threshold_humidity_')
+          ? 'threshold_humidity_min_percent'
+          : error.key;
+      final group = _groups.entries
+          .firstWhere((entry) => entry.value.contains(field))
+          .key;
+      setState(() => _expandedThreshold = field);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final target = _thresholdGroupKeys[group]!.currentContext;
+        if (target != null) unawaited(Scrollable.ensureVisible(target));
+      });
+      final label = error.key == 'humidity'
+          ? 'Humidity'
+          : SafetyThresholdGroup.labelFor(error.key);
+      _message('$label: ${error.value}');
       return;
     }
     final changes = _editor.changedValues();
@@ -203,6 +224,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
       }
       setState(() {
         _settingsRevision++;
+        _expandedThreshold = null;
         _editor.confirm(
           SafetyThresholds.fromJson({
             for (final field in _controllers.keys)
@@ -340,6 +362,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
         ),
         for (final group in _groups.entries)
           SafetyThresholdGroup(
+            key: _thresholdGroupKeys[group.key],
             title: group.key,
             fields: group.value,
             editor: _editor,
@@ -347,6 +370,15 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
             reading: reading,
             activeTriggers: triggers,
             locked: locked,
+            expandedField: _expandedThreshold,
+            onToggle: (field) {
+              FocusManager.instance.primaryFocus?.unfocus();
+              setState(
+                () => _expandedThreshold = _expandedThreshold == field
+                    ? null
+                    : field,
+              );
+            },
             onChanged: (field, value) =>
                 setState(() => _editor.edit(field, value)),
           ),

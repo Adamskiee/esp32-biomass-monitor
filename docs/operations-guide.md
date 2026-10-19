@@ -46,19 +46,27 @@ standards or calibrated measurements. Changes apply immediately and are saved
 to flash no more than once per minute. Power loss before that write can lose a
 recent change.
 
-Each sensor row shows a reading, a saved limit, and its status. Current firmware
+Each sensor row starts collapsed and shows its name and status. Tap it to
+reveal its current reading, slider, and editable limit. Badges identify alerts,
+faults, or setup states; normal readings have no badge. Current firmware
 starts with all limits configured, fills previously unset fields on upgrade,
 and preserves saved values. See the [API reference](api.md) for the default
 values and their limitations. Keep humidity minimum below maximum; either
 boundary can be edited independently.
-Adjust upper limits with their slider or numeric input. Humidity has a
-two-handle range slider with exact minimum/maximum entry. Slider dragging uses
+
+Opening another sensor closes the previous one. Tap the open sensor again
+to close it; its draft remains available when reopened. **Default** restores that sensor
+setting as a draft; humidity restores both bounds together to 30% and 60%.
+Humidity has a two-handle range slider with exact minimum/maximum entry.
+Slider dragging uses
 0.5 °C, 0.1 V, 1 µg/m³, or 1% steps; type a value for finer precision.
 Particulate slider ranges expand when a typed or saved value exceeds 500 µg/m³.
-**Apply Thresholds** submits only edited fields; visible saved values change
-after device confirmation. A failed request retains edits. Polling may update
-the saved opposite humidity boundary while you edit, so validation always uses
-the latest device settings.
+**Apply Thresholds** submits only edited fields, including restored defaults;
+the device-confirmed values replace the draft after success. A failed request
+retains edits. Invalid drafts reopen the affected sensor and show a message
+naming it. Successful saves close the editor. Polling may update the saved
+opposite humidity boundary while you edit, so validation always uses the
+latest device settings.
 
 New MQ-2 values cannot exceed 4.8 V; an existing 5 V limit stays readable.
 On earlier firmware, an explicit unset limit remains editable; configure both

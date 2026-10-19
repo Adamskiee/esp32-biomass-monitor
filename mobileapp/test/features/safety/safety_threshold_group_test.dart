@@ -73,25 +73,40 @@ void main() {
     SensorData? data,
     Set<String> triggers = const {},
     bool locked = false,
-  }) => MaterialApp(
-    home: Scaffold(
-      body: SingleChildScrollView(
-        child: StatefulBuilder(
-          builder: (context, update) => SafetyThresholdGroup(
-            title: title,
-            fields: fields,
-            editor: editor,
-            controllers: controllers,
-            reading: data ?? reading,
-            activeTriggers: triggers,
-            locked: locked,
-            onChanged: (field, value) =>
-                update(() => editor.edit(field, value)),
+    double textScale = 1,
+    bool initiallyExpanded = true,
+  }) {
+    String? expandedField = initiallyExpanded ? fields.first : null;
+    return MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: StatefulBuilder(
+            builder: (context, update) => SafetyThresholdGroup(
+              title: title,
+              fields: fields,
+              editor: editor,
+              controllers: controllers,
+              reading: data ?? reading,
+              activeTriggers: triggers,
+              locked: locked,
+              expandedField: expandedField,
+              onToggle: (field) => update(
+                () => expandedField = expandedField == field ? null : field,
+              ),
+              onChanged: (field, value) =>
+                  update(() => editor.edit(field, value)),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   testWidgets('renders all canonical inputs across four groups', (
     tester,
@@ -104,12 +119,22 @@ void main() {
     }.entries) {
       await tester.pumpWidget(subject(title: entry.key, fields: entry.value));
       for (final field in entry.value) {
+        if (find.byKey(ValueKey(field)).evaluate().isEmpty) {
+          final header = find.byKey(
+            ValueKey(
+              '${field == humidityMax ? 'humidity_range' : field}_header',
+            ),
+          );
+          await tester.ensureVisible(header);
+          await tester.tap(header);
+          await tester.pump();
+        }
         expect(find.byKey(ValueKey(field)), findsOneWidget);
       }
     }
   });
 
-  testWidgets('shows saved limits, readings, actions, and alert state', (
+  testWidgets('shows readings, actions, and alert state without saved labels', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -121,12 +146,114 @@ void main() {
     );
 
     expect(find.text('Current: 65 °C'), findsOneWidget);
-    expect(find.text('Current: -2 °C'), findsOneWidget);
-    expect(find.text('Saved limit: 70 °C'), findsOneWidget);
+    expect(find.textContaining('Saved'), findsNothing);
+    expect(find.text('Current: -2 °C'), findsNothing);
+
     expect(find.text('Alerts + automatic sprinkler'), findsOneWidget);
     expect(find.text('Alerts only'), findsOneWidget);
     expect(find.text('Alert'), findsOneWidget);
   });
+
+  testWidgets('shares alert-only descriptions across a sensor group', (
+    tester,
+  ) async {
+    await tester.pumpWidget(subject(title: 'Gas', fields: [mq2, mq135]));
+    expect(find.text('Alerts only'), findsOneWidget);
+  });
+
+  testWidgets('humidity shows one reading without saved labels', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+    );
+    expect(find.text('Current: 55 %'), findsOneWidget);
+    expect(find.textContaining('Saved'), findsNothing);
+
+    expect(find.text('Normal'), findsNothing);
+  });
+
+  testWidgets('humidity reports an alert from either bound', (tester) async {
+    for (final trigger in ['low_humidity', 'high_humidity']) {
+      await tester.pumpWidget(
+        subject(
+          title: 'Humidity',
+          fields: [humidityMin, humidityMax],
+          triggers: {trigger},
+        ),
+      );
+      expect(find.text('Alert'), findsOneWidget);
+    }
+  });
+
+  testWidgets('narrow layouts keep slider and numeric entry usable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetDevicePixelRatio());
+    addTearDown(() => tester.view.resetPhysicalSize());
+    await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
+    final input = find.byKey(const ValueKey(mq2));
+    final slider = find.byType(Slider);
+    expect(
+      tester.getTopLeft(input).dy,
+      greaterThan(tester.getBottomLeft(slider).dy),
+    );
+    await tester.enterText(input, '2.8');
+    await tester.pump();
+    expect(editor.changedValues(), {mq2: 2.8});
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sensor groups fit narrow screens with enlarged text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+    addTearDown(() => tester.view.resetDevicePixelRatio());
+    for (final entry in <String, List<String>>{
+      'Temperature': [chamber, ambient],
+      'Gas': [mq2, mq135],
+      'Particulate Matter': [pm1, pm25, pm10],
+      'Humidity': [humidityMin, humidityMax],
+    }.entries) {
+      await tester.pumpWidget(
+        subject(title: entry.key, fields: entry.value, textScale: 2),
+      );
+      expect(tester.takeException(), isNull);
+      for (final field in entry.value.where(
+        (field) => find.byKey(ValueKey(field)).evaluate().isNotEmpty,
+      )) {
+        final rect = tester.getRect(find.byKey(ValueKey(field)));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320));
+      }
+    }
+  });
+
+  testWidgets(
+    'an unsupported humidity bound does not hide the other bound alert',
+    (tester) async {
+      editor.refresh(SafetyThresholds.fromJson({humidityMax: 70}));
+      await tester.pumpWidget(
+        subject(
+          title: 'Humidity',
+          fields: [humidityMin, humidityMax],
+          triggers: {'high_humidity'},
+        ),
+      );
+      expect(find.text('Alert'), findsOneWidget);
+      expect(find.text('Firmware update required'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey(humidityMin)))
+            .enabled,
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('prioritizes sensor fault and warm-up status', (tester) async {
     await tester.pumpWidget(
@@ -152,7 +279,7 @@ void main() {
         data: SensorData(timestamp: DateTime.utc(2026)),
       ),
     );
-    expect(find.text('Sensor fault'), findsNWidgets(2));
+    expect(find.text('Sensor fault'), findsOneWidget);
   });
 
   testWidgets('shows unsupported fields as disabled firmware requirements', (
@@ -197,7 +324,7 @@ void main() {
     );
     expect(
       find.text('Maximum humidity must exceed minimum humidity.'),
-      findsNWidgets(2),
+      findsOneWidget,
     );
   });
 
@@ -206,6 +333,147 @@ void main() {
       .widget<TextFormField>(find.byKey(ValueKey(field)))
       .controller!
       .text;
+
+  Future<void> revealSlider(WidgetTester tester, String field) async {
+    final slider = field == 'humidity_range'
+        ? find.byType(RangeSlider)
+        : sliderFor(field);
+    if (slider.evaluate().isNotEmpty) return;
+    final header = find.byKey(ValueKey('${field}_header'));
+    await tester.ensureVisible(header);
+    await tester.tap(header);
+    await tester.pump();
+  }
+
+  testWidgets(
+    'tapping an expanded sensor hides its controls and keeps its draft',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(
+          title: 'Temperature',
+          fields: [chamber],
+          initiallyExpanded: false,
+        ),
+      );
+      expect(find.byType(Slider), findsNothing);
+      final header = find.byKey(const ValueKey('${chamber}_header'));
+      await tester.tap(header);
+      await tester.pump();
+      expect(tester.widget<Slider>(sliderFor(chamber)).onChanged, isNotNull);
+      await tester.enterText(find.byKey(const ValueKey(chamber)), '85');
+      await tester.tap(header);
+      await tester.pump();
+      expect(find.byType(Slider), findsNothing);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(editor.changedValues(), {chamber: 85});
+      await tester.tap(header);
+      await tester.pump();
+      expect(inputText(tester, chamber), '85');
+      expect(find.text('Edit'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Default restores each upper limit as a draft in the open editor',
+    (tester) async {
+      for (final entry in <String, String>{
+        chamber: '80',
+        ambient: '35',
+        mq2: '2.5',
+        mq135: '2',
+        pm1: '15',
+        pm25: '15',
+        pm10: '45',
+      }.entries) {
+        await tester.pumpWidget(
+          subject(title: 'Threshold', fields: [entry.key]),
+        );
+        final input = find.byKey(ValueKey(entry.key));
+        await tester.enterText(input, 'bad');
+        await tester.pump();
+        final reset = find.byKey(ValueKey('${entry.key}_slider_default'));
+        await tester.ensureVisible(reset);
+        await tester.tap(reset);
+        await tester.pump();
+        expect(inputText(tester, entry.key), entry.value);
+        expect(editor.textFor(entry.key), entry.value);
+        expect(editor.validate(), isEmpty);
+        expect(
+          tester.widget<Slider>(sliderFor(entry.key)).value,
+          double.parse(entry.value),
+        );
+        expect(
+          tester.widget<Slider>(sliderFor(entry.key)).onChanged,
+          isNotNull,
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'humidity Default restores both bounds and clears pairing errors',
+    (tester) async {
+      await tester.pumpWidget(
+        subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+      );
+      await tester.enterText(find.byKey(const ValueKey(humidityMin)), '90');
+      await tester.pump();
+      expect(editor.validate(), contains('humidity'));
+      final reset = find.byKey(const ValueKey('humidity_range_slider_default'));
+      await tester.ensureVisible(reset);
+      await tester.tap(reset);
+      await tester.pump();
+      expect(inputText(tester, humidityMin), '30');
+      expect(inputText(tester, humidityMax), '60');
+      expect(editor.changedValues(), {humidityMax: 60});
+      expect(editor.validate(), isEmpty);
+      expect(
+        tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged,
+        isNotNull,
+      );
+      expect(
+        tester.widget<RangeSlider>(find.byType(RangeSlider)).values,
+        const RangeValues(30, 60),
+      );
+    },
+  );
+
+  testWidgets('Default is unavailable while locked or unsupported', (
+    tester,
+  ) async {
+    await tester.pumpWidget(subject(title: 'Gas', fields: [mq2], locked: true));
+    expect(
+      tester
+          .widget<TextButton>(
+            find.byKey(const ValueKey('${mq2}_slider_default')),
+          )
+          .onPressed,
+      isNull,
+    );
+    editor.refresh(SafetyThresholds.fromJson({chamber: 70}));
+    await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
+    expect(
+      tester
+          .widget<TextButton>(
+            find.byKey(const ValueKey('${mq2}_slider_default')),
+          )
+          .onPressed,
+      isNull,
+    );
+    editor.refresh(SafetyThresholds.fromJson({humidityMin: 30}));
+    await tester.pumpWidget(
+      subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.byKey(const ValueKey('humidity_range_slider_default')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(editor.hasDrafts, isFalse);
+  });
 
   testWidgets('each upper limit offers a slider that writes a valid draft', (
     tester,
@@ -220,6 +488,7 @@ void main() {
       pm10: (110.1, '110'),
     }.entries) {
       await tester.pumpWidget(subject(title: 'Threshold', fields: [entry.key]));
+      await revealSlider(tester, entry.key);
       final slider = tester.widget<Slider>(sliderFor(entry.key));
       slider.onChanged!(entry.value.$1);
       await tester.pump();
@@ -257,6 +526,7 @@ void main() {
       expect(tester.widget<Slider>(sliderFor(pm25)).max, 500);
       await tester.enterText(find.byKey(const ValueKey(pm25)), '1200.25');
       await tester.pump();
+      await revealSlider(tester, pm25);
       final expanded = tester.widget<Slider>(sliderFor(pm25));
       expect(expanded.max, greaterThanOrEqualTo(1200.25));
       expect(expanded.value, 1200.25);
@@ -294,11 +564,11 @@ void main() {
     expect(inputText(tester, ambient), isEmpty);
     expect(editor.isDirty, isFalse);
     expect(editor.changedValues(), isEmpty);
+    await revealSlider(tester, ambient);
     tester.widget<Slider>(sliderFor(ambient)).onChanged!(-5);
     await tester.pump();
     expect(inputText(tester, ambient), '-5');
     expect(editor.changedValues(), {ambient: -5});
-    expect(find.text('Saved limit: Not configured'), findsOneWidget);
   });
 
   testWidgets('legacy MQ-2 setting stays intact until the slider is edited', (
@@ -307,6 +577,7 @@ void main() {
     editor.refresh(SafetyThresholds.fromJson({mq2: 5}));
     controllers[mq2]!.text = '5';
     await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
+    await revealSlider(tester, mq2);
     final slider = tester.widget<Slider>(sliderFor(mq2));
     expect(slider.max, 4.8);
     expect(slider.value, 4.8);
@@ -342,6 +613,7 @@ void main() {
         subject(title: 'Humidity', fields: [humidityMin, humidityMax]),
       );
       expect(find.byType(Slider), findsNothing);
+      await revealSlider(tester, 'humidity_range');
       final range = find.byType(RangeSlider);
       expect(range, findsOneWidget);
       tester.widget<RangeSlider>(range).onChanged!(const RangeValues(30, 81.7));
@@ -375,6 +647,7 @@ void main() {
       expect(editor.changedValues(), isEmpty);
       expect(inputText(tester, humidityMin), isEmpty);
       expect(inputText(tester, humidityMax), isEmpty);
+      await revealSlider(tester, 'humidity_range');
       tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged!(
         const RangeValues(20.4, 79.6),
       );
@@ -410,6 +683,7 @@ void main() {
         subject(title: 'Gas', fields: [mq2], locked: true),
       );
       expect(tester.widget<Slider>(sliderFor(mq2)).onChanged, isNull);
+
       await tester.pumpWidget(
         subject(
           title: 'Humidity',
@@ -421,6 +695,7 @@ void main() {
         tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged,
         isNull,
       );
+
       editor.refresh(SafetyThresholds.fromJson({humidityMin: 30}));
       await tester.pumpWidget(
         subject(title: 'Humidity', fields: [humidityMin, humidityMax]),

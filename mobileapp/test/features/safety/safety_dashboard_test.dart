@@ -38,7 +38,11 @@ void main() {
       expect(find.byType(SafetyControlsPanel), findsOneWidget);
       expect(find.text('EcoBurn Safety Dashboard'), findsOneWidget);
       expect(find.text('Live Sensor Data'), findsNothing);
-      expect(find.byType(TextFormField), findsNWidgets(9));
+      expect(find.byType(TextFormField), findsNothing);
+      expect(
+        find.byKey(const ValueKey('threshold_chamber_temp_c_header')),
+        findsOneWidget,
+      );
       await tester.pumpWidget(const SizedBox.shrink());
       client.close();
     },
