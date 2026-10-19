@@ -367,6 +367,7 @@ void main() {
         (_) async => http.Response(
           jsonEncode({
             'temperature_c': 30.0,
+            'humidity_percent': 54.5,
             'chamber_temp_c': 60.0,
             'mq135_v': 0.75,
             'mq2_v': 1.25,
@@ -398,8 +399,10 @@ void main() {
         state.getSessionAnalytics(),
         containsPair('avgAmbientTemp', '30.0'),
       );
+      expect(state.getSessionAnalytics(), containsPair('avgHumidity', '54.5'));
       expect(state.getSessionAnalytics(), containsPair('avgMq135', '0.75'));
       expect(state.getSessionAnalytics(), containsPair('avgPm2_5', '12.0'));
+      expect(state.history.last.humidityPercent, 54.5);
 
       state.dispose();
       client.close();

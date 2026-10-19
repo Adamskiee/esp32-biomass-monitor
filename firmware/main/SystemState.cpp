@@ -241,8 +241,8 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
     xSemaphoreTake(stateMutex, portMAX_DELAY);
   }
 
-  current_humidity_percent = humidity_percent;
   current_temp_c = temperature_c;
+  current_humidity_percent = humidity_percent;
   current_chamber_c = chamber_c;
   mq_sensors_are_warming_up = mq_sensors_warming_up;
   current_mq135_v = mq_sensors_warming_up ? NAN : mq135_v;

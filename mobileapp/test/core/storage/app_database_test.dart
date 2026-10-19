@@ -67,7 +67,7 @@ void main() {
       startedAt.add(const Duration(hours: 1)),
     );
 
-    expect((await appDatabase.database).getVersion(), completion(6));
+    expect((await appDatabase.database).getVersion(), completion(7));
     expect(next.sequenceNumber, 2);
     expect((await store.listReadings(savedId)).single.data.temperatureC, 25.0);
     expect((await store.listAttempts()).map((attempt) => attempt.id), [
@@ -80,6 +80,10 @@ void main() {
       SensorData(pm2_5UgM3: 15.0, timestamp: startedAt),
     );
     expect((await history.getSensorData()).first.pm2_5UgM3, 15.0);
+    await history.insertSensorData(
+      SensorData(humidityPercent: 54.5, timestamp: startedAt),
+    );
+    expect((await history.getSensorData()).first.humidityPercent, 54.5);
     await appDatabase.close();
   });
 
@@ -126,7 +130,7 @@ void main() {
     final version = await (await reopenedDatabase.database).rawQuery(
       'PRAGMA user_version',
     );
-    expect(version.single['user_version'], 6);
+    expect(version.single['user_version'], 7);
     expect((await reopenedHistory.getSensorData()).single.chamberTempC, 36.5);
     expect((await reopenedHistory.getSensorData()).single.pm1_0UgM3, isNull);
     expect((await reopenedAlerts.getAlerts()).single.id, 'alert-1');
@@ -243,7 +247,7 @@ void main() {
       databasePath: appPath,
     );
     final appHistory = SensorHistoryStore(appDatabase);
-    expect(await (await appDatabase.database).getVersion(), 6);
+    expect(await (await appDatabase.database).getVersion(), 7);
     expect((await appHistory.getSensorData()).single.pm2_5UgM3, isNull);
     expect((await AlertsStore(appDatabase).getAlerts()).single.id, 'old-alert');
     await appHistory.insertSensorData(
@@ -273,10 +277,11 @@ void main() {
       databasePath: legacyPath,
     );
     final legacyHistory = DatabaseHelper.forTesting(legacyStorage);
-    expect(await (await legacyStorage.database).getVersion(), 6);
+    expect(await (await legacyStorage.database).getVersion(), 7);
     expect((await legacyHistory.getSensorData()).single.pm1_0UgM3, isNull);
     await legacyHistory.insertSensorData(
       SensorData(
+        humidityPercent: 54.5,
         pm1_0UgM3: 8,
         pm2_5UgM3: 12,
         pm10UgM3: 18,
@@ -284,6 +289,7 @@ void main() {
       ),
     );
     expect((await legacyHistory.getSensorData()).first.pm2_5UgM3, 12.0);
+    expect((await legacyHistory.getSensorData()).first.humidityPercent, 54.5);
     await legacyStorage.close();
   });
 

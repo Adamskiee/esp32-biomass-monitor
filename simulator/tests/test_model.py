@@ -65,6 +65,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertEqual(first["threshold_mq2_v"], 2.5)
         self.assertEqual(first["active_triggers"], [])
         self.assertNotEqual(first["temperature_c"], second["temperature_c"])
+        self.assertIsInstance(first["humidity_percent"], float)
 
     def test_pms_fields_in_all_online_scenarios(self):
         for scenario in ("normal", "gas", "heat", "temp-fault", "mq2-fault"):

@@ -100,13 +100,13 @@ jobs:
           build_tools="$ANDROID_HOME/build-tools/$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -1)"
           export PATH="$build_tools:$PATH"
           version=$(cat "$RUNNER_TEMP/version")
-          tool/verify_release_apk.sh build/app/outputs/flutter-apk/app-release.apk com.biomo.biomassmonitor "$version" "$GITHUB_RUN_NUMBER"
+          tool/verify_release_apk.sh build/app/outputs/flutter-apk/app-release.apk com.biomo.ecoburn "$version" "$GITHUB_RUN_NUMBER"
           mkdir -p release-artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/biomo-biomassmonitor-$GITHUB_REF_NAME.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "release-artifacts/ecoburn-$GITHUB_REF_NAME.apk"
       - uses: actions/upload-artifact@v7
         with:
           name: apk
-          path: mobileapp/release-artifacts/biomo-biomassmonitor-${{ github.ref_name }}.apk
+          path: mobileapp/release-artifacts/ecoburn-${{ github.ref_name }}.apk
           if-no-files-found: error
           overwrite: true
 
@@ -127,9 +127,9 @@ jobs:
           mkdir release-assets
           find downloaded-artifacts -name '*.bin' -type f -exec cp {} release-assets/ \;
           find downloaded-artifacts -name '*.zip' -type f -exec cp {} release-assets/ \;
-          cp "downloaded-artifacts/apk/biomo-biomassmonitor-$GITHUB_REF_NAME.apk" release-assets/
+          cp "downloaded-artifacts/apk/ecoburn-$GITHUB_REF_NAME.apk" release-assets/
           find release-assets -name '*.bin' -type f -print -quit | grep -q .
-          test -f "release-assets/biomo-biomassmonitor-$GITHUB_REF_NAME.apk"
+          test -f "release-assets/ecoburn-$GITHUB_REF_NAME.apk"
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}

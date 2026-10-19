@@ -8,7 +8,6 @@ import 'package:biomass_iot_app/features/safety/control_tab.dart';
 import 'package:biomass_iot_app/features/settings/settings_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class MainWrapper extends StatefulWidget {
@@ -113,13 +112,25 @@ class _MainWrapperState extends State<MainWrapper> {
           ? AppBar(
               backgroundColor: theme.cardColor.withValues(alpha: 0.9),
               elevation: 0,
-              title: Text(
-                "IoT Biomass Terminal",
-                style: TextStyle(
-                  color: theme.textTheme.bodyLarge?.color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/branding/ecoburn-icon.png',
+                    width: 28,
+                    height: 28,
+                    semanticLabel: 'EcoBurn icon',
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "EcoBurn",
+                    style: TextStyle(
+                      color: theme.textTheme.bodyLarge?.color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
               ),
               actions: [
                 Icon(
@@ -168,8 +179,8 @@ class _MainWrapperState extends State<MainWrapper> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            "BIOMASS IOT",
-                            style: GoogleFonts.inter(
+                            "ECOBURN",
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.2,

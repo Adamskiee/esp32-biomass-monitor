@@ -2,7 +2,7 @@
 
 ## What does the app control?
 
-The Flutter app displays readings and actuator states reported by the ESP32.
+EcoBurn is the Flutter app for readings and actuator states reported by the ESP32.
 The firmware decides when safety rules activate the pump and sprinkler. The app
 can request manual sprinkler operation and update supported safety thresholds.
 Pump Status and saved-limit labels use values confirmed by the device.
@@ -69,7 +69,10 @@ The Home dashboard groups live and historical trends by unit so readings remain
 readable: ambient and chamber temperatures, MQ2 and MQ135 voltages, and PM1.0,
 PM2.5, and PM10 concentrations. Each chart uses the same Live, 1H, and 24H
 timeframe control. A missing reading appears as a gap, so the app does not
-misrepresent unavailable sensor data as zero.
+misrepresent unavailable sensor data as zero. A sensor with no valid readings in
+the selected timeframe is omitted from its chart and legend. If every sensor in
+a chart is unavailable, the chart shows a no-data message. This also handles
+hardware startup and sensor faults, when the ESP32 can report null readings.
 
 The sensor data log reads the full local history in pages of 10 records, newest
 first. Live updates are off by default so records do not move between pages
@@ -78,6 +81,13 @@ on Live updates to refresh the first page as telemetry arrives. When new data
 arrives while an older page is open, the app keeps that page stable and shows a
 New records available action that returns to the refreshed first page. Session
 analytics and CSV exports continue to use the current in-memory session.
+
+To export those session readings on Android, tap the export icon beside
+**Sensor Data Log**, then **GENERATE & SHARE CSV**. The export sheet scrolls
+on smaller screens and with larger text. Android opens its share chooser with
+`Biomass_Telemetry_Export.csv` attached, so the receiving app gets a CSV file.
+The file includes the latest 60 session readings, rather than the full paginated
+log. If there are no readings or sharing fails, the app displays a message.
 
 ## How do I configure sensor limits on Control?
 
@@ -156,12 +166,53 @@ percentage is `(with filtration average - without filtration average) / without
 filtration average`. Missing data and zero baselines are shown as unavailable.
 The comparison describes observations and never gives a success verdict.
 
+## Why did login fail?
+
+Login checks credentials with one `GET /api/state` request and a three-second
+timeout. The screen distinguishes invalid credentials (`401`), a busy device
+(`503`), a timeout, network errors, and other HTTP responses. If waiting and
+retrying works, capture the first failure before changing the timeout or adding
+retries, so the original cause remains visible.
+
+Run the app with `flutter run` from `mobileapp/` and look for `Device login:`
+in the console. For an already running app, use `flutter logs` with the phone
+connected and selected. For example:
+
+```text
+Device login: timeout exception=TimeoutException elapsed_ms=3002
+Device login: http_error status=503 elapsed_ms=24
+Device login: success status=200 elapsed_ms=18
+```
+
+Logs include the outcome, HTTP status or exception type, and elapsed time.
+They omit credentials, authorization headers, response bodies, and raw exception
+messages. A timeout only establishes that the request missed the deadline;
+it does not identify whether Wi-Fi, the phone, or the ESP32 caused the delay.
+
 ## How do I check the app?
 
 ```bash
 flutter analyze
 flutter test
 ```
+
+## Where are the EcoBurn branding assets?
+
+`mobileapp/assets/branding/ecoburn-logo.png` is the supplied logo used on the
+login screen. `ecoburn-icon.png` is the symbol-only launcher artwork, with a
+dark green background and padding to keep the symbol readable at small sizes.
+Android and iOS launcher images are checked in so normal builds need no image
+generation dependencies. After replacing the launcher artwork, install
+ImageMagick and run from `mobileapp/`:
+
+```bash
+bash tool/generate_launcher_icons.sh
+```
+
+The Android application ID is `com.biomo.ecoburn`. Android treats it as a
+separate app from the earlier `com.biomo.biomassmonitor` package, so the old
+installation's preferences, history, and attempts do not transfer automatically.
+The Dart package name and iOS bundle identifier retain their existing values.
 
 ## How do I profile tab transitions?
 
@@ -182,7 +233,7 @@ jank or frame-budget spikes are not expected.
 
 ## How do I publish an Android release?
 
-Android requires every update for `com.biomo.biomassmonitor` to use the same
+Android requires every update for `com.biomo.ecoburn` to use the same
 signing key. Create the key outside the repository and keep an offline backup;
 losing it prevents future APKs from updating installations of the first release.
 
@@ -205,7 +256,7 @@ git push origin v1.2.3
 ```
 
 The workflow creates or updates the matching GitHub Release. It includes the
-firmware binary and `biomo-biomassmonitor-v1.2.3.apk`; a hardware archive is
+firmware binary and `ecoburn-v1.2.3.apk`; a hardware archive is
 included only when matching hardware files exist. A manual workflow run must
 target a valid tag in the same `vMAJOR.MINOR.PATCH` format.
 
@@ -215,14 +266,16 @@ Download the APK from the GitHub Release page. Android Build Tools can check
 the signature and the package metadata before installation:
 
 ```bash
-apksigner verify biomo-biomassmonitor-v1.2.3.apk
-aapt2 dump badging biomo-biomassmonitor-v1.2.3.apk
+apksigner verify ecoburn-v1.2.3.apk
+aapt2 dump badging ecoburn-v1.2.3.apk
 ```
 
-The output must identify `com.biomo.biomassmonitor`. Install later releases
-over the earlier APK on a device to confirm the retained signing key permits an
-update. APK distribution uses manual installation and does not provide Google
-Play or in-app updates.
+The output must identify `com.biomo.ecoburn`. Install later EcoBurn releases
+over the first EcoBurn APK on a device to confirm the retained signing key
+permits an update. The previous `com.biomo.biomassmonitor` APK cannot update to
+EcoBurn because Android treats the new application ID as a separate app. APK
+distribution uses manual installation and does not provide Google Play or
+in-app updates.
 
 ## What can prevent a release from working?
 

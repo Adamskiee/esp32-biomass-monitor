@@ -1,5 +1,6 @@
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/features/safety/control_tab.dart';
+import 'package:biomass_iot_app/features/safety/widgets/safety_controls_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +13,7 @@ import 'package:sqflite/sqflite.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('does not expose audit logs or sensor calibration controls', (
+  testWidgets('shows safety controls without network diagnostics', (
     tester,
   ) async {
     databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
@@ -48,6 +49,11 @@ void main() {
 
     expect(find.text('Hardware Audit Log'), findsNothing);
     expect(find.text('Sensor Calibration (Admin Override)'), findsNothing);
+    expect(find.text('Network & Hardware Diagnostics'), findsNothing);
+    expect(find.text('Active Connection'), findsNothing);
+    expect(find.text('IP Address'), findsNothing);
+    expect(find.byType(SafetyControlsPanel), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
     appState.logout();
   });
 }

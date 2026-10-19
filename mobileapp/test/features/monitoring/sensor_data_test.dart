@@ -42,6 +42,12 @@ void main() {
     expect(reading.mqWarmupRemainingSeconds, 300);
   });
 
+  test('parses humidity from the DHT22 firmware field', () {
+    final reading = SensorData.fromJson({'humidity_percent': 54.5});
+
+    expect(reading.humidityPercent, 54.5);
+  });
+
   test('keeps MQ warmup active while firmware finishes the first reading', () {
     final reading = SensorData.fromJson({
       'mq_warming_up': true,

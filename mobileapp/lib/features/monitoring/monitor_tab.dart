@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
@@ -71,95 +72,122 @@ class _MonitorTabState extends State<MonitorTab> {
   ) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: theme.cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Export Telemetry Data",
-              style: TextStyle(
-                color: theme.textTheme.bodyLarge?.color,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Export Telemetry Data",
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Select the parameters for your CSV report.",
-              style: TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-            const SizedBox(height: 24),
-            ListTile(
-              title: Text(
-                "Date Range",
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              const SizedBox(height: 8),
+              const Text(
+                "Export the latest session readings as a CSV file.",
+                style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
-              trailing: const Text(
-                "Current Session",
-                style: TextStyle(color: AppTheme.neonGreen),
+              const SizedBox(height: 24),
+              ListTile(
+                title: Text(
+                  "Date Range",
+                  style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                ),
+                subtitle: const Text(
+                  "Current Session",
+                  style: TextStyle(color: AppTheme.neonGreen),
+                ),
+                tileColor: theme.scaffoldBackgroundColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              tileColor: theme.scaffoldBackgroundColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 12),
+              ListTile(
+                title: Text(
+                  "Include Sensors",
+                  style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                ),
+                subtitle: const Text(
+                  "Temperature, humidity, chamber, MQ135, MQ2, PMS",
+                  style: TextStyle(color: AppTheme.neonGreen),
+                ),
+                tileColor: theme.scaffoldBackgroundColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              title: Text(
-                "Include Sensors",
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-              ),
-              trailing: const Text(
-                "Temperature, chamber, MQ135, MQ2, PMS",
-                style: TextStyle(color: AppTheme.neonGreen),
-              ),
-              tileColor: theme.scaffoldBackgroundColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.neonGreen,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    backgroundColor: AppTheme.neonGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  icon: const Icon(CupertinoIcons.share),
+                  label: const Text(
+                    "GENERATE & SHARE CSV",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _generateAndShareCSV(history);
+                  },
                 ),
-                icon: const Icon(CupertinoIcons.share),
-                label: const Text(
-                  "GENERATE & SHARE CSV",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _generateAndShareCSV(history);
-                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _generateAndShareCSV(List<SensorData> history) {
-    if (history.isEmpty) return;
-    // ignore: deprecated_member_use
-    Share.share(
-      buildTelemetryCsv(history),
-      subject: 'Biomass_Telemetry_Export.csv',
-    );
+  Future<void> _generateAndShareCSV(List<SensorData> history) async {
+    if (history.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No sensor readings to export yet.')),
+      );
+      return;
+    }
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              utf8.encode(buildTelemetryCsv(history)),
+              mimeType: 'text/csv',
+            ),
+          ],
+          fileNameOverrides: ['Biomass_Telemetry_Export.csv'],
+          subject: 'Biomass_Telemetry_Export.csv',
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to export CSV. Please try again.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -260,6 +288,13 @@ class _MonitorTabState extends State<MonitorTab> {
             '${stats['maxAmbientTemp']} °C',
             '${stats['avgAmbientTemp']} °C',
             AppTheme.neonOrange,
+            theme,
+          ),
+          _analyticsCard(
+            'Humidity',
+            '${stats['maxHumidity']} %',
+            '${stats['avgHumidity']} %',
+            AppTheme.neonBlue,
             theme,
           ),
         ], theme),
@@ -427,6 +462,12 @@ class _MonitorTabState extends State<MonitorTab> {
                             '°C',
                             1,
                           ),
+                          _sensorReading(
+                            'Humidity',
+                            log.humidityPercent,
+                            '%',
+                            1,
+                          ),
                           _sensorReading('MQ-135', log.mq135V, 'V', 2),
                           _sensorReading('MQ-2', log.mq2V, 'V', 2),
                           _sensorReading('PM1.0', log.pm1_0UgM3, 'µg/m³', 0),
@@ -446,8 +487,11 @@ class _MonitorTabState extends State<MonitorTab> {
             ),
           ),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             TextButton(
               onPressed:

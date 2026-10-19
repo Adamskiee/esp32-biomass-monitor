@@ -36,7 +36,7 @@ void main() {
       await tester.tap(find.text('Retry'));
       await tester.pump();
       expect(find.byType(SafetyControlsPanel), findsOneWidget);
-      expect(find.text('Biomass Monitor Safety Dashboard'), findsOneWidget);
+      expect(find.text('EcoBurn Safety Dashboard'), findsOneWidget);
       expect(find.text('Live Sensor Data'), findsNothing);
       expect(find.byType(TextFormField), findsNWidgets(9));
       await tester.pumpWidget(const SizedBox.shrink());

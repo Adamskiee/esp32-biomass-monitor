@@ -519,6 +519,13 @@ void testProcessingSensorReadingsEvaluatesSafety() {
   EXPECT_CONTAINS(name, active_triggers_json, "high_chamber_temp");
 }
 
+void testProcessingSensorReadingsCachesHumidity() {
+  const char *name = "processing sensor readings caches humidity";
+  resetSafetyState();
+  processSensorReadings(28.0f, 25.0f, 1.2f, 0.5f, false, 54.5f);
+  EXPECT_TRUE(name, current_humidity_percent == 54.5f);
+}
+
 void testTemperatureDangerReassertsSprinklerRequest() {
   const char *name = "temperature danger reasserts sprinkler request";
   resetSafetyState();
@@ -1236,6 +1243,8 @@ int main() {
       testLedFollowsLatchedTemperatureDanger);
   run("processing sensor readings evaluates safety",
       testProcessingSensorReadingsEvaluatesSafety);
+  run("processing sensor readings caches humidity",
+      testProcessingSensorReadingsCachesHumidity);
   run("temperature danger reasserts sprinkler request",
       testTemperatureDangerReassertsSprinklerRequest);
   run("temperature hysteresis", testTemperatureHysteresis);

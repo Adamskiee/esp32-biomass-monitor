@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsController>();
     return MaterialApp(
-      title: 'Biomass IoT Monitor',
+      title: 'EcoBurn',
       debugShowCheckedModeBanner: false,
       theme: settings.isDarkMode
           ? AppTheme.getDarkTheme()

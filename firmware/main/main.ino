@@ -41,8 +41,8 @@ void loop() {
       snprintf(tempStr, sizeof(tempStr), "%.1fC", t_temp);
     }
 
-    Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %s | Chamber: %.1fC\n",
-                  t_mq135, t_mq2, tempStr, t_chamber);
+    Serial.printf("MQ135: %.2fV | MQ2: %.2fV | Temp: %s | Humidity: %.1f%% | Chamber: %.1fC\n",
+                  t_mq135, t_mq2, tempStr, t_humidity, t_chamber);
 
     bool do_save = false;
     SafetyThresholds snapshot;

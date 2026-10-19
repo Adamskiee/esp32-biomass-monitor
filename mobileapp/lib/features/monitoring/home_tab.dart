@@ -104,6 +104,17 @@ class _HomeTabState extends State<HomeTab> {
                         maxVal: 50.0,
                       ),
                       _metricCard(
+                        "Humidity",
+                        data.humidityPercent,
+                        " %",
+                        CupertinoIcons.drop_fill,
+                        AppTheme.neonBlue,
+                        theme,
+                        decimals: 1,
+                        isCompact: isCompact,
+                        maxVal: 100.0,
+                      ),
+                      _metricCard(
                         "Chamber Temp",
                         data.chamberTempC,
                         " °C",
@@ -308,6 +319,21 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                               const SizedBox(height: 24),
                               _buildTrendChart(
+                                title: 'Humidity',
+                                unit: '%',
+                                history: chartData,
+                                theme: theme,
+                                height: chartHeight,
+                                series: [
+                                  _TrendSeries(
+                                    label: 'Relative humidity',
+                                    color: AppTheme.neonBlue,
+                                    valueFor: (data) => data.humidityPercent,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              _buildTrendChart(
                                 title: 'Particulate Matter',
                                 unit: 'µg/m³',
                                 history: chartData,
@@ -447,6 +473,11 @@ class _HomeTabState extends State<HomeTab> {
     required double height,
     required List<_TrendSeries> series,
   }) {
+    final availableSeries = series
+        .where(
+          (item) => history.any((reading) => item.valueFor(reading) != null),
+        )
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -455,7 +486,7 @@ class _HomeTabState extends State<HomeTab> {
         Wrap(
           spacing: 12,
           runSpacing: 6,
-          children: series
+          children: availableSeries
               .map(
                 (item) => Row(
                   mainAxisSize: MainAxisSize.min,
@@ -478,7 +509,15 @@ class _HomeTabState extends State<HomeTab> {
         const SizedBox(height: 12),
         SizedBox(
           height: height,
-          child: LineChart(_buildChartData(history, theme, unit, series)),
+          child: availableSeries.isEmpty
+              ? Center(child: Text('No readings available for $title'))
+              : LineChart(
+                  _buildChartData(history, theme, unit, availableSeries),
+                  // Reset cached tooltips and bar animations when sensors change.
+                  key: ValueKey(
+                    availableSeries.map((item) => item.label).join('|'),
+                  ),
+                ),
         ),
       ],
     );

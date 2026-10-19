@@ -35,7 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Biomass Monitor Safety Dashboard')),
+    appBar: AppBar(title: const Text('EcoBurn Safety Dashboard')),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [

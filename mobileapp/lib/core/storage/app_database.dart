@@ -21,7 +21,7 @@ class AppDatabase implements DatabaseProvider {
     _database = await (_databaseFactory ?? databaseFactory).openDatabase(
       _databasePath ?? await _defaultPath(),
       options: OpenDatabaseOptions(
-        version: 6,
+        version: 7,
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
@@ -60,6 +60,9 @@ class AppDatabase implements DatabaseProvider {
     if (oldVersion < 6) {
       await _createAlertStatesTable(db);
     }
+    if (oldVersion < 7) {
+      await _addSensorColumnIfAbsent(db, 'humidity_percent');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -82,6 +85,7 @@ class AppDatabase implements DatabaseProvider {
     CREATE TABLE sensor_data (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       temperature_c REAL,
+      humidity_percent REAL,
       chamber_temp_c REAL,
       mq135_v REAL,
       mq2_v REAL,
@@ -120,6 +124,15 @@ class AppDatabase implements DatabaseProvider {
           'UPDATE sensor_data SET ${entry.key} = ${entry.value}',
         );
       }
+    }
+  }
+
+  Future<void> _addSensorColumnIfAbsent(Database db, String column) async {
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(sensor_data)',
+    )).map((entry) => entry['name'] as String).toSet();
+    if (!columns.contains(column)) {
+      await db.execute('ALTER TABLE sensor_data ADD COLUMN $column REAL');
     }
   }
 
