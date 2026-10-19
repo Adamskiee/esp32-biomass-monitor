@@ -68,7 +68,10 @@ The Home dashboard groups live and historical trends by unit so readings remain
 readable: ambient and chamber temperatures, MQ2 and MQ135 voltages, and PM1.0,
 PM2.5, and PM10 concentrations. Each chart uses the same Live, 1H, and 24H
 timeframe control. A missing reading appears as a gap, so the app does not
-misrepresent unavailable sensor data as zero.
+misrepresent unavailable sensor data as zero. A sensor with no valid readings in
+the selected timeframe is omitted from its chart and legend. If every sensor in
+a chart is unavailable, the chart shows a no-data message. This also handles
+hardware startup and sensor faults, when the ESP32 can report null readings.
 
 The sensor data log reads the full local history in pages of 10 records, newest
 first. Live updates are off by default so records do not move between pages
