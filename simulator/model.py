@@ -23,6 +23,13 @@ class SimulatorState:
         "pm1_0_ug_m3": 8, "pm2_5_ug_m3": 12, "pm10_ug_m3": 18,
     }
     _PMS_FIELDS = ("pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3")
+    _DEFAULT_THRESHOLDS = {
+        "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+        "threshold_mq135_v": 2.0, "threshold_temperature_c": 35.0,
+        "threshold_pm1_0_ug_m3": 15.0, "threshold_pm2_5_ug_m3": 15.0,
+        "threshold_pm10_ug_m3": 45.0, "threshold_humidity_min_percent": 30.0,
+        "threshold_humidity_max_percent": 60.0,
+    }
     _LIMITS = {
         "threshold_chamber_temp_c": (20.0, 150.0),
         "threshold_mq2_v": (0.1, 5.0),
@@ -69,8 +76,7 @@ class SimulatorState:
             self._readings = self._DEFAULT_READINGS.copy()
             self._overrides = set()
             self._pms_sampled_at = now
-            self._thresholds = dict.fromkeys(self._LIMITS)
-            self._thresholds.update(threshold_chamber_temp_c=80.0, threshold_mq2_v=2.5)
+            self._thresholds = self._DEFAULT_THRESHOLDS.copy()
             self._upper_danger = dict.fromkeys(self._UPPER_TRIGGERS, False)
             self._low_humidity_danger = False
             self._high_humidity_danger = False

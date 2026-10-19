@@ -11,10 +11,10 @@ from simulator.server import make_handler
 
 DEFAULT_THRESHOLDS = {
     "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
-    "threshold_mq135_v": None, "threshold_temperature_c": None,
-    "threshold_pm1_0_ug_m3": None, "threshold_pm2_5_ug_m3": None,
-    "threshold_pm10_ug_m3": None, "threshold_humidity_min_percent": None,
-    "threshold_humidity_max_percent": None,
+    "threshold_mq135_v": 2.0, "threshold_temperature_c": 35.0,
+    "threshold_pm1_0_ug_m3": 15.0, "threshold_pm2_5_ug_m3": 15.0,
+    "threshold_pm10_ug_m3": 45.0, "threshold_humidity_min_percent": 30.0,
+    "threshold_humidity_max_percent": 60.0,
 }
 
 
@@ -168,7 +168,7 @@ class ServerTests(unittest.TestCase):
                           {"threshold_mq135_v": True}, {"threshold_temperature_c": "20"},
                           {"threshold_temperature_c": -41}, {"threshold_pm1_0_ug_m3": 0},
                           {"threshold_pm2_5_ug_m3": 65536},
-                          {"threshold_humidity_min_percent": 30}):
+                          {"threshold_humidity_min_percent": 60}):
                 with self.subTest(route=route, patch=patch):
                     self.assertEqual(self.request(route, "POST", {"threshold_mq2_v": 3, **patch})[0], 400)
                     self.assertEqual(self.request("/api/settings")[2], DEFAULT_THRESHOLDS)

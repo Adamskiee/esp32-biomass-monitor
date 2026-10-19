@@ -61,11 +61,8 @@ bool validFieldValue(ThresholdField field, float value) {
 }
 
 SafetyThresholds defaultSafetyThresholds() {
-  SafetyThresholds defaults;
-  defaults.values.fill(std::numeric_limits<float>::quiet_NaN());
-  defaults.values[static_cast<uint8_t>(ThresholdField::Chamber)] = 80.0f;
-  defaults.values[static_cast<uint8_t>(ThresholdField::Mq2)] = 2.5f;
-  return defaults;
+  return SafetyThresholds{{80.0f, 2.5f, 2.0f, 35.0f, 15.0f, 15.0f, 45.0f,
+                           30.0f, 60.0f}};
 }
 
 const char *thresholdFieldName(ThresholdField field) {
@@ -140,6 +137,12 @@ bool decodeThresholdRecord(const uint8_t *bytes, size_t length,
   }
   if (!validateStoredThresholds(candidate)) {
     return false;
+  }
+  const auto defaults = defaultSafetyThresholds();
+  for (size_t i = 0; i < candidate.values.size(); ++i) {
+    if (std::isnan(candidate.values[i])) {
+      candidate.values[i] = defaults.values[i];
+    }
   }
   accepted = candidate;
   return true;

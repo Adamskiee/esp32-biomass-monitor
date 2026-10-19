@@ -25,7 +25,7 @@ The system operates on a continuous, non-blocking evaluation loop.
 
 *   **Polling Interval:** Hardware sensors are read every `POLL_INTERVAL_MS`.
 *   **Concurrency & Data Access:** Hardware readings are safely cached into global state variables, protected by a FreeRTOS mutex (`stateMutex`). This allows the API server to serve data to the visualization dashboard rapidly without blocking the hardware control loop.
-*   **Threshold Persistence:** Nine limits cover chamber temperature, MQ-2, MQ-135, ambient temperature, PM1.0, PM2.5, PM10, and humidity minimum/maximum. New optional limits begin unset; chamber and MQ-2 default to 80 C and 2.5 V. The validated record is saved atomically to NVS at most once every 60 seconds.
+*   **Threshold Persistence:** Nine limits cover chamber temperature, MQ-2, MQ-135, ambient temperature, PM1.0, PM2.5, PM10, and humidity minimum/maximum. Defaults are 80 C, 2.5 V, 2 V, 35 C, 15/15/45 µg/m³, and 30–60% humidity respectively. Startup fills previously unset fields while preserving configured values. These are initial project alert settings, not exposure or certified operating limits; see [the API reference](../api.md) for rationale. The validated record is saved atomically to non-volatile storage (NVS) at most once every 60 seconds.
 *   **Attempt recording:** The mobile app may record one connected local attempt at a time as with or without filtration. It persists readings locally and presents descriptive comparisons without a success verdict.
 
 ## 4. Safety Rules & Automation Logic

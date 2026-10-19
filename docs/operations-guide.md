@@ -46,8 +46,11 @@ standards or calibrated measurements. Changes apply immediately and are saved
 to flash no more than once per minute. Power loss before that write can lose a
 recent change.
 
-Each sensor row shows a reading, a saved limit, and its status. Enter both
-humidity boundaries for the first save and keep minimum below maximum.
+Each sensor row shows a reading, a saved limit, and its status. Current firmware
+starts with all limits configured, fills previously unset fields on upgrade,
+and preserves saved values. See the [API reference](api.md) for the default
+values and their limitations. Keep humidity minimum below maximum; either
+boundary can be edited independently.
 Adjust upper limits with their slider or numeric input. Humidity has a
 two-handle range slider with exact minimum/maximum entry. Slider dragging uses
 0.5 °C, 0.1 V, 1 µg/m³, or 1% steps; type a value for finer precision.
@@ -58,7 +61,8 @@ the saved opposite humidity boundary while you edit, so validation always uses
 the latest device settings.
 
 New MQ-2 values cannot exceed 4.8 V; an existing 5 V limit stays readable.
-An explicit unset limit remains editable. **Firmware update required** disables
+On earlier firmware, an explicit unset limit remains editable; configure both
+humidity boundaries together if both are unset. **Firmware update required** disables
 only a field absent from older firmware. Offline readings are marked stale and
 controls lock until reconnection. Sensor faults take priority over alert or
 unconfigured statuses, except that MQ warm-up shows its remaining seconds.

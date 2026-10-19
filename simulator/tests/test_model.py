@@ -2,6 +2,14 @@ import unittest
 
 from simulator.model import SafetyOverrideError, SimulatorState
 
+DEFAULT_THRESHOLDS = {
+    "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+    "threshold_mq135_v": 2.0, "threshold_temperature_c": 35.0,
+    "threshold_pm1_0_ug_m3": 15.0, "threshold_pm2_5_ug_m3": 15.0,
+    "threshold_pm10_ug_m3": 45.0, "threshold_humidity_min_percent": 30.0,
+    "threshold_humidity_max_percent": 60.0,
+}
+
 
 class SimulatorStateTests(unittest.TestCase):
     def setUp(self):
@@ -172,13 +180,11 @@ class SimulatorStateTests(unittest.TestCase):
         self.state.update_thresholds({"threshold_chamber_temp_c": 80})
         self.assertTrue(self.state.snapshot()["pump_on"])
 
-    def test_new_limits_start_unset_and_confirmation_does_not_advance_drift(self):
+    def test_all_limits_have_defaults_and_confirmation_does_not_advance_drift(self):
         first = self.state.snapshot()
         self.assertEqual(first["humidity_percent"], 50.0)
         limits = self.state.thresholds_snapshot()
-        self.assertEqual(len(limits), 9)
-        for field in set(limits) - {"threshold_chamber_temp_c", "threshold_mq2_v"}:
-            self.assertIsNone(limits[field])
+        self.assertEqual(limits, DEFAULT_THRESHOLDS)
         limits["threshold_mq2_v"] = 4
         self.assertEqual(self.state.thresholds_snapshot()["threshold_mq2_v"], 2.5)
         self.assertEqual(self.state.snapshot()["temperature_c"], 25.1)
@@ -337,13 +343,13 @@ class SimulatorStateTests(unittest.TestCase):
         self.state.reset()
         sample = self.state.snapshot()
         self.assertEqual((sample["temperature_c"], sample["humidity_percent"]), (25, 50))
-        self.assertIsNone(sample["threshold_temperature_c"])
+        self.assertEqual(sample["threshold_temperature_c"], 35)
         self.assertEqual(sample["active_triggers"], [])
 
     def test_humidity_validation_uses_complete_candidate_atomically(self):
         before = self.state.thresholds_snapshot()
-        for patch in ({"threshold_humidity_min_percent": 30},
-                      {"threshold_humidity_max_percent": 70},
+        for patch in ({"threshold_humidity_min_percent": 60},
+                      {"threshold_humidity_max_percent": 30},
                       {"threshold_humidity_min_percent": 70, "threshold_humidity_max_percent": 30}):
             with self.assertRaises(ValueError):
                 self.state.update_thresholds({"threshold_mq2_v": 3, **patch})
@@ -410,8 +416,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertFalse(sample["pump_on"])
         self.assertEqual(sample["humidity_percent"], 50)
         self.assertEqual(sample["pm1_0_ug_m3"], 8)
-        for key, value in self.state.thresholds_snapshot().items():
-            self.assertEqual(value, {"threshold_chamber_temp_c": 80, "threshold_mq2_v": 2.5}.get(key))
+        self.assertEqual(self.state.thresholds_snapshot(), DEFAULT_THRESHOLDS)
 
     def test_unknown_scenario_keeps_state(self):
         self.state.select_scenario("heat")

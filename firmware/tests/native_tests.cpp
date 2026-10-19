@@ -67,16 +67,24 @@ void testThresholdRecordWireFormat() {
   expectSameThresholds(name, restored, configured);
 }
 
-void testThresholdRecordPreservesUnsetFields() {
-  const char *name = "threshold record preserves unset fields";
-  auto configured = defaultSafetyThresholds();
+void testThresholdRecordFillsUnsetFields() {
+  const char *name = "threshold record fills unset fields";
+  SafetyThresholds configured{{95, 3, NAN, NAN, NAN, NAN, NAN, NAN, NAN}};
+  SafetyThresholds expected{{95, 3, 2, 35, 15, 15, 45, 30, 60}};
   for (size_t field = 2; field <= 7; ++field) {
     const auto bytes = encodeThresholdRecord(configured);
     SafetyThresholds restored{};
     EXPECT_TRUE(name,
                 decodeThresholdRecord(bytes.data(), bytes.size(), restored));
-    expectSameThresholds(name, restored, configured);
-    configured.values[field] = 1.0f;
+    expectSameThresholds(name, restored, expected);
+    const auto migrated = encodeThresholdRecord(restored);
+    EXPECT_TRUE(name,
+                decodeThresholdRecord(migrated.data(), migrated.size(), restored));
+    expectSameThresholds(name, restored, expected);
+    if (field < 7) {
+      configured.values[field] = 1.0f;
+      expected.values[field] = 1.0f;
+    }
   }
 }
 
@@ -109,7 +117,7 @@ void testThresholdRecordRejectsMalformedDataAtomically() {
   }
   for (const auto field : {0, 1, 7, 8}) {
     auto invalid = defaultSafetyThresholds();
-    invalid.values[field] = field < 2 ? NAN : 50.0f;
+    invalid.values[field] = field < 2 ? NAN : (field == 7 ? 60.0f : 30.0f);
     auto record = encodeThresholdRecord(invalid);
     EXPECT_FALSE(name,
                  decodeThresholdRecord(record.data(), record.size(), accepted));
@@ -219,13 +227,13 @@ void testThresholdUpdatesKeepOnlyRealChangesPending() {
                   ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name,
               threshold_persistence.beginSave(0, safety_thresholds, snapshot));
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2)) ==
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
                         ThresholdUpdateResult::Accepted);
   threshold_persistence.finishSave(true);
   EXPECT_TRUE(name, threshold_persistence.beginSave(60000, safety_thresholds,
                                                     snapshot));
-  EXPECT_TRUE(name, snapshot.values[0] == 90 && snapshot.values[2] == 2);
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2)) ==
+  EXPECT_TRUE(name, snapshot.values[0] == 90 && snapshot.values[2] == 3);
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
                         ThresholdUpdateResult::Accepted);
   threshold_persistence.finishSave(true);
   EXPECT_FALSE(name, threshold_persistence.beginSave(120000, safety_thresholds,
@@ -237,9 +245,8 @@ void testThresholdDefaults() {
   const auto defaults = defaultSafetyThresholds();
   EXPECT_TRUE(name, defaults.values[0] == 80.0f);
   EXPECT_TRUE(name, defaults.values[1] == 2.5f);
-  for (size_t index = 2; index < defaults.values.size(); ++index) {
-    EXPECT_TRUE(name, std::isnan(defaults.values[index]));
-  }
+  const SafetyThresholds expected{{80, 2.5f, 2, 35, 15, 15, 45, 30, 60}};
+  expectSameThresholds(name, defaults, expected);
   EXPECT_TRUE(name, validateStoredThresholds(defaults));
   const char *expected_names[] = {
       "threshold_chamber_temp_c", "threshold_mq2_v", "threshold_mq135_v",
@@ -302,7 +309,7 @@ void testThresholdRanges() {
                              accepted));
       auto stored = defaults;
       stored.values[index] = value;
-      const bool optional_unset = index >= 2 && std::isnan(value);
+      const bool optional_unset = index >= 2 && index <= 6 && std::isnan(value);
       EXPECT_TRUE(name, validateStoredThresholds(stored) == optional_unset);
     }
   }
@@ -322,13 +329,21 @@ void testHumidityPairValidation() {
   const char *name = "humidity pair validation";
   const auto defaults = defaultSafetyThresholds();
   SafetyThresholds accepted = defaults;
-  EXPECT_FALSE(name, validateThresholdPatch(
+  EXPECT_TRUE(name, validateThresholdPatch(
                          defaults, patchFor(ThresholdField::HumidityMin, 30.0f),
                          accepted));
   EXPECT_TRUE(name, accepted.values[0] == 80.0f);
-  EXPECT_TRUE(name, std::isnan(accepted.values[7]));
-  EXPECT_FALSE(name, validateThresholdPatch(
+  EXPECT_TRUE(name, accepted.values[7] == 30.0f);
+  EXPECT_TRUE(name, validateThresholdPatch(
                          defaults, patchFor(ThresholdField::HumidityMax, 70.0f),
+                         accepted));
+  auto legacy = defaults;
+  legacy.values[7] = legacy.values[8] = NAN;
+  EXPECT_FALSE(name, validateThresholdPatch(
+                         legacy, patchFor(ThresholdField::HumidityMin, 30.0f),
+                         accepted));
+  EXPECT_FALSE(name, validateThresholdPatch(
+                         legacy, patchFor(ThresholdField::HumidityMax, 70.0f),
                          accepted));
   auto pair = patchFor(ThresholdField::HumidityMin, 30.0f);
   pair.fields |= 1u << static_cast<uint8_t>(ThresholdField::HumidityMax);
@@ -986,7 +1001,8 @@ void testEnvironmentalInvalidReadings() {
   }
   for (float value : {-40.0f, 80.0f}) {
     processSensorReadings(value, 25, 0.5f, 0.5f, false, 50);
-    EXPECT_TRUE(name, active_triggers_json == "[]");
+    EXPECT_TRUE(name, active_triggers_json ==
+                          (value == 80.0f ? "[\"high_ambient_temp\"]" : "[]"));
   }
   for (float value : {-0.1f, 100.1f}) {
     processSensorReadings(25, 25, 0.5f, 0.5f, false, value);
@@ -994,7 +1010,9 @@ void testEnvironmentalInvalidReadings() {
   }
   for (float value : {0.0f, 100.0f}) {
     processSensorReadings(25, 25, 0.5f, 0.5f, false, value);
-    EXPECT_TRUE(name, active_triggers_json == "[]");
+    EXPECT_TRUE(name, active_triggers_json ==
+                          (value == 0.0f ? "[\"low_humidity\"]"
+                                         : "[\"high_humidity\"]"));
   }
 }
 
@@ -1203,8 +1221,7 @@ void digitalWrite(uint8_t pin, uint8_t level) {
 
 int main() {
   run("threshold record wire format", testThresholdRecordWireFormat);
-  run("threshold record preserves unset fields",
-      testThresholdRecordPreservesUnsetFields);
+  run("threshold record fills unset fields", testThresholdRecordFillsUnsetFields);
   run("threshold record rejects malformed data atomically",
       testThresholdRecordRejectsMalformedDataAtomically);
   run("persistence first save and rate limit",

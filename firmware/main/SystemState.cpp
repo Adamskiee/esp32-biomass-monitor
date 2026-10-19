@@ -116,6 +116,8 @@ void initSystemState() {
         safety_thresholds = candidate;
       }
     }
+  }
+  if (!restored || encodeThresholdRecord(safety_thresholds) != record) {
     threshold_persistence.markChanged();
   }
   xSemaphoreGive(stateMutex);

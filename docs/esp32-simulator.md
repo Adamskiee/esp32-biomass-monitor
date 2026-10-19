@@ -72,14 +72,14 @@ Type one command into the simulator terminal while the app is open:
 | `offline` | Authenticated requests return 503 and the app shows its disconnected state. The simulator retains readings and settings. |
 | `warmup` | Restart the five-minute MQ-135 and MQ-2 warm-up countdown without changing the selected scenario. |
 | `status` | Print the selected scenario. |
-| `reset` | Restore `normal`, clear safety latches, reading overrides, and manual control, restore 80.0 °C and 2.5 V thresholds, unset all environmental limits, and start the five-minute MQ warm-up countdown. |
+| `reset` | Restore `normal`, clear safety latches, reading overrides, and manual control, restore all nine default thresholds, and start the five-minute MQ warm-up countdown. |
 | `help` | Print available commands. |
 | `quit` | Stop the server. |
 
 Every online scenario also returns stable PMS telemetry: PM1.0 is 8 µg/m³,
 PM2.5 is 12 µg/m³, and PM10 is 18 µg/m³. Each snapshot simulates a fresh
 PMS frame unless a test explicitly overrides a particulate reading. These
-readings activate alerts once their corresponding limits are configured.
+readings activate alerts when they cross their configured limits.
 
 `pump_on` represents the commanded pump relay and changes immediately when a
 manual or safety sprinkler request is accepted. It does not confirm pump
@@ -87,9 +87,12 @@ operation or water flow.
 
 All nine threshold fields follow the firmware's validation and recovery rules.
 MQ2 uses its saved limit; a reading above 4.8 V reports a fault instead of a new
-threshold crossing. MQ135, ambient temperature, the three particulate limits,
-and the humidity pair begin unset (`null`). Humidity requires both boundaries
-on its first update. Thresholds and latches are never persisted to disk.
+threshold crossing. Defaults are 80 °C chamber, 2.5 V MQ-2, 2 V MQ-135,
+35 °C ambient, 15 µg/m³ PM1.0, 15 µg/m³ PM2.5, 45 µg/m³ PM10, and
+30–60% humidity. These are project alert settings; see the
+[API reference](api.md) for their rationale and limitations. Either humidity
+boundary can be updated while minimum remains below maximum. Thresholds and
+latches are never persisted to disk.
 The simulator starts with, and `reset` simulates, an ESP32
 restart. During the first five minutes, `mq_warming_up` is `true`,
 `mq_warmup_remaining_seconds` counts down from 300, both MQ readings are
@@ -149,8 +152,8 @@ threshold ranges. Run the simulator tests with:
 python3 -m unittest discover -s simulator/tests -v
 ```
 
-Run the shared firmware API checks only against a disposable simulator you
-started, because write checks configure previously unset limits:
+Run the shared firmware API checks against an isolated simulator you started.
+Write checks temporarily change limits and restore the original configuration:
 
 ```bash
 BIOMASS_TEST_BASE_URL=http://127.0.0.1:8765 \

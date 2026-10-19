@@ -63,13 +63,13 @@ Returns cached readings and current safety outputs:
   "pm10_ug_m3": 18,
   "threshold_chamber_temp_c": 130.0,
   "threshold_mq2_v": 2.5,
-  "threshold_mq135_v": null,
-  "threshold_temperature_c": null,
-  "threshold_pm1_0_ug_m3": null,
-  "threshold_pm2_5_ug_m3": null,
-  "threshold_pm10_ug_m3": null,
-  "threshold_humidity_min_percent": null,
-  "threshold_humidity_max_percent": null,
+  "threshold_mq135_v": 2,
+  "threshold_temperature_c": 35,
+  "threshold_pm1_0_ug_m3": 15,
+  "threshold_pm2_5_ug_m3": 15,
+  "threshold_pm10_ug_m3": 45,
+  "threshold_humidity_min_percent": 30,
+  "threshold_humidity_max_percent": 60,
   "pump_on": false,
   "manual_sprinkler": false,
   "active_triggers": []
@@ -173,13 +173,13 @@ Updates any nonempty subset of the nine supported limits atomically:
 | --- | --- | --- |
 | `threshold_chamber_temp_c` | 20 to 150 °C | Existing saved value, otherwise 80 |
 | `threshold_mq2_v` | 0.1 to 5 V | Existing saved value, otherwise 2.5 |
-| `threshold_mq135_v` | 0.1 to 5 V | `null` |
-| `threshold_temperature_c` | -40 to 80 °C | `null` |
-| `threshold_pm1_0_ug_m3` | Greater than 0, up to 65535 µg/m³ | `null` |
-| `threshold_pm2_5_ug_m3` | Greater than 0, up to 65535 µg/m³ | `null` |
-| `threshold_pm10_ug_m3` | Greater than 0, up to 65535 µg/m³ | `null` |
-| `threshold_humidity_min_percent` | 0 to 100% | `null` |
-| `threshold_humidity_max_percent` | 0 to 100%, strictly greater than minimum | `null` |
+| `threshold_mq135_v` | 0.1 to 5 V | 2 |
+| `threshold_temperature_c` | -40 to 80 °C | 35 |
+| `threshold_pm1_0_ug_m3` | Greater than 0, up to 65535 µg/m³ | 15 |
+| `threshold_pm2_5_ug_m3` | Greater than 0, up to 65535 µg/m³ | 15 |
+| `threshold_pm10_ug_m3` | Greater than 0, up to 65535 µg/m³ | 45 |
+| `threshold_humidity_min_percent` | 0 to 100% | 30 |
+| `threshold_humidity_max_percent` | 0 to 100%, strictly greater than minimum | 60 |
 
 Ranges are inclusive unless stated otherwise. They are configuration bounds,
 not health standards. MQ readings are volts, not calibrated gas concentrations.
@@ -188,8 +188,8 @@ over a gas alert, so limits above 4.8 V cannot produce a valid threshold crossin
 
 Every supplied value must be a finite JSON number. Booleans, strings, `null`,
 unknown keys, non-object bodies, and empty objects are rejected. Absent fields
-retain their saved values. Configure both humidity boundaries together on their
-first update; later partial edits validate against the saved opposite boundary.
+retain their saved values. Either humidity boundary can be edited independently;
+the complete candidate must keep minimum strictly below maximum.
 Any invalid field rejects the whole request without changing any limit.
 
 The body must not exceed 1024 bytes. Accepted limits immediately reevaluate
@@ -199,9 +199,26 @@ saved as one versioned record in non-volatile storage at most once every 60
 seconds. A successful response confirms in-memory acceptance; power loss before
 the pending flash write may lose recent edits.
 
-New optional limits begin unset so the firmware does not invent environmental
-safety defaults. They return `null` and skip threshold evaluation until
-configured. The API cannot clear a configured limit back to unset.
+Every limit starts configured. At startup, existing valid saved values take
+precedence; previously unset fields receive the defaults above. The migrated
+configuration is queued for persistence using the same flash-write limit.
+The API cannot clear a configured limit back to unset.
+
+These are initial alert settings for surrounding-air monitoring, not certified
+operating or exposure limits. Ambient temperature at 35 °C and PM1.0 at
+15 µg/m³ are project choices. MQ-135 at 2 V and MQ-2 at 2.5 V are provisional
+voltage settings that require calibration for the installed circuit and gases.
+See the [Winsen MQ135 manual](https://www.winsen-sensor.com/manual/mq135.html).
+
+The PM2.5 and PM10 numbers match the WHO 2021 24-hour guideline values of
+15 and 45 µg/m³. Firmware applies them to live readings, so these alerts do not
+assess a 24-hour average or WHO compliance. See the
+[WHO guidelines](https://www.who.int/Publications/i/Item/9789240034228).
+Humidity defaults to 30–60% for general moisture monitoring, informed by
+[EPA guidance](https://www.epa.gov/indoor-air-quality-iaq/what-can-i-do-improve-indoor-air-quality-my-home)
+to stay below 60%, ideally 30–50%. An open, humid installation may need a
+different range. Only chamber protection controls automatic pump operation;
+the existing 80 °C chamber setting is retained and requires site validation.
 
 Success returns `200 OK` with the complete configuration accepted by that
 request, even if another update follows immediately:
@@ -212,11 +229,11 @@ request, even if another update follows immediately:
   "thresholds": {
     "threshold_chamber_temp_c": 120,
     "threshold_mq2_v": 2,
-    "threshold_mq135_v": null,
-    "threshold_temperature_c": null,
-    "threshold_pm1_0_ug_m3": null,
-    "threshold_pm2_5_ug_m3": null,
-    "threshold_pm10_ug_m3": null,
+    "threshold_mq135_v": 2,
+    "threshold_temperature_c": 35,
+    "threshold_pm1_0_ug_m3": 15,
+    "threshold_pm2_5_ug_m3": 15,
+    "threshold_pm10_ug_m3": 45,
     "threshold_humidity_min_percent": 30,
     "threshold_humidity_max_percent": 70
   }
@@ -229,8 +246,9 @@ request, even if another update follows immediately:
 
 Returns a flat object containing all nine fields shown inside `thresholds`
 above. There is no `status` or `thresholds` wrapper. `GET /api/state` includes
-the same nine fields alongside telemetry. Explicit `null` means supported but
-unset; a missing field on older firmware means unsupported.
+the same nine fields alongside telemetry. Current firmware reports numeric
+limits after startup migration. Earlier firmware can report explicit `null`
+for a supported but unset limit; a missing field means unsupported.
 
 ### `POST /api/settings`
 
@@ -264,8 +282,9 @@ Threshold-write checks require `BIOMASS_TEST_ALLOW_WRITES=1`. They capture
 and restore the original configured limits and refuse to start if any limit
 is unset or missing, because the production API cannot restore unset values.
 On a disposable simulator only, add `BIOMASS_TEST_DISPOSABLE=1` to allow
-configuration of those limits. Restart that simulator afterward to recover its
-unset defaults. No test sends manual pump commands, but changing chamber limits
+configuration of those limits on older versions. Restart that simulator afterward
+to recover its defaults. Current simulators start with all limits configured.
+No test sends manual pump commands, but changing chamber limits
 on a device can change automatic pump output. Keep other configuration writers
 disconnected while testing so snapshot checks and restoration remain valid.
 

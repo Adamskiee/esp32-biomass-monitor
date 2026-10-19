@@ -98,11 +98,12 @@ temperature says **Alerts + automatic sprinkler**; every other reading says
 **Alerts only**. Pump status and manual control share the card above the groups.
 
 1. Drag a slider or type the limits selected for your operation. Configuration
-   ranges validate device settings; they are not exposure standards. New optional
-   limits start unset, with **Not configured** displayed until saved.
-2. Enter both humidity boundaries for the first configuration, with minimum
-   strictly below maximum. Later edits validate against the latest saved
-   opposite boundary. Limits already configured cannot be cleared.
+   ranges validate device settings; they are not exposure standards. Current
+   firmware provides defaults for every limit and fills previously unset fields
+   at startup while preserving saved values. See the [default table](api.md#post-apithresholds).
+2. Keep humidity minimum strictly below maximum. Either boundary can be edited;
+   validation uses the latest saved opposite boundary. Limits already configured
+   cannot be cleared.
 3. Select **Apply Thresholds**. Only changed fields are sent together. Inputs
    lock during the request, and the device-confirmed values replace the draft
    and saved labels after success. Failed writes or missing confirmation keep
@@ -114,7 +115,9 @@ two-handle range slider and separate minimum/maximum inputs. Dragging uses
 Particulate sliders initially span 1–500 µg/m³ and expand for larger typed or
 saved values, up to 65535. Their displayed range stays stable while dragging.
 These slider ranges do not restrict the API's accepted configuration ranges.
-An unset slider position does not configure a limit until you interact with it.
+On earlier firmware, an unset slider position does not configure a limit until
+you interact with it. Such fields display **Not configured** until saved;
+configure both humidity boundaries together if both are unset.
 
 Polling refreshes readings and saved labels while preserving edited text,
 including while scrolling or using the keyboard. For example, if you type a

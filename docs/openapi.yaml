@@ -116,9 +116,9 @@ components:
       description: >-
         Nonempty partial update, maximum 1024 bytes. Only finite JSON numbers
         are accepted; booleans, strings, null, and unknown keys are rejected.
-        Omitted fields retain their values. Both humidity boundaries are required
-        on first configuration; later partial updates must keep minimum strictly
-        below the saved maximum. An invalid field rejects the entire patch.
+        Omitted fields retain their values. Humidity defaults to 30–60%; partial
+        updates must keep minimum strictly below maximum after merging with
+        saved values. An invalid field rejects the entire patch.
         Changes apply immediately and reevaluate valid cached readings. They
         cannot clear the catastrophic latch. Flash saves occur at most once per
         60 seconds, so power loss before persistence may lose accepted edits.
@@ -186,12 +186,12 @@ components:
         - threshold_humidity_min_percent
         - threshold_humidity_max_percent
       description: >-
-        Complete saved configuration. Chamber and MQ-2 retain upgraded saved
-        values or default to 80 °C and 2.5 V. Other limits start null and do not
-        evaluate threshold alerts until configured. Humidity boundaries are
-        either both null or minimum is strictly below maximum. Configured limits
-        cannot be cleared via the API. Missing fields on older firmware mean
-        unsupported, which differs from explicit null. Ranges are configuration
+        Complete saved configuration. Every field has a numeric default. Startup
+        preserves configured values and fills previously unset fields from the
+        defaults, queuing the migrated record for persistence. Humidity minimum
+        is strictly below maximum. Configured limits cannot be cleared via the
+        API. Earlier firmware can report null for supported but unset fields;
+        missing fields mean unsupported. Ranges are configuration
         bounds, not health standards; MQ voltages are not calibrated gas levels.
         Upper alerts activate at or above the limit and clear at or below 95%.
         Ambient recovery instead subtracts the greater of 0.5 °C or 5% of the
@@ -202,56 +202,58 @@ components:
         threshold_chamber_temp_c:
           type: number
           format: float
+          default: 80
           minimum: 20
           maximum: 150
         threshold_mq2_v:
           type: number
           format: float
+          default: 2.5
           minimum: 0.1
           maximum: 5
         threshold_mq135_v:
           type: number
           format: float
-          nullable: true
+          default: 2
           minimum: 0.1
           maximum: 5
         threshold_temperature_c:
           type: number
           format: float
-          nullable: true
+          default: 35
           minimum: -40
           maximum: 80
         threshold_pm1_0_ug_m3:
           type: number
           format: float
-          nullable: true
+          default: 15
           minimum: 0
           exclusiveMinimum: true
           maximum: 65535
         threshold_pm2_5_ug_m3:
           type: number
           format: float
-          nullable: true
+          default: 15
           minimum: 0
           exclusiveMinimum: true
           maximum: 65535
         threshold_pm10_ug_m3:
           type: number
           format: float
-          nullable: true
+          default: 45
           minimum: 0
           exclusiveMinimum: true
           maximum: 65535
         threshold_humidity_min_percent:
           type: number
           format: float
-          nullable: true
+          default: 30
           minimum: 0
           maximum: 100
         threshold_humidity_max_percent:
           type: number
           format: float
-          nullable: true
+          default: 60
           minimum: 0
           maximum: 100
     ThresholdSuccessResponse:
