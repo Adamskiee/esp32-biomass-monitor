@@ -534,8 +534,9 @@ String _status(
   SensorData reading,
   Set<String> activeTriggers,
 ) {
-  if (!editor.saved.supports(definition.field))
+  if (!editor.saved.supports(definition.field)) {
     return 'Firmware update required';
+  }
   if (definition.isMq && reading.isMqWarmingUp) {
     return 'Warming up: ${reading.mqWarmupRemainingSeconds} s';
   }

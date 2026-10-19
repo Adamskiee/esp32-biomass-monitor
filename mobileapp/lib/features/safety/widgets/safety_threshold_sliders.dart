@@ -229,7 +229,6 @@ class SafetyHumidityRangeSlider extends StatelessWidget {
 
 class _SliderControls extends StatelessWidget {
   const _SliderControls({
-    super.key,
     required this.field,
     required this.label,
     required this.enabled,
