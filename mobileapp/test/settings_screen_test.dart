@@ -104,4 +104,52 @@ void main() {
 
     expect(find.text('Version 1.0.0 (1)'), findsOneWidget);
   });
+
+  testWidgets('reveals connection diagnostics only after they are requested', (
+    tester,
+  ) async {
+    databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (call) async => '/tmp/biomass-tests',
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('com.tekartik.sqflite'),
+      (call) async => switch (call.method) {
+        'openDatabase' => {'id': 1},
+        'query' => <Map<String, Object?>>[],
+        _ => null,
+      },
+    );
+    SharedPreferences.setMockInitialValues({'deviceIp': '192.168.1.10'});
+    final preferences = await SharedPreferences.getInstance();
+    final appState = AppStateProvider(
+      preferences,
+      client: MockClient((request) async => http.Response('{}', 200)),
+    );
+    final settings = SettingsController(preferences);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: appState),
+          ChangeNotifierProvider.value(value: settings),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    expect(find.text('Active Connection'), findsNothing);
+    expect(find.text('192.168.1.10'), findsNothing);
+
+    await tester.tap(find.text('Network & Hardware Diagnostics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active Connection'), findsOneWidget);
+    expect(find.text('IP Address'), findsOneWidget);
+    expect(find.text('192.168.1.10'), findsOneWidget);
+  });
 }

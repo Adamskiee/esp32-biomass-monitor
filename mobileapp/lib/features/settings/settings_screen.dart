@@ -95,6 +95,62 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showDiagnosticsDialog(BuildContext context, ThemeData theme) {
+    final deviceIp = context.read<AppStateProvider>().deviceIp;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(CupertinoIcons.wifi, color: AppTheme.neonBlue),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Network & Hardware Diagnostics",
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Active Connection",
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "IP Address",
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(deviceIp, style: const TextStyle(color: Colors.grey)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              "Close",
+              style: TextStyle(color: AppTheme.neonBlue),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsController>();
@@ -234,6 +290,24 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  leading: const Icon(CupertinoIcons.wifi, color: Colors.grey),
+                  title: const Text(
+                    "Network & Hardware Diagnostics",
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  trailing: const Icon(
+                    CupertinoIcons.chevron_right,
+                    color: Colors.grey,
+                    size: 18,
+                  ),
+                  onTap: () => _showDiagnosticsDialog(context, theme),
                 ),
               ),
               const SizedBox(height: 40),
