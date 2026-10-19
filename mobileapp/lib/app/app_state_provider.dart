@@ -40,6 +40,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   AlertsController? _alertsController;
 
   bool _isAuthenticated = false, _isAdmin = false, _isHardwareConnected = false;
+  String? _loginErrorMessage;
   int _currentTab = 0;
   String _currentUser = "";
   String _password = "";
@@ -66,6 +67,7 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
   }
 
   bool get isAuthenticated => _isAuthenticated;
+  String? get loginErrorMessage => _loginErrorMessage;
   bool get isAdmin => _isAdmin;
   @override
   bool get isHardwareConnected => _isHardwareConnected;
@@ -181,8 +183,20 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
       'Basic ${base64Encode(utf8.encode("$_currentUser:$_password"))}';
 
   Future<bool> login(String username, String password) async {
+    _loginErrorMessage = null;
+    final stopwatch = Stopwatch()..start();
+    bool fail(String message, String outcome) {
+      _loginErrorMessage = message;
+      debugPrint(
+        'Device login: $outcome elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      return false;
+    }
+
     final user = username.trim();
-    if (user.isEmpty || password.isEmpty) return false;
+    if (user.isEmpty || password.isEmpty) {
+      return fail('Enter a username and password.', 'validation_failed');
+    }
     try {
       final authorization =
           'Basic ${base64Encode(utf8.encode("$user:$password"))}';
@@ -192,10 +206,39 @@ class AppStateProvider extends ChangeNotifier implements TelemetrySource {
             headers: {'Authorization': authorization},
           )
           .timeout(const Duration(seconds: 3));
-      if (response.statusCode != 200) return false;
-    } catch (_) {
-      return false;
+      if (response.statusCode != 200) {
+        final message = switch (response.statusCode) {
+          401 => 'Invalid username or password.',
+          503 => 'Device is busy. Wait a moment and try again.',
+          _ =>
+            'Device returned an unexpected response (HTTP ${response.statusCode}).',
+        };
+        return fail(message, 'http_error status=${response.statusCode}');
+      }
+    } on TimeoutException {
+      return fail(
+        'Connection timed out after 3 seconds. Wait a moment and try again.',
+        'timeout exception=TimeoutException',
+      );
+    } on http.ClientException catch (error) {
+      return fail(
+        'Cannot reach the device. Check its IP address and Wi-Fi connection.',
+        'network_error exception=${error.runtimeType}',
+      );
+    } on FormatException {
+      return fail(
+        'Invalid device address. Enter its IP address, for example 192.168.1.42.',
+        'invalid_address exception=FormatException',
+      );
+    } catch (error) {
+      return fail(
+        'Could not connect to the device. Please try again.',
+        'unexpected_error exception=${error.runtimeType}',
+      );
     }
+    debugPrint(
+      'Device login: success status=200 elapsed_ms=${stopwatch.elapsedMilliseconds}',
+    );
     _isAdmin = true;
     _currentUser = user;
     _password = password;

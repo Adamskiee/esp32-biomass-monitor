@@ -111,6 +111,29 @@ percentage is `(with filtration average - without filtration average) / without
 filtration average`. Missing data and zero baselines are shown as unavailable.
 The comparison describes observations and never gives a success verdict.
 
+## Why did login fail?
+
+Login checks credentials with one `GET /api/state` request and a three-second
+timeout. The screen distinguishes invalid credentials (`401`), a busy device
+(`503`), a timeout, network errors, and other HTTP responses. If waiting and
+retrying works, capture the first failure before changing the timeout or adding
+retries, so the original cause remains visible.
+
+Run the app with `flutter run` from `mobileapp/` and look for `Device login:`
+in the console. For an already running app, use `flutter logs` with the phone
+connected and selected. For example:
+
+```text
+Device login: timeout exception=TimeoutException elapsed_ms=3002
+Device login: http_error status=503 elapsed_ms=24
+Device login: success status=200 elapsed_ms=18
+```
+
+Logs include the outcome, HTTP status or exception type, and elapsed time.
+They omit credentials, authorization headers, response bodies, and raw exception
+messages. A timeout only establishes that the request missed the deadline;
+it does not identify whether Wi-Fi, the phone, or the ESP32 caused the delay.
+
 ## How do I check the app?
 
 ```bash
