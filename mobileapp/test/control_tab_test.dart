@@ -12,7 +12,7 @@ import 'package:sqflite/sqflite.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('does not expose audit logs or sensor calibration controls', (
+  testWidgets('shows safety controls without network diagnostics', (
     tester,
   ) async {
     databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
@@ -48,6 +48,10 @@ void main() {
 
     expect(find.text('Hardware Audit Log'), findsNothing);
     expect(find.text('Sensor Calibration (Admin Override)'), findsNothing);
+    expect(find.text('Network & Hardware Diagnostics'), findsNothing);
+    expect(find.text('Active Connection'), findsNothing);
+    expect(find.text('IP Address'), findsNothing);
+    expect(find.text('EcoBurn Safety Dashboard'), findsOneWidget);
     appState.logout();
   });
 }
