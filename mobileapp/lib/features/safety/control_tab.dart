@@ -1,8 +1,6 @@
 import 'package:biomass_iot_app/api_service.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
-import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
-import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/dashboard.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -32,51 +30,6 @@ class ControlTab extends StatelessWidget {
               bottom: 100,
             ),
             children: [
-              Text(
-                "Network & Hardware Diagnostics",
-                style: TextStyle(
-                  color: theme.textTheme.bodyLarge?.color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 16),
-              FluidTileGrid(
-                minTileWidth: 300,
-                children: [
-                  GlowingCard(
-                    glowColor: AppTheme.neonBlue,
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              "Active Connection",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _infoRow(
-                          CupertinoIcons.wifi,
-                          "IP Address",
-                          state.deviceIp,
-                          AppTheme.neonBlue,
-                          theme,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-
               if (state.isAdmin) ...[
                 Text(
                   "Emergency Control & Local Alerts",
@@ -135,39 +88,6 @@ class ControlTab extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _infoRow(
-    IconData icon,
-    String title,
-    String val,
-    Color color,
-    ThemeData theme,
-  ) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: theme.textTheme.bodyLarge?.color,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        Text(val, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-      ],
     );
   }
 }
