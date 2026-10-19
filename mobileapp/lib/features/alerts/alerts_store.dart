@@ -26,6 +26,72 @@ class AlertsStore {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<bool> recordActivation(String key, AlertItem alert) async {
+    if (kIsWeb) return true;
+    final database = await _database.database;
+    return database.transaction((transaction) async {
+      final states = await transaction.query(
+        'alert_states',
+        where: 'key = ? AND active = ?',
+        whereArgs: [key, 1],
+        limit: 1,
+      );
+      if (states.isNotEmpty) return false;
+      await transaction.insert('alerts', {
+        'id': alert.id,
+        'title': alert.title,
+        'description': alert.description,
+        'severity': alert.severity,
+        'time': alert.timestamp?.toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await transaction.insert('alert_states', {
+        'key': key,
+        'active': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      return true;
+    });
+  }
+
+  Future<void> migrateLegacyGasHazard() async {
+    if (kIsWeb) return;
+    final database = await _database.database;
+    await database.transaction((transaction) async {
+      final legacy = await transaction.query(
+        'alert_states',
+        where: 'key = ? AND active = ?',
+        whereArgs: ['gas_hazard', 1],
+        limit: 1,
+      );
+      if (legacy.isEmpty) return;
+      await transaction.insert('alert_states', {
+        'key': 'trigger:high_mq2_gas',
+        'active': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await transaction.insert('alert_states', {
+        'key': 'gas_hazard',
+        'active': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
+  Future<void> recordRecovery(String key, AlertItem alert) async {
+    if (kIsWeb) return;
+    final database = await _database.database;
+    await database.transaction((transaction) async {
+      await transaction.insert('alerts', {
+        'id': alert.id,
+        'title': alert.title,
+        'description': alert.description,
+        'severity': alert.severity,
+        'time': alert.timestamp?.toIso8601String(),
+      });
+      await transaction.insert('alert_states', {
+        'key': key,
+        'active': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   Future<List<AlertItem>> getAlerts({
     int limit = 20,
     int offset = 0,

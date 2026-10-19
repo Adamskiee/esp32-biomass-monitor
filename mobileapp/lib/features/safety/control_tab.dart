@@ -1,13 +1,39 @@
 import 'package:biomass_iot_app/api_service.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
-import 'package:biomass_iot_app/app/app_theme.dart';
-import 'package:biomass_iot_app/dashboard.dart';
-import 'package:flutter/cupertino.dart';
+import 'widgets/safety_controls_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class ControlTab extends StatelessWidget {
+class ControlTab extends StatefulWidget {
   const ControlTab({super.key});
+
+  @override
+  State<ControlTab> createState() => _ControlTabState();
+}
+
+class _ControlTabState extends State<ControlTab> {
+  ApiService? _apiService;
+  String? _deviceIp;
+  String? _authorization;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = context.watch<AppStateProvider>();
+    if (_deviceIp != state.deviceIp ||
+        _authorization != state.authorizationHeader) {
+      _apiService?.close();
+      _deviceIp = state.deviceIp;
+      _authorization = state.authorizationHeader;
+      _apiService = state.createSafetyApiService();
+    }
+  }
+
+  @override
+  void dispose() {
+    _apiService?.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,48 +66,10 @@ class ControlTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
-                  ),
-                  tileColor: theme.cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: theme.dividerColor),
-                  ),
-                  leading: const Icon(
-                    Icons.dashboard_outlined,
-                    color: AppTheme.neonGreen,
-                    size: 28,
-                  ),
-                  title: Text(
-                    "EcoBurn Safety Dashboard",
-                    style: TextStyle(
-                      color: theme.textTheme.bodyLarge?.color,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    "Direct ESP32 Sprinkler Control & Danger Alerts",
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    CupertinoIcons.chevron_right,
-                    color: Colors.grey,
-                    size: 18,
-                  ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DashboardScreen(
-                        apiService: ApiService(
-                          baseUrl: 'http://${state.deviceIp}/api',
-                          authorizationHeader: state.authorizationHeader,
-                        ),
-                      ),
-                    ),
-                  ),
+                SafetyControlsPanel(
+                  key: ObjectKey(_apiService),
+                  apiService: _apiService!,
+                  observationRecorder: state.safetyObservationRecorder,
                 ),
               ],
             ],
@@ -91,7 +79,3 @@ class ControlTab extends StatelessWidget {
     );
   }
 }
-
-// ==========================================
-// TAB 4: ALERTS
-// ==========================================

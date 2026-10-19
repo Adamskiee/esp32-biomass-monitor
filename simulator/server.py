@@ -20,14 +20,10 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
             if state.scenario == "offline":
                 self._send_json(503, {"status": "error", "message": "Device offline"})
                 return
-            snapshot = state.snapshot()
             if self.path == "/api/state":
-                self._send_json(200, snapshot)
+                self._send_json(200, state.snapshot())
             else:
-                self._send_json(200, {
-                    "threshold_chamber_temp_c": snapshot["threshold_chamber_temp_c"],
-                    "threshold_mq2_v": snapshot["threshold_mq2_v"],
-                })
+                self._send_json(200, state.thresholds_snapshot())
 
         def do_POST(self) -> None:
             if not self._authenticate():
@@ -41,20 +37,21 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
             payload = self._read_payload()
             if payload is None:
                 return
+            confirmation = {"status": "ok"}
             try:
                 if self.path == "/api/control":
                     if type(payload.get("sprinkler")) is not bool:
                         raise ValueError("sprinkler must be a boolean")
                     state.set_manual_sprinkler(payload["sprinkler"])
                 else:
-                    state.update_thresholds(payload)
+                    confirmation["thresholds"] = state.update_thresholds(payload)
             except SafetyOverrideError as error:
                 self._send_json(409, {"status": "error", "message": str(error)})
                 return
             except ValueError as error:
                 self._send_json(400, {"status": "error", "message": str(error)})
                 return
-            self._send_json(200, {"status": "ok"})
+            self._send_json(200, confirmation)
 
         def _authenticate(self) -> bool:
             header = self.headers.get("Authorization", "")
@@ -77,10 +74,14 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
                 length = int(self.headers.get("Content-Length", ""))
             except ValueError:
                 length = -1
-            if length < 0 or length > 256:
+            if length < 0:
                 self._send_json(400, {"status": "error", "message": "Invalid body length"})
                 return None
-            raw = self.rfile.read(min(length, 257))
+            limit = 256 if self.path == "/api/control" else 1024
+            if length > limit:
+                self._send_json(413, {"status": "error", "message": "Body too large"})
+                return None
+            raw = self.rfile.read(length)
             try:
                 payload = json.loads(raw)
             except (UnicodeDecodeError, json.JSONDecodeError):

@@ -1,5 +1,6 @@
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/features/safety/control_tab.dart';
+import 'package:biomass_iot_app/features/safety/widgets/safety_controls_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,7 +52,8 @@ void main() {
     expect(find.text('Network & Hardware Diagnostics'), findsNothing);
     expect(find.text('Active Connection'), findsNothing);
     expect(find.text('IP Address'), findsNothing);
-    expect(find.text('EcoBurn Safety Dashboard'), findsOneWidget);
+    expect(find.byType(SafetyControlsPanel), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
     appState.logout();
   });
 }

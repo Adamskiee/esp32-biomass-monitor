@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:biomass_iot_app/features/safety/safety_thresholds.dart';
 
 class DeviceApiClient {
   DeviceApiClient({
@@ -48,19 +49,51 @@ class DeviceApiClient {
   }
 
   Future<void> setThresholds(double chamberLimit, double mq2Limit) async {
+    await updateSafetyThresholds({
+      'threshold_chamber_temp_c': chamberLimit,
+      'threshold_mq2_v': mq2Limit,
+    });
+  }
+
+  Future<SafetyThresholds> fetchThresholds() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/settings'), headers: _headers)
+        .timeout(const Duration(seconds: 2));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load thresholds: ${response.statusCode}');
+    }
+    return SafetyThresholds.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<SafetyThresholds> updateSafetyThresholds(
+    Map<String, double> changes,
+  ) async {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/thresholds'),
           headers: _headers,
-          body: jsonEncode({
-            'threshold_chamber_temp_c': chamberLimit,
-            'threshold_mq2_v': mq2Limit,
-          }),
+          body: jsonEncode(changes),
         )
         .timeout(const Duration(seconds: 2));
     if (response.statusCode != 200) {
       throw Exception('Failed to set thresholds: ${response.statusCode}');
     }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final thresholds = body['thresholds'];
+    final confirmed = thresholds is Map<String, dynamic>
+        ? SafetyThresholds.fromJson(thresholds)
+        : await fetchThresholds();
+    if (changes.keys.any(
+      (field) =>
+          !confirmed.supports(field) ||
+          confirmed.value(field) == null ||
+          !confirmed.value(field)!.isFinite,
+    )) {
+      throw Exception('Device did not confirm every submitted limit.');
+    }
+    return confirmed;
   }
 
   void close() {

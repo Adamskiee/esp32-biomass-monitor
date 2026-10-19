@@ -37,13 +37,61 @@ password.
 The API and Pump Status indicator report commanded relay outputs. They do not
 confirm that the pump ran or water flowed.
 
+## How do I configure safety limits?
+
+Open **Control > Emergency Control & Local Alerts** before first use. Configure
+chamber temperature, MQ-2, MQ-135, ambient temperature, PM1.0, PM2.5, PM10,
+and both humidity boundaries. These are operator settings, not exposure
+standards or calibrated measurements. Changes apply immediately and are saved
+to flash no more than once per minute. Power loss before that write can lose a
+recent change.
+
+Each sensor row starts collapsed and shows its name and status. Tap it to
+reveal its current reading, slider, and editable limit. Badges identify alerts,
+faults, or setup states; normal readings have no badge. Current firmware
+starts with all limits configured, fills previously unset fields on upgrade,
+and preserves saved values. See the [API reference](api.md) for the default
+values and their limitations. Keep humidity minimum below maximum; either
+boundary can be edited independently.
+
+Opening another sensor closes the previous one. Tap the open sensor again
+to close it; its draft remains available when reopened. **Default** restores that sensor
+setting as a draft; humidity restores both bounds together to 30% and 60%.
+Humidity has a two-handle range slider with exact minimum/maximum entry.
+Slider dragging uses
+0.5 °C, 0.1 V, 1 µg/m³, or 1% steps; type a value for finer precision.
+Particulate slider ranges expand when a typed or saved value exceeds 500 µg/m³.
+**Apply Thresholds** submits only edited fields, including restored defaults;
+the device-confirmed values replace the draft after success. A failed request
+retains edits. Invalid drafts reopen the affected sensor and show a message
+naming it. Successful saves close the editor. Polling may update the saved
+opposite humidity boundary while you edit, so validation always uses the
+latest device settings.
+
+New MQ-2 values cannot exceed 4.8 V; an existing 5 V limit stays readable.
+On earlier firmware, an explicit unset limit remains editable; configure both
+humidity boundaries together if both are unset. **Firmware update required** disables
+only a field absent from older firmware. Offline readings are marked stale and
+controls lock until reconnection. Sensor faults take priority over alert or
+unconfigured statuses, except that MQ warm-up shows its remaining seconds.
+
+Only chamber temperature owns automatic sprinkler and buzzer behavior. Gas,
+ambient, particulate, and humidity conditions add device triggers and app
+history entries without taking pump ownership. The device evaluates conditions
+without the app, but app alerts require a connected running app. There are no
+push notifications or device-side alert history. Control and telemetry share
+one history recorder, retaining one entry per active condition across polls and
+app restarts. App mute suppresses sound without changing protection or history.
+Manual control remains locked for a catastrophic chamber latch even if the
+chamber reading fails; an environmental alert leaves manual control available.
+
 ## What should I check during operation?
 
 - A green LED indicates the current readings are safe. The LED starts yellow
   until the first poll.
 - MQ-135 and MQ-2 heaters warm up for five minutes after every ESP32 restart.
   During this interval, the app displays a countdown and the firmware does not
-  issue MQ2 gas or MQ2 sensor-fault triggers.
+  issue MQ gas or MQ sensor-fault triggers.
 - A red LED indicates chamber temperature at or above its configured limit.
   It also means the sprinkler has opened automatically. An MQ2 gas alert does
   not change the green LED or open the sprinkler. Check `active_triggers` and
