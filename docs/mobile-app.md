@@ -78,6 +78,13 @@ arrives while an older page is open, the app keeps that page stable and shows a
 New records available action that returns to the refreshed first page. Session
 analytics and CSV exports continue to use the current in-memory session.
 
+To export those session readings on Android, tap the export icon beside
+**Sensor Data Log**, then **GENERATE & SHARE CSV**. The export sheet scrolls
+on smaller screens and with larger text. Android opens its share chooser with
+`Biomass_Telemetry_Export.csv` attached, so the receiving app gets a CSV file.
+The file includes the latest 60 session readings, rather than the full paginated
+log. If there are no readings or sharing fails, the app displays a message.
+
 The safety dashboard sends threshold changes to `POST /api/thresholds`. The
 firmware also accepts `/api/settings` for older clients, with the same
 validation. See [the API reference](api.md) for ranges and examples.
