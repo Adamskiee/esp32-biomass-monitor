@@ -473,6 +473,11 @@ class _HomeTabState extends State<HomeTab> {
     required double height,
     required List<_TrendSeries> series,
   }) {
+    final availableSeries = series
+        .where(
+          (item) => history.any((reading) => item.valueFor(reading) != null),
+        )
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -481,7 +486,7 @@ class _HomeTabState extends State<HomeTab> {
         Wrap(
           spacing: 12,
           runSpacing: 6,
-          children: series
+          children: availableSeries
               .map(
                 (item) => Row(
                   mainAxisSize: MainAxisSize.min,
@@ -504,7 +509,15 @@ class _HomeTabState extends State<HomeTab> {
         const SizedBox(height: 12),
         SizedBox(
           height: height,
-          child: LineChart(_buildChartData(history, theme, unit, series)),
+          child: availableSeries.isEmpty
+              ? Center(child: Text('No readings available for $title'))
+              : LineChart(
+                  _buildChartData(history, theme, unit, availableSeries),
+                  // Reset cached tooltips and bar animations when sensors change.
+                  key: ValueKey(
+                    availableSeries.map((item) => item.label).join('|'),
+                  ),
+                ),
         ),
       ],
     );
