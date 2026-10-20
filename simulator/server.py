@@ -3,6 +3,7 @@ import binascii
 import hmac
 import json
 from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlsplit
 
 from simulator.model import SafetyOverrideError, SimulatorState
 
@@ -11,6 +12,12 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
     expected = f"{username}:{password}".encode("utf-8")
 
     class SimulatorHandler(BaseHTTPRequestHandler):
+        def do_OPTIONS(self) -> None:
+            self.send_response(204)
+            self._send_cors_headers()
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
         def do_GET(self) -> None:
             if not self._authenticate():
                 return
@@ -97,12 +104,35 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            self._send_cors_headers()
             for key, header_value in (headers or {}).items():
                 self.send_header(key, header_value)
             self.end_headers()
             self.wfile.write(body)
 
+        def _send_cors_headers(self) -> None:
+            origin = self.headers.get("Origin")
+            if not _is_local_web_origin(origin):
+                return
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            self.send_header("Vary", "Origin")
+
         def log_message(self, format: str, *args: object) -> None:
             pass
 
     return SimulatorHandler
+
+
+def _is_local_web_origin(origin: str | None) -> bool:
+    if not origin:
+        return False
+    parsed = urlsplit(origin)
+    return (
+        parsed.scheme == "http"
+        and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        and not parsed.path
+        and not parsed.query
+        and not parsed.fragment
+    )

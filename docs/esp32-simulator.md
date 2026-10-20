@@ -29,6 +29,16 @@ python3 -m simulator --port 8766 --user local --password secret
 This still listens on `127.0.0.1`, which a physical phone cannot reach.
 Use the network listener below when connecting a phone.
 
+## How do I connect Chrome?
+
+Start the simulator on the same computer as Chrome, then enter
+`127.0.0.1:8765` in the app with the default `demo` / `demo` credentials.
+The simulator accepts browser cross-origin requests so the Flutter web app can
+use its authenticated API. It accepts only local Chrome origins such as
+`http://localhost:<port>` and `http://127.0.0.1:<port>`, which prevents other
+websites from using the simulator's credentials. Enter only the address and
+port, without `http://` or `/api`.
+
 ## How do I connect an Android emulator?
 
 1. Start the simulator on the computer running the Android emulator.
