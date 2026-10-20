@@ -156,147 +156,160 @@ class _LoginScreenState extends State<LoginScreen>
               );
             },
           ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: GlassContainer(
-                borderRadius: 32,
-                color: theme.cardColor,
-                child: Padding(
-                  padding: const EdgeInsets.all(48),
-                  child: SizedBox(
-                    width: 360,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TweenAnimationBuilder<double>(
-                          duration: const Duration(seconds: 1),
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          curve: Curves.easeOutExpo,
-                          builder: (context, val, child) =>
-                              Transform.scale(scale: val, child: child),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Image.asset(
-                              'assets/branding/ecoburn-logo.png',
-                              width: 280,
-                              fit: BoxFit.contain,
-                              semanticLabel: 'EcoBurn',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          "Telemetry & Command Protocol",
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 48),
-                        TextField(
-                          controller: _ipCtrl,
-                          keyboardType: TextInputType.url,
-                          style: TextStyle(
-                            color: theme.textTheme.bodyLarge?.color,
-                          ),
-                          decoration: _inputDec(
-                            "ESP32 IP address",
-                            CupertinoIcons.wifi,
-                            theme,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: _userCtrl,
-                          style: TextStyle(
-                            color: theme.textTheme.bodyLarge?.color,
-                          ),
-                          decoration: _inputDec(
-                            "Operator ID",
-                            CupertinoIcons.person_solid,
-                            theme,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: _passCtrl,
-                          obscureText: true,
-                          style: TextStyle(
-                            color: theme.textTheme.bodyLarge?.color,
-                          ),
-                          decoration: _inputDec(
-                            "Passcode",
-                            CupertinoIcons.lock_fill,
-                            theme,
-                          ),
-                          onSubmitted: (_) => _handleLogin(),
-                        ),
-                        if (_errorMsg.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            _errorMsg,
-                            style: const TextStyle(
-                              color: AppTheme.neonRed,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 40),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 60,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.neonGreen,
-                              foregroundColor: Colors.black,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 480;
+                final pagePadding = isCompact ? 16.0 : 24.0;
+                final cardPadding = isCompact ? 16.0 : 48.0;
+                final logoWidth = isCompact ? 220.0 : 280.0;
+                final sectionSpacing = isCompact ? 32.0 : 48.0;
+                final buttonSpacing = isCompact ? 32.0 : 40.0;
+
+                return Center(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(pagePadding),
+                    child: GlassContainer(
+                      borderRadius: 32,
+                      color: theme.cardColor,
+                      child: Padding(
+                        padding: EdgeInsets.all(cardPadding),
+                        child: SizedBox(
+                          width: 360,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TweenAnimationBuilder<double>(
+                                duration: const Duration(seconds: 1),
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                curve: Curves.easeOutExpo,
+                                builder: (context, val, child) =>
+                                    Transform.scale(scale: val, child: child),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Image.asset(
+                                    'assets/branding/ecoburn-logo.png',
+                                    width: logoWidth,
+                                    fit: BoxFit.contain,
+                                    semanticLabel: 'EcoBurn',
+                                  ),
+                                ),
                               ),
-                            ),
-                            onPressed: _isLoading ? null : _handleLogin,
-                            child: _isLoading
-                                ? const CircularProgressIndicator(
-                                    color: Colors.black,
-                                  )
-                                : const Text(
-                                    "INITIATE CONNECTION",
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1.5,
+                              const SizedBox(height: 24),
+                              const Text(
+                                "Telemetry & Command Protocol",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              SizedBox(height: sectionSpacing),
+                              TextField(
+                                controller: _ipCtrl,
+                                keyboardType: TextInputType.url,
+                                style: TextStyle(
+                                  color: theme.textTheme.bodyLarge?.color,
+                                ),
+                                decoration: _inputDec(
+                                  "ESP32 IP address",
+                                  CupertinoIcons.wifi,
+                                  theme,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              TextField(
+                                controller: _userCtrl,
+                                style: TextStyle(
+                                  color: theme.textTheme.bodyLarge?.color,
+                                ),
+                                decoration: _inputDec(
+                                  "Operator ID",
+                                  CupertinoIcons.person_solid,
+                                  theme,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              TextField(
+                                controller: _passCtrl,
+                                obscureText: true,
+                                style: TextStyle(
+                                  color: theme.textTheme.bodyLarge?.color,
+                                ),
+                                decoration: _inputDec(
+                                  "Passcode",
+                                  CupertinoIcons.lock_fill,
+                                  theme,
+                                ),
+                                onSubmitted: (_) => _handleLogin(),
+                              ),
+                              if (_errorMsg.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                Text(
+                                  _errorMsg,
+                                  style: const TextStyle(
+                                    color: AppTheme.neonRed,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                              SizedBox(height: buttonSpacing),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 60,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.neonGreen,
+                                    foregroundColor: Colors.black,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),
+                                  onPressed: _isLoading ? null : _handleLogin,
+                                  child: _isLoading
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.black,
+                                        )
+                                      : const Text(
+                                          "INITIATE CONNECTION",
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              if (settings.biometricLogin &&
+                                  context
+                                      .watch<AppStateProvider>()
+                                      .canResumeWithBiometrics) ...[
+                                const SizedBox(height: 24),
+                                TextButton.icon(
+                                  icon: const Icon(
+                                    CupertinoIcons.lock_shield_fill,
+                                    color: AppTheme.neonBlue,
+                                  ),
+                                  label: const Text(
+                                    "Biometric Override",
+                                    style: TextStyle(
+                                      color: AppTheme.neonBlue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  onPressed: _checkBiometrics,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        if (settings.biometricLogin &&
-                            context
-                                .watch<AppStateProvider>()
-                                .canResumeWithBiometrics) ...[
-                          const SizedBox(height: 24),
-                          TextButton.icon(
-                            icon: const Icon(
-                              CupertinoIcons.lock_shield_fill,
-                              color: AppTheme.neonBlue,
-                            ),
-                            label: const Text(
-                              "Biometric Override",
-                              style: TextStyle(
-                                color: AppTheme.neonBlue,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            onPressed: _checkBiometrics,
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
