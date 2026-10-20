@@ -38,6 +38,71 @@ void main() {
     );
   });
 
+  testWidgets('login fields fit within a 320 pixel wide phone', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final state = AppStateProvider(prefs);
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: state),
+          ChangeNotifierProvider(create: (_) => SettingsController(prefs)),
+        ],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+
+    final viewport = tester.getRect(find.byType(Scaffold));
+    final fields = find.byType(TextField);
+    expect(fields, findsNWidgets(3));
+    for (final field in fields.evaluate()) {
+      final bounds = tester.getRect(find.byWidget(field.widget));
+      expect(bounds.left, greaterThanOrEqualTo(viewport.left));
+      expect(bounds.right, lessThanOrEqualTo(viewport.right));
+      expect(bounds.width, greaterThanOrEqualTo(240));
+    }
+    final connectionButton = find.byType(ElevatedButton);
+    await tester.ensureVisible(connectionButton);
+    await tester.pump();
+    final buttonBounds = tester.getRect(connectionButton);
+    expect(buttonBounds.top, greaterThanOrEqualTo(24));
+    expect(buttonBounds.bottom, lessThanOrEqualTo(viewport.bottom - 24));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('login preserves the desktop gap before the connection button', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final state = AppStateProvider(prefs);
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: state),
+          ChangeNotifierProvider(create: (_) => SettingsController(prefs)),
+        ],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+
+    final passcodeBounds = tester.getRect(find.byType(TextField).at(2));
+    final buttonBounds = tester.getRect(find.byType(ElevatedButton));
+    expect(buttonBounds.top - passcodeBounds.bottom, closeTo(40, 0.1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final scenario in [
     (
       name: 'unauthorized',
