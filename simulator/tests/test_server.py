@@ -92,6 +92,50 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(status, 401)
                 self.assertEqual(headers["WWW-Authenticate"], 'Basic realm="Login Required"')
 
+    def test_cors_allows_authenticated_browser_requests(self):
+        origin = "http://localhost:54321"
+        preflight = Request(
+            self.base + "/api/state",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization, content-type",
+            },
+            method="OPTIONS",
+        )
+        with urlopen(preflight, timeout=2) as response:
+            self.assertEqual(response.status, 204)
+            self.assertEqual(response.headers["Access-Control-Allow-Origin"], origin)
+            self.assertEqual(response.headers["Access-Control-Allow-Methods"], "GET, POST, OPTIONS")
+            self.assertEqual(
+                response.headers["Access-Control-Allow-Headers"],
+                "Authorization, Content-Type",
+            )
+
+        request = Request(
+            self.base + "/api/state",
+            headers={
+                "Origin": origin,
+                "Authorization": "Basic " + base64.b64encode(b"demo:demo").decode("ascii"),
+            },
+        )
+        with urlopen(request, timeout=2) as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers["Access-Control-Allow-Origin"], origin)
+
+    def test_cors_does_not_allow_non_local_origins(self):
+        request = Request(
+            self.base + "/api/state",
+            headers={
+                "Origin": "https://example.com",
+                "Access-Control-Request-Method": "GET",
+            },
+            method="OPTIONS",
+        )
+        with urlopen(request, timeout=2) as response:
+            self.assertEqual(response.status, 204)
+            self.assertIsNone(response.headers.get("Access-Control-Allow-Origin"))
+
     def test_non_ascii_basic_auth_returns_401_and_configured_credentials_work(self):
         bad = "Basic " + base64.b64encode("démo:demo".encode()).decode()
         status, headers, _ = self.request("/api/state", authorization=bad)
