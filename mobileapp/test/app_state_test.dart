@@ -162,10 +162,16 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.runAsync(
-        () async => Future<void>.delayed(const Duration(milliseconds: 100)),
-      );
-      await tester.pump();
+      for (
+        var attempt = 0;
+        attempt < 100 && find.text('High PM2.5').evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.runAsync(
+          () async => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      }
       expect(find.text('High PM2.5'), findsOneWidget);
       expect(sounds, 1);
       await tester.tap(find.byTooltip('Mute app alerts'));

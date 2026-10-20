@@ -85,30 +85,26 @@ class SensorLogController extends ChangeNotifier {
 
   Future<void> nextPage() async {
     if (_isDisposed || _isLoading || _currentPage >= pageCount) return;
-    _currentPage++;
-    await _loadCurrentPage();
+    await _load(() => _readCurrentPage(page: _currentPage + 1));
   }
 
   Future<void> previousPage() async {
     if (_isDisposed || _isLoading || _currentPage <= 1) return;
-    _currentPage--;
-    await _loadCurrentPage();
+    await _load(() => _readCurrentPage(page: _currentPage - 1));
   }
 
-  Future<void> _loadCurrentPage() async {
-    await _load(_readCurrentPage);
-  }
-
-  Future<void> _readCurrentPage() async {
+  Future<void> _readCurrentPage({int? page}) async {
+    final requestedPage = page ?? _currentPage;
+    final records = await _historyStore.getSensorData(
+      limit: pageSize,
+      offset: (requestedPage - 1) * pageSize,
+      throughId: _snapshotId,
+    );
+    if (_isDisposed) return;
+    _currentPage = requestedPage;
     _records
       ..clear()
-      ..addAll(
-        await _historyStore.getSensorData(
-          limit: pageSize,
-          offset: (_currentPage - 1) * pageSize,
-          throughId: _snapshotId,
-        ),
-      );
+      ..addAll(records);
   }
 
   Future<void> _load(Future<void> Function() operation) async {

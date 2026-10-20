@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:biomass_iot_app/app/app_shell.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
+import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
@@ -125,6 +126,40 @@ void main() {
     state.dispose();
     client.close();
   }
+
+  testWidgets(
+    'navigation shows available content immediately without a forced skeleton',
+    (tester) async {
+      await initialize(tester);
+      await mount(tester);
+      expect(find.text('ESP32 disconnected').hitTestable(), findsOneWidget);
+      expect(find.byType(LoadingSkeleton), findsNothing);
+
+      await tester.tap(find.text('Monitor'));
+      await tester.pump();
+      expect(find.byType(MonitorTab), findsOneWidget);
+      expect(find.byType(LoadingSkeleton), findsNothing);
+      final monitor = tester.element(find.byType(MonitorTab));
+
+      await tester.tap(find.text('Monitor'));
+      await tester.pump();
+      expect(tester.element(find.byType(MonitorTab)), same(monitor));
+      expect(find.byType(LoadingSkeleton), findsNothing);
+
+      await tester.tap(find.text('Home'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Monitor'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Home'));
+      await tester.pump();
+      expect(find.text('ESP32 disconnected').hitTestable(), findsOneWidget);
+      expect(find.byType(LoadingSkeleton), findsNothing);
+      await dispose(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('mobile navigation has no backdrop blur', (tester) async {
     await initialize(tester);
@@ -566,6 +601,7 @@ void main() {
       );
     chamber = null;
     await mount(tester);
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Real-Time Telemetry Trends'),
       150,

@@ -5,6 +5,8 @@ import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
+import 'package:biomass_iot_app/core/widgets/delayed_loading.dart';
+import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_history_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_log_controller.dart';
@@ -394,97 +396,119 @@ class _MonitorTabState extends State<MonitorTab> {
             ),
           ),
         const SizedBox(height: 8),
-        if (_sensorLogController.isLoading &&
-            _sensorLogController.records.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (_sensorLogController.errorMessage != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              children: [
-                Text(
-                  _sensorLogController.errorMessage!,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => unawaited(_sensorLogController.refresh()),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          )
-        else if (_sensorLogController.records.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
-            child: Center(child: Text('No sensor records yet.')),
-          ),
-        ..._sensorLogController.records.map(
-          (log) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.dividerColor),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
+        DelayedLoading(
+          isLoading: _sensorLogController.isLoading,
+          hasContent: _sensorLogController.records.isNotEmpty,
+          placeholder: const _SensorLogSkeleton(),
+          child: Column(
+            children: [
+              if (_sensorLogController.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Telemetry Record",
-                        style: TextStyle(
-                          color: theme.textTheme.bodyLarge?.color,
-                          fontWeight: FontWeight.bold,
+                        _sensorLogController.errorMessage!,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () =>
+                            unawaited(_sensorLogController.refresh()),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_sensorLogController.records.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: Text('No sensor records yet.')),
+                ),
+              ..._sensorLogController.records.map(
+                (log) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.dividerColor),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Telemetry Record",
+                              style: TextStyle(
+                                color: theme.textTheme.bodyLarge?.color,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 2,
+                              children: [
+                                _sensorReading(
+                                  'Chamber Temp',
+                                  log.chamberTempC,
+                                  '°C',
+                                  1,
+                                ),
+                                _sensorReading(
+                                  'Ambient Temp',
+                                  log.temperatureC,
+                                  '°C',
+                                  1,
+                                ),
+                                _sensorReading(
+                                  'Humidity',
+                                  log.humidityPercent,
+                                  '%',
+                                  1,
+                                ),
+                                _sensorReading('MQ-135', log.mq135V, 'V', 2),
+                                _sensorReading('MQ-2', log.mq2V, 'V', 2),
+                                _sensorReading(
+                                  'PM1.0',
+                                  log.pm1_0UgM3,
+                                  'µg/m³',
+                                  0,
+                                ),
+                                _sensorReading(
+                                  'PM2.5',
+                                  log.pm2_5UgM3,
+                                  'µg/m³',
+                                  0,
+                                ),
+                                _sensorReading(
+                                  'PM10',
+                                  log.pm10UgM3,
+                                  'µg/m³',
+                                  0,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 2,
-                        children: [
-                          _sensorReading(
-                            'Chamber Temp',
-                            log.chamberTempC,
-                            '°C',
-                            1,
-                          ),
-                          _sensorReading(
-                            'Ambient Temp',
-                            log.temperatureC,
-                            '°C',
-                            1,
-                          ),
-                          _sensorReading(
-                            'Humidity',
-                            log.humidityPercent,
-                            '%',
-                            1,
-                          ),
-                          _sensorReading('MQ-135', log.mq135V, 'V', 2),
-                          _sensorReading('MQ-2', log.mq2V, 'V', 2),
-                          _sensorReading('PM1.0', log.pm1_0UgM3, 'µg/m³', 0),
-                          _sensorReading('PM2.5', log.pm2_5UgM3, 'µg/m³', 0),
-                          _sensorReading('PM10', log.pm10UgM3, 'µg/m³', 0),
-                        ],
+                      const SizedBox(width: 12),
+                      Text(
+                        "${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}",
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  "${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}",
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         Wrap(
@@ -607,4 +631,20 @@ class _MonitorTabState extends State<MonitorTab> {
       ),
     );
   }
+}
+
+class _SensorLogSkeleton extends StatelessWidget {
+  const _SensorLogSkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.only(top: 16),
+    child: Column(
+      children: [
+        LoadingSkeletonCard(),
+        LoadingSkeletonCard(),
+        LoadingSkeletonCard(margin: EdgeInsets.zero),
+      ],
+    ),
+  );
 }

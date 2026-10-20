@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:biomass_iot_app/api_service.dart';
+import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/dashboard.dart';
 import 'package:biomass_iot_app/features/safety/widgets/safety_controls_panel.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +65,11 @@ void main() {
           ),
         ),
       );
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(LoadingSkeletonCard), findsNothing);
+      await tester.pump(const Duration(milliseconds: 199));
+      expect(find.byType(LoadingSkeletonCard), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(find.byType(LoadingSkeletonCard), findsNWidgets(2));
       await tester.pumpWidget(const SizedBox.shrink());
       pending.complete(http.Response('{}', 200));
       await tester.pump(const Duration(seconds: 3));

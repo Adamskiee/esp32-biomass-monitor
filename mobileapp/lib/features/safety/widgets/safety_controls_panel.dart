@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../api_service.dart';
+import '../../../core/widgets/delayed_loading.dart';
+import '../../../core/widgets/loading_skeleton.dart';
 import '../../monitoring/sensor_data.dart';
 import '../safety_condition.dart';
 import '../safety_observation_recorder.dart';
@@ -262,18 +264,25 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
   Widget build(BuildContext context) {
     final state = _state;
     if (state == null) {
-      return Column(
-        children: [
-          if (_error == null)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(),
-            )
-          else ...[
-            Text(_error!),
-            ElevatedButton(onPressed: _poll, child: const Text('Retry')),
+      return DelayedLoading(
+        isLoading: _error == null,
+        placeholder: const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Column(
+            children: [
+              LoadingSkeletonCard(height: 150),
+              LoadingSkeletonCard(height: 180, margin: EdgeInsets.zero),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            if (_error != null) ...[
+              Text(_error!),
+              ElevatedButton(onPressed: _poll, child: const Text('Retry')),
+            ],
           ],
-        ],
+        ),
       );
     }
     final reading = SensorData.fromJson(state);

@@ -37,8 +37,16 @@ offline, saving limits, or under chamber protection. The indicator reports the
 commanded relay output, so it does not confirm that the pump ran or water flowed.
 Update the device and app together because older responses omit that field.
 
+Pages show available content immediately when opened. A data section with no
+available content shows skeleton shapes only if its request is still pending
+after 200 milliseconds. When the request finishes, the shapes disappear and the
+result fades in over 150 milliseconds, without a minimum loading time. Fast
+requests skip the skeleton and fade. Background refreshes keep existing content
+visible. Skeletons shimmer in light and dark themes; the system's reduced-motion
+setting disables shimmer and the fade.
+
 The main telemetry view shows no live readings while the ESP32 is disconnected.
-It stores history and alerts locally in `biomass_iot.db` only from successful
+The app stores history and alerts locally in `biomass_iot.db` only from successful
 responses. The alert screen first reads the newest 20 alerts, then
 loads another batch when you scroll near the end. Severity filters run in the
 local database before each batch is read, so a long history does not delay the
