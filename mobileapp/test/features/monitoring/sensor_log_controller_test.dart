@@ -121,6 +121,34 @@ void main() {
     expect(controller.records.first.temperatureC, 24);
   });
 
+  for (final fails in [false, true]) {
+    test(
+      'retains current rows during a pending refresh, failure=$fails',
+      () async {
+        final reader = _ControllableSensorHistoryReader([
+          SensorData(temperatureC: 1, timestamp: start),
+        ]);
+        final refreshingController = SensorLogController(reader);
+        addTearDown(refreshingController.dispose);
+        await refreshingController.loadInitialPage();
+        final pending = Completer<List<SensorData>>();
+        reader.pendingPage = pending;
+        final refresh = refreshingController.refresh();
+        await Future<void>.delayed(Duration.zero);
+        expect(refreshingController.isLoading, isTrue);
+        expect(refreshingController.records.single.temperatureC, 1);
+        if (fails) {
+          pending.completeError(StateError('unavailable'));
+        } else {
+          pending.complete([SensorData(temperatureC: 2, timestamp: start)]);
+        }
+        await refresh;
+        expect(refreshingController.records.single.temperatureC, fails ? 1 : 2);
+        expect(refreshingController.errorMessage, fails ? isNotNull : isNull);
+      },
+    );
+  }
+
   test('keeps updates out of the log until a manual refresh', () async {
     await controller.loadInitialPage();
     await history.insertSensorData(
@@ -139,6 +167,41 @@ void main() {
 
     expect(controller.records.first.temperatureC, 99);
   });
+
+  for (final goForward in [false, true]) {
+    test(
+      'failed pagination preserves the displayed page, forward=$goForward',
+      () async {
+        final reader = _ControllableSensorHistoryReader(
+          List.generate(
+            30,
+            (index) => SensorData(
+              temperatureC: index.toDouble(),
+              timestamp: start.add(Duration(minutes: index)),
+            ),
+          ),
+        );
+        final pager = SensorLogController(reader);
+        addTearDown(pager.dispose);
+        await pager.loadInitialPage();
+        if (!goForward) await pager.nextPage();
+        final pending = Completer<List<SensorData>>();
+        reader.pendingPage = pending;
+        final navigation = goForward ? pager.nextPage() : pager.previousPage();
+        await Future<void>.delayed(Duration.zero);
+        expect(pager.currentPage, goForward ? 1 : 2);
+        expect(pager.records.first.temperatureC, goForward ? 29 : 19);
+        pending.completeError(StateError('unavailable'));
+        await navigation;
+        expect(pager.currentPage, goForward ? 1 : 2);
+        expect(pager.records.first.temperatureC, goForward ? 29 : 19);
+        expect(pager.errorMessage, isNotNull);
+        await (goForward ? pager.nextPage() : pager.previousPage());
+        expect(pager.currentPage, goForward ? 2 : 1);
+        expect(pager.records.first.temperatureC, goForward ? 19 : 29);
+      },
+    );
+  }
 
   test('updates page one live without disrupting an older page', () async {
     await controller.loadInitialPage();

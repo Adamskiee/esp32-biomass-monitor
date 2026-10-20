@@ -2,6 +2,8 @@ import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
+import 'package:biomass_iot_app/core/widgets/delayed_loading.dart';
+import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/database_helper.dart';
 import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
@@ -17,6 +19,43 @@ class HomeTab extends StatefulWidget {
 
   @override
   State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HistoryChartsSkeleton extends StatelessWidget {
+  const _HistoryChartsSkeleton({required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: List.generate(
+      3,
+      (index) => Padding(
+        padding: EdgeInsets.only(bottom: index == 2 ? 0 : 16),
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LoadingSkeleton(width: 128, height: 18),
+              SizedBox(height: 16),
+              Expanded(
+                child: LoadingSkeleton(
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _HomeTabState extends State<HomeTab> {
@@ -251,113 +290,120 @@ class _HomeTabState extends State<HomeTab> {
                       const SizedBox(height: 24),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          if (_isLoadingHistory) {
-                            return SizedBox(
-                              height: constraints.maxWidth < 600 ? 200 : 350,
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          }
                           final chartData = _chartTimeframe == 0
                               ? state.history
-                              : (_historicalData ?? []);
-                          if (chartData.isEmpty) {
-                            return SizedBox(
+                              : (_historicalData ??
+                                    (_isLoadingHistory ? state.history : []));
+                          return DelayedLoading(
+                            isLoading: _isLoadingHistory,
+                            hasContent: chartData.isNotEmpty,
+                            placeholder: _HistoryChartsSkeleton(
                               height: constraints.maxWidth < 600 ? 200 : 350,
-                              child: const Center(
-                                child: Text(
-                                  "No historical data available",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ),
-                            );
-                          }
-                          final chartHeight = constraints.maxWidth < 600
-                              ? 200.0
-                              : 250.0;
-                          return Column(
-                            children: [
-                              _buildTrendChart(
-                                title: 'Temperature',
-                                unit: '°C',
-                                history: chartData,
-                                theme: theme,
-                                height: chartHeight,
-                                series: [
-                                  _TrendSeries(
-                                    label: 'Ambient',
-                                    color: AppTheme.neonOrange,
-                                    valueFor: (data) => data.temperatureC,
-                                  ),
-                                  _TrendSeries(
-                                    label: 'Chamber',
-                                    color: AppTheme.neonRed,
-                                    valueFor: (data) => data.chamberTempC,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 24),
-                              _buildTrendChart(
-                                title: 'Gas Sensors',
-                                unit: 'V',
-                                history: chartData,
-                                theme: theme,
-                                height: chartHeight,
-                                series: [
-                                  _TrendSeries(
-                                    label: 'MQ2',
-                                    color: AppTheme.neonPurple,
-                                    valueFor: (data) => data.mq2V,
-                                  ),
-                                  _TrendSeries(
-                                    label: 'MQ135',
-                                    color: AppTheme.neonBlue,
-                                    valueFor: (data) => data.mq135V,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 24),
-                              _buildTrendChart(
-                                title: 'Humidity',
-                                unit: '%',
-                                history: chartData,
-                                theme: theme,
-                                height: chartHeight,
-                                series: [
-                                  _TrendSeries(
-                                    label: 'Relative humidity',
-                                    color: AppTheme.neonBlue,
-                                    valueFor: (data) => data.humidityPercent,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 24),
-                              _buildTrendChart(
-                                title: 'Particulate Matter',
-                                unit: 'µg/m³',
-                                history: chartData,
-                                theme: theme,
-                                height: chartHeight,
-                                series: [
-                                  _TrendSeries(
-                                    label: 'PM1.0',
-                                    color: AppTheme.neonGreen,
-                                    valueFor: (data) => data.pm1_0UgM3,
-                                  ),
-                                  _TrendSeries(
-                                    label: 'PM2.5',
-                                    color: AppTheme.neonBlue,
-                                    valueFor: (data) => data.pm2_5UgM3,
-                                  ),
-                                  _TrendSeries(
-                                    label: 'PM10',
-                                    color: AppTheme.neonOrange,
-                                    valueFor: (data) => data.pm10UgM3,
-                                  ),
-                                ],
-                              ),
-                            ],
+                            ),
+                            child: Builder(
+                              builder: (context) {
+                                if (chartData.isEmpty) {
+                                  return SizedBox(
+                                    height: constraints.maxWidth < 600
+                                        ? 200
+                                        : 350,
+                                    child: const Center(
+                                      child: Text(
+                                        "No historical data available",
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                final chartHeight = constraints.maxWidth < 600
+                                    ? 200.0
+                                    : 250.0;
+                                return Column(
+                                  children: [
+                                    _buildTrendChart(
+                                      title: 'Temperature',
+                                      unit: '°C',
+                                      history: chartData,
+                                      theme: theme,
+                                      height: chartHeight,
+                                      series: [
+                                        _TrendSeries(
+                                          label: 'Ambient',
+                                          color: AppTheme.neonOrange,
+                                          valueFor: (data) => data.temperatureC,
+                                        ),
+                                        _TrendSeries(
+                                          label: 'Chamber',
+                                          color: AppTheme.neonRed,
+                                          valueFor: (data) => data.chamberTempC,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 24),
+                                    _buildTrendChart(
+                                      title: 'Gas Sensors',
+                                      unit: 'V',
+                                      history: chartData,
+                                      theme: theme,
+                                      height: chartHeight,
+                                      series: [
+                                        _TrendSeries(
+                                          label: 'MQ2',
+                                          color: AppTheme.neonPurple,
+                                          valueFor: (data) => data.mq2V,
+                                        ),
+                                        _TrendSeries(
+                                          label: 'MQ135',
+                                          color: AppTheme.neonBlue,
+                                          valueFor: (data) => data.mq135V,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 24),
+                                    _buildTrendChart(
+                                      title: 'Humidity',
+                                      unit: '%',
+                                      history: chartData,
+                                      theme: theme,
+                                      height: chartHeight,
+                                      series: [
+                                        _TrendSeries(
+                                          label: 'Relative humidity',
+                                          color: AppTheme.neonBlue,
+                                          valueFor: (data) =>
+                                              data.humidityPercent,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 24),
+                                    _buildTrendChart(
+                                      title: 'Particulate Matter',
+                                      unit: 'µg/m³',
+                                      history: chartData,
+                                      theme: theme,
+                                      height: chartHeight,
+                                      series: [
+                                        _TrendSeries(
+                                          label: 'PM1.0',
+                                          color: AppTheme.neonGreen,
+                                          valueFor: (data) => data.pm1_0UgM3,
+                                        ),
+                                        _TrendSeries(
+                                          label: 'PM2.5',
+                                          color: AppTheme.neonBlue,
+                                          valueFor: (data) => data.pm2_5UgM3,
+                                        ),
+                                        _TrendSeries(
+                                          label: 'PM10',
+                                          color: AppTheme.neonOrange,
+                                          valueFor: (data) => data.pm10UgM3,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           );
                         },
                       ),

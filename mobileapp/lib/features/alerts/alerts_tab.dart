@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
+import 'package:biomass_iot_app/core/widgets/delayed_loading.dart';
+import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
@@ -178,157 +180,165 @@ class _AlertsTabState extends State<AlertsTab> {
               ),
               const SizedBox(height: 24),
               Expanded(
-                child: alerts.isEmpty && _controller.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : alerts.isEmpty && _controller.errorMessage != null
-                    ? Center(
-                        child: TextButton(
-                          onPressed: _controller.load,
-                          child: Text(_controller.errorMessage!),
-                        ),
-                      )
-                    : alerts.isEmpty
-                    ? const Center(
-                        child: Text(
-                          "No alerts found.",
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: EdgeInsets.only(
-                          left: isCompact ? 16 : 24,
-                          right: isCompact ? 16 : 24,
-                          bottom: alertListBottomInset(
-                            width: mediaQuery.size.width,
-                            safeAreaBottom: mediaQuery.padding.bottom,
+                child: DelayedLoading(
+                  isLoading: _controller.isLoading,
+                  hasContent: alerts.isNotEmpty,
+                  placeholder: const _AlertsSkeleton(),
+                  child: alerts.isEmpty && _controller.errorMessage != null
+                      ? Center(
+                          child: TextButton(
+                            onPressed: _controller.load,
+                            child: Text(_controller.errorMessage!),
                           ),
-                        ),
-                        itemCount:
-                            alerts.length +
-                            (_controller.hasMoreAlerts ||
-                                    _controller.errorMessage != null
-                                ? 1
-                                : 0),
-                        itemBuilder: (ctx, i) {
-                          if (i == alerts.length) {
-                            if (_controller.errorMessage != null) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: TextButton(
-                                  onPressed: _controller.loadMore,
-                                  child: Text(_controller.errorMessage!),
+                        )
+                      : alerts.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "No alerts found.",
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: EdgeInsets.only(
+                            left: isCompact ? 16 : 24,
+                            right: isCompact ? 16 : 24,
+                            bottom: alertListBottomInset(
+                              width: mediaQuery.size.width,
+                              safeAreaBottom: mediaQuery.padding.bottom,
+                            ),
+                          ),
+                          itemCount:
+                              alerts.length +
+                              (_controller.hasMoreAlerts ||
+                                      _controller.errorMessage != null
+                                  ? 1
+                                  : 0),
+                          itemBuilder: (ctx, i) {
+                            if (i == alerts.length) {
+                              if (_controller.errorMessage != null) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: TextButton(
+                                    onPressed: _controller.loadMore,
+                                    child: Text(_controller.errorMessage!),
+                                  ),
+                                );
+                              }
+                              return const Padding(
+                                padding: EdgeInsets.only(bottom: 16),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
                                 ),
                               );
                             }
-                            return const Padding(
-                              padding: EdgeInsets.only(bottom: 16),
-                              child: Center(child: CircularProgressIndicator()),
+                            final alert = alerts[i];
+                            final presentation = alertPresentationForSeverity(
+                              alert.severity,
                             );
-                          }
-                          final alert = alerts[i];
-                          final presentation = alertPresentationForSeverity(
-                            alert.severity,
-                          );
 
-                          return Dismissible(
-                            key: Key(alert.id),
-                            direction: DismissDirection.endToStart,
-                            onDismissed: (_) {
-                              unawaited(_controller.removeAlert(alert.id));
-                            },
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 24),
-                              decoration: BoxDecoration(
-                                color: AppTheme.neonGreen,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                            ),
-                            child: Card(
-                              color: theme.cardColor,
-                              margin: const EdgeInsets.only(bottom: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(color: theme.dividerColor),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: presentation.color.withValues(
-                                          alpha: 0.15,
-                                        ),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        presentation.icon,
-                                        color: presentation.color,
-                                        size: 24,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  alert.title,
-                                                  style: TextStyle(
-                                                    color: presentation.color,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 15,
-                                                  ),
-                                                ),
-                                              ),
-                                              Text(
-                                                formatAlertTimestamp(
-                                                  alert.timestamp,
-                                                ),
-                                                style: const TextStyle(
-                                                  color: Colors.grey,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            alert.description,
-                                            style: TextStyle(
-                                              color: theme
-                                                  .textTheme
-                                                  .bodyLarge
-                                                  ?.color,
-                                              fontSize: 13,
-                                              height: 1.4,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                            return Dismissible(
+                              key: Key(alert.id),
+                              direction: DismissDirection.endToStart,
+                              onDismissed: (_) {
+                                unawaited(_controller.removeAlert(alert.id));
+                              },
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 24),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.neonGreen,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 32,
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                              child: Card(
+                                color: theme.cardColor,
+                                margin: const EdgeInsets.only(bottom: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(color: theme.dividerColor),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: presentation.color.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          presentation.icon,
+                                          color: presentation.color,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 20),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    alert.title,
+                                                    style: TextStyle(
+                                                      color: presentation.color,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Text(
+                                                  formatAlertTimestamp(
+                                                    alert.timestamp,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    color: Colors.grey,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              alert.description,
+                                              style: TextStyle(
+                                                color: theme
+                                                    .textTheme
+                                                    .bodyLarge
+                                                    ?.color,
+                                                fontSize: 13,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
               ),
             ],
           ),
@@ -336,4 +346,19 @@ class _AlertsTabState extends State<AlertsTab> {
       ),
     );
   }
+}
+
+class _AlertsSkeleton extends StatelessWidget {
+  const _AlertsSkeleton();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    children: const [
+      LoadingSkeletonCard(),
+      LoadingSkeletonCard(),
+      LoadingSkeletonCard(),
+      LoadingSkeletonCard(margin: EdgeInsets.zero),
+    ],
+  );
 }

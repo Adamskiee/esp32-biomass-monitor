@@ -1,6 +1,5 @@
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
-import 'package:biomass_iot_app/tab_transition.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
@@ -248,9 +247,9 @@ class _MainWrapperState extends State<MainWrapper> {
               children: [
                 offlineBanner,
                 Expanded(
-                  child: TabTransition(
-                    currentIndex: currentTab,
-                    children: screens,
+                  child: KeyedSubtree(
+                    key: ValueKey(currentTab),
+                    child: screens[currentTab],
                   ),
                 ),
               ],
