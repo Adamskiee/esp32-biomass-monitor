@@ -4,30 +4,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SettingsController extends ChangeNotifier {
   SettingsController(this._prefs)
     : _isDarkMode = _prefs.getBool('isDarkMode') ?? true,
-      _pushNotifications = _prefs.getBool('pushNotifications') ?? true,
       _biometricLogin = _prefs.getBool('biometricLogin') ?? false,
       _pollingInterval = _prefs.getInt('pollingInterval') ?? 2;
 
   final SharedPreferences _prefs;
   bool _isDarkMode;
-  bool _pushNotifications;
   bool _biometricLogin;
   int _pollingInterval;
 
   bool get isDarkMode => _isDarkMode;
-  bool get pushNotifications => _pushNotifications;
   bool get biometricLogin => _biometricLogin;
   int get pollingInterval => _pollingInterval;
 
   void toggleTheme() {
     _isDarkMode = !_isDarkMode;
     _prefs.setBool('isDarkMode', _isDarkMode);
-    notifyListeners();
-  }
-
-  void togglePush(bool value) {
-    _pushNotifications = value;
-    _prefs.setBool('pushNotifications', value);
     notifyListeners();
   }
 

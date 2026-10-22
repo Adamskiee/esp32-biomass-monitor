@@ -182,7 +182,7 @@ class SettingsScreen extends StatelessWidget {
               IconLabel(
                 color: theme.colorScheme.onSurfaceVariant,
                 icon: AppIcons.preferences,
-                label: 'Preferences (Auto-Saved)',
+                label: 'Preferences',
                 style: TextStyle(
                   color: theme.textTheme.bodyLarge?.color,
                   fontWeight: FontWeight.bold,
@@ -201,14 +201,6 @@ class SettingsScreen extends StatelessWidget {
                       settings.isDarkMode,
                       theme,
                       (val) => settings.toggleTheme(),
-                    ),
-                    const Divider(height: 32),
-                    _switchRow(
-                      "Push Notifications",
-                      AppIcons.alerts,
-                      settings.pushNotifications,
-                      theme,
-                      (val) => settings.togglePush(val),
                     ),
                   ],
                 ),
@@ -276,6 +268,17 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
+              IconLabel(
+                color: theme.colorScheme.onSurfaceVariant,
+                icon: AppIcons.information,
+                label: 'Support & Information',
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 16),
               GlowingCard(
                 glowColor: AppTheme.cardBorder,
                 padding: EdgeInsets.zero,

@@ -15,7 +15,7 @@ import 'package:sqflite/sqflite.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('does not show admin security controls to an admin', (
+  testWidgets('shows grouped support settings without notification controls', (
     tester,
   ) async {
     databaseFactoryOrNull ??= databaseFactorySqflitePlugin;
@@ -56,6 +56,12 @@ void main() {
     expect(find.text('Admin Security & Access'), findsNothing);
     expect(find.text('Biometric Login (Face ID)'), findsNothing);
     expect(find.text('Session Timeout'), findsNothing);
+    expect(find.text('Push Notifications'), findsNothing);
+    expect(find.text('Preferences'), findsOneWidget);
+    expect(find.text('Preferences (Auto-Saved)'), findsNothing);
+    expect(find.text('Support & Information'), findsOneWidget);
+    expect(find.text('About / Documentation'), findsOneWidget);
+    expect(find.text('Network & Hardware Diagnostics'), findsOneWidget);
     appState.logout();
   });
 
@@ -153,7 +159,7 @@ void main() {
       findsOneWidget,
     );
     final dividers = tester.widgetList<Divider>(find.byType(Divider)).toList();
-    expect(dividers, hasLength(2));
+    expect(dividers, hasLength(1));
     expect(dividers.last.indent, 24);
     expect(dividers.last.endIndent, 24);
 
