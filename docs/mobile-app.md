@@ -280,7 +280,17 @@ Add the encoded output and the passwords to these GitHub repository secrets:
 and `ANDROID_KEY_ALIAS`. Keep the keystore and its passwords out of the
 repository. The release workflow reconstructs them only on its runner.
 
-Publish a three-part numeric version tag after the normal checks pass:
+Set the built-in version in `mobileapp/pubspec.yaml` before tagging. The
+three-part version must exactly match the release tag; the `+BUILD` suffix can
+remain a local build counter because GitHub Actions supplies the release build
+number.
+
+```yaml
+version: 1.2.3+1
+```
+
+Publish the matching three-part numeric version tag after the normal checks
+pass:
 
 ```bash
 git tag v1.2.3
@@ -311,9 +321,10 @@ in-app updates.
 
 ## What can prevent a release from working?
 
-Missing signing secrets, an invalid tag, failed Flutter analysis or tests, and
-missing firmware or APK artifacts stop publication. The workflow verifies the
-APK signature, application ID, version name, and version code before upload.
+Missing signing secrets, an invalid tag, a tag that does not match the built-in
+app version, failed Flutter analysis or tests, and missing firmware or APK
+artifacts stop publication. The workflow verifies the APK signature,
+application ID, version name, and version code before upload.
 
 The app needs local network access to the device. This firmware connects to a
 configured Wi-Fi network; it does not implement access point provisioning,
