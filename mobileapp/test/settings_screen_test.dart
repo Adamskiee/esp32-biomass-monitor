@@ -57,6 +57,8 @@ void main() {
     expect(find.text('Biometric Login (Face ID)'), findsNothing);
     expect(find.text('Session Timeout'), findsNothing);
     expect(find.text('Push Notifications'), findsNothing);
+    expect(find.text('Preferences'), findsOneWidget);
+    expect(find.text('Preferences (Auto-Saved)'), findsNothing);
     expect(find.text('Support & Information'), findsOneWidget);
     expect(find.text('About / Documentation'), findsOneWidget);
     expect(find.text('Network & Hardware Diagnostics'), findsOneWidget);

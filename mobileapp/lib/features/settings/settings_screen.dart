@@ -182,7 +182,7 @@ class SettingsScreen extends StatelessWidget {
               IconLabel(
                 color: theme.colorScheme.onSurfaceVariant,
                 icon: AppIcons.preferences,
-                label: 'Preferences (Auto-Saved)',
+                label: 'Preferences',
                 style: TextStyle(
                   color: theme.textTheme.bodyLarge?.color,
                   fontWeight: FontWeight.bold,
