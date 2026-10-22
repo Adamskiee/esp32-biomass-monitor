@@ -106,6 +106,7 @@ void main() {
 
   Future<void> openExport(WidgetTester tester) async {
     await tester.scrollUntilVisible(find.byTooltip('Export CSV'), 300);
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.byTooltip('Export CSV'));
     await tester.pumpAndSettle();

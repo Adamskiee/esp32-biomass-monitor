@@ -1,3 +1,4 @@
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -31,7 +32,7 @@ class _AttemptsSectionState extends State<AttemptsSection> {
         const SizedBox(height: 16),
         Row(
           children: [
-            const Icon(Icons.science_outlined, color: AppTheme.neonGreen),
+            const Icon(AppIcons.experiment, color: AppTheme.neonGreen),
             const SizedBox(width: 12),
             Text('Attempts', style: Theme.of(context).textTheme.headlineSmall),
           ],
@@ -112,7 +113,7 @@ class _AttemptsSectionState extends State<AttemptsSection> {
                   : active == null
                   ? () => _start(context, controller)
                   : controller.stop,
-              icon: Icon(active == null ? Icons.play_arrow : Icons.stop),
+              icon: Icon(active == null ? AppIcons.start : AppIcons.stop),
               label: Text(active == null ? 'Start attempt' : 'Stop attempt'),
             ),
           ),
@@ -206,7 +207,7 @@ class _AttemptsSectionState extends State<AttemptsSection> {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.compare_arrows),
+                    Icon(AppIcons.compare),
                     SizedBox(width: 8),
                     Text('Compare attempts'),
                   ],
@@ -227,7 +228,7 @@ class _AttemptsSectionState extends State<AttemptsSection> {
           '${attempt.status.name} · ${attempt.sampleCount} samples',
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.delete_outline),
+          icon: const Icon(AppIcons.delete),
           onPressed: controller.isBusy
               ? null
               : () => _confirmDelete(attempt, controller),

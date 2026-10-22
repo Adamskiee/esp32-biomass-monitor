@@ -1,3 +1,4 @@
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:flutter/cupertino.dart';
 
@@ -12,15 +13,15 @@ AlertPresentation alertPresentationForSeverity(String severity) {
   return switch (severity) {
     'critical' => const AlertPresentation(
       color: AppTheme.neonRed,
-      icon: CupertinoIcons.exclamationmark_octagon_fill,
+      icon: AppIcons.critical,
     ),
     'warning' => const AlertPresentation(
       color: AppTheme.neonOrange,
-      icon: CupertinoIcons.exclamationmark_triangle_fill,
+      icon: AppIcons.warning,
     ),
     _ => const AlertPresentation(
       color: AppTheme.neonBlue,
-      icon: CupertinoIcons.info_circle_fill,
+      icon: AppIcons.informationStatus,
     ),
   };
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
@@ -11,6 +13,23 @@ import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+class _SeverityFilterLabel extends StatelessWidget {
+  const _SeverityFilterLabel(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 16),
+      const SizedBox(height: 4),
+      Text(label, style: const TextStyle(fontSize: 12)),
+    ],
+  );
+}
 
 double alertListBottomInset({
   required double width,
@@ -83,14 +102,18 @@ class _AlertsTabState extends State<AlertsTab> {
                 child: GlowingCard(
                   glowColor: AppTheme.neonOrange,
                   padding: EdgeInsets.all(isCompact ? 16 : 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 16,
+                    runSpacing: 12,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            "Session Summary",
+                          const IconLabel(
+                            icon: AppIcons.alerts,
+                            label: 'Session Summary',
                             style: TextStyle(
                               color: Colors.grey,
                               fontSize: 13,
@@ -119,7 +142,7 @@ class _AlertsTabState extends State<AlertsTab> {
                         ),
                         onPressed: () =>
                             unawaited(_controller.clearAllAlerts()),
-                        icon: const Icon(CupertinoIcons.trash, size: 18),
+                        icon: const Icon(AppIcons.delete, size: 20),
                         label: const Text(
                           "Clear All",
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -142,19 +165,28 @@ class _AlertsTabState extends State<AlertsTab> {
                         children: const {
                           'All': Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text("All"),
+                            child: _SeverityFilterLabel(AppIcons.alerts, 'All'),
                           ),
                           'Info': Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text("Info"),
+                            child: _SeverityFilterLabel(
+                              AppIcons.information,
+                              'Info',
+                            ),
                           ),
                           'Warning': Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text("Warning"),
+                            child: _SeverityFilterLabel(
+                              AppIcons.warning,
+                              'Warning',
+                            ),
                           ),
                           'Critical': Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text("Critical"),
+                            child: _SeverityFilterLabel(
+                              AppIcons.critical,
+                              'Critical',
+                            ),
                           ),
                         },
                         onValueChanged: (val) {
@@ -169,7 +201,7 @@ class _AlertsTabState extends State<AlertsTab> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(CupertinoIcons.refresh),
+                      icon: const Icon(AppIcons.refresh),
                       tooltip: 'Refresh alerts',
                       onPressed: _controller.isLoading
                           ? null
@@ -251,7 +283,7 @@ class _AlertsTabState extends State<AlertsTab> {
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: const Icon(
-                                  Icons.check,
+                                  AppIcons.success,
                                   color: Colors.white,
                                   size: 32,
                                 ),

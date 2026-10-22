@@ -1,3 +1,5 @@
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/api_service.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'widgets/safety_controls_panel.dart';
@@ -57,8 +59,9 @@ class _ControlTabState extends State<ControlTab> {
             ),
             children: [
               if (state.isAdmin) ...[
-                Text(
-                  "Emergency Control & Local Alerts",
+                IconLabel(
+                  icon: AppIcons.safety,
+                  label: 'Emergency Control & Local Alerts',
                   style: TextStyle(
                     color: theme.textTheme.bodyLarge?.color,
                     fontWeight: FontWeight.bold,

@@ -1,3 +1,5 @@
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
 
 import '../../monitoring/sensor_data.dart';
@@ -10,6 +12,7 @@ class SafetyThresholdGroup extends StatelessWidget {
   const SafetyThresholdGroup({
     super.key,
     required this.title,
+    this.icon = AppIcons.control,
     required this.fields,
     required this.editor,
     required this.controllers,
@@ -21,6 +24,7 @@ class SafetyThresholdGroup extends StatelessWidget {
     required this.onChanged,
   });
   final String title;
+  final IconData icon;
   final List<String> fields;
   final SafetyThresholdEditor editor;
   final Map<String, TextEditingController> controllers;
@@ -45,7 +49,11 @@ class SafetyThresholdGroup extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!humidityPair) ...[
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              IconLabel(
+                icon: icon,
+                label: title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               if (alertsOnly)
                 Text('Alerts only', style: _secondaryStyle(context)),
             ],
@@ -124,6 +132,7 @@ class _ThresholdRow extends StatelessWidget {
         _SensorHeader(
           key: ValueKey('${definition.field}_header'),
           title: definition.label,
+          icon: definition.icon,
           status: _status(definition, editor, reading, activeTriggers),
           details: [
             if (expanded)
@@ -134,8 +143,8 @@ class _ThresholdRow extends StatelessWidget {
                   children: [
                     if (definition.field == 'threshold_chamber_temp_c') ...[
                       Icon(
-                        Icons.shield_outlined,
-                        size: 18,
+                        AppIcons.safety,
+                        size: 20,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
@@ -275,6 +284,7 @@ class _HumidityThresholdRow extends StatelessWidget {
         _SensorHeader(
           key: const ValueKey('humidity_range_header'),
           title: 'Humidity',
+          icon: AppIcons.humidity,
           status: status,
           details: [
             if (expanded) 'Current: ${_format(reading.humidityPercent, '%')}',
@@ -351,6 +361,7 @@ class _SensorHeader extends StatelessWidget {
   const _SensorHeader({
     super.key,
     required this.title,
+    required this.icon,
     required this.status,
     required this.details,
     required this.expanded,
@@ -359,6 +370,7 @@ class _SensorHeader extends StatelessWidget {
   });
 
   final String title;
+  final IconData icon;
   final String status;
   final List<String> details;
   final bool expanded;
@@ -376,6 +388,8 @@ class _SensorHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -390,7 +404,7 @@ class _SensorHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(expanded ? Icons.expand_less : Icons.expand_more),
+            Icon(expanded ? AppIcons.collapse : AppIcons.expand),
           ],
         ),
       ),
@@ -571,6 +585,7 @@ class _FieldDefinition {
   const _FieldDefinition({
     required this.field,
     required this.label,
+    required this.icon,
     required this.unit,
     required this.defaultValue,
     required this.actionLabel,
@@ -581,6 +596,7 @@ class _FieldDefinition {
   });
   final String field;
   final String label;
+  final IconData icon;
   final String unit;
   final double defaultValue;
   final String actionLabel;
@@ -619,6 +635,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_chamber_temp_c',
     defaultValue: 80,
     label: 'Chamber temperature',
+    icon: AppIcons.chamberTemperature,
     unit: '°C',
     actionLabel: 'Alerts + automatic sprinkler',
     reading: _chamber,
@@ -629,6 +646,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_temperature_c',
     defaultValue: 35,
     label: 'Ambient temperature',
+    icon: AppIcons.ambientTemperature,
     unit: '°C',
     actionLabel: 'Alerts only',
     reading: _ambient,
@@ -639,6 +657,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_mq2_v',
     defaultValue: 2.5,
     label: 'MQ-2',
+    icon: AppIcons.smoke,
     unit: 'V',
     actionLabel: 'Alerts only',
     reading: _mq2,
@@ -650,6 +669,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_mq135_v',
     defaultValue: 2,
     label: 'MQ-135',
+    icon: AppIcons.gas,
     unit: 'V',
     actionLabel: 'Alerts only',
     reading: _mq135,
@@ -661,6 +681,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_pm1_0_ug_m3',
     defaultValue: 15,
     label: 'PM1.0',
+    icon: AppIcons.particulateMatter,
     unit: 'µg/m³',
     actionLabel: 'Alerts only',
     reading: _pm1,
@@ -671,6 +692,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_pm2_5_ug_m3',
     defaultValue: 15,
     label: 'PM2.5',
+    icon: AppIcons.particulateMatter,
     unit: 'µg/m³',
     actionLabel: 'Alerts only',
     reading: _pm25,
@@ -681,6 +703,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_pm10_ug_m3',
     defaultValue: 45,
     label: 'PM10',
+    icon: AppIcons.particulateMatter,
     unit: 'µg/m³',
     actionLabel: 'Alerts only',
     reading: _pm10,
@@ -691,6 +714,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_humidity_min_percent',
     defaultValue: 30,
     label: 'Humidity minimum',
+    icon: AppIcons.humidity,
     unit: '%',
     actionLabel: 'Alerts only',
     reading: _humidity,
@@ -701,6 +725,7 @@ const _definitions = <String, _FieldDefinition>{
     field: 'threshold_humidity_max_percent',
     defaultValue: 60,
     label: 'Humidity maximum',
+    icon: AppIcons.humidity,
     unit: '%',
     actionLabel: 'Alerts only',
     reading: _humidity,

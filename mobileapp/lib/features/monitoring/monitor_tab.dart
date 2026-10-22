@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/storage/app_database.dart';
@@ -143,7 +145,7 @@ class _MonitorTabState extends State<MonitorTab> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: const Icon(CupertinoIcons.share),
+                  icon: const Icon(AppIcons.share),
                   label: const Text(
                     "GENERATE & SHARE CSV",
                     textAlign: TextAlign.center,
@@ -218,11 +220,17 @@ class _MonitorTabState extends State<MonitorTab> {
                     children: const {
                       0: Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text("Sensors Log"),
+                        child: IconLabel(
+                          icon: AppIcons.sensorLog,
+                          label: "Sensors Log",
+                        ),
                       ),
                       1: Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text("Attempts"),
+                        child: IconLabel(
+                          icon: AppIcons.experiment,
+                          label: "Attempts",
+                        ),
                       ),
                     },
                     onValueChanged: (val) => setState(() => _segIndex = val),
@@ -268,8 +276,9 @@ class _MonitorTabState extends State<MonitorTab> {
         bottom: 100,
       ),
       children: [
-        Text(
-          "Session Analytics",
+        IconLabel(
+          icon: AppIcons.analytics,
+          label: 'Session Analytics',
           style: TextStyle(
             color: theme.textTheme.bodyLarge?.color,
             fontWeight: FontWeight.bold,
@@ -277,9 +286,10 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
         ),
         const SizedBox(height: 16),
-        _analyticsSection('Temperature', [
+        _analyticsSection('Temperature', AppIcons.ambientTemperature, [
           _analyticsCard(
             'Chamber Temperature',
+            AppIcons.chamberTemperature,
             '${stats['maxT']} °C',
             '${stats['avgT']} °C',
             AppTheme.neonOrange,
@@ -287,6 +297,7 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
           _analyticsCard(
             'Ambient Temperature',
+            AppIcons.ambientTemperature,
             '${stats['maxAmbientTemp']} °C',
             '${stats['avgAmbientTemp']} °C',
             AppTheme.neonOrange,
@@ -294,6 +305,7 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
           _analyticsCard(
             'Humidity',
+            AppIcons.humidity,
             '${stats['maxHumidity']} %',
             '${stats['avgHumidity']} %',
             AppTheme.neonBlue,
@@ -301,9 +313,10 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
         ], theme),
         const SizedBox(height: 24),
-        _analyticsSection('Gas Sensors', [
+        _analyticsSection('Gas Sensors', AppIcons.gas, [
           _analyticsCard(
             'MQ-2',
+            AppIcons.smoke,
             '${stats['maxMq2']} V',
             '${stats['avgMq2']} V',
             AppTheme.neonRed,
@@ -311,6 +324,7 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
           _analyticsCard(
             'MQ-135',
+            AppIcons.gas,
             '${stats['maxMq135']} V',
             '${stats['avgMq135']} V',
             AppTheme.neonPurple,
@@ -318,9 +332,10 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
         ], theme),
         const SizedBox(height: 24),
-        _analyticsSection('Particulate Matter', [
+        _analyticsSection('Particulate Matter', AppIcons.particulateMatter, [
           _analyticsCard(
             'PM1.0',
+            AppIcons.particulateMatter,
             '${stats['maxPm1_0']} µg/m³',
             '${stats['avgPm1_0']} µg/m³',
             AppTheme.neonGreen,
@@ -328,6 +343,7 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
           _analyticsCard(
             'PM2.5',
+            AppIcons.particulateMatter,
             '${stats['maxPm2_5']} µg/m³',
             '${stats['avgPm2_5']} µg/m³',
             AppTheme.neonGreen,
@@ -335,6 +351,7 @@ class _MonitorTabState extends State<MonitorTab> {
           ),
           _analyticsCard(
             'PM10',
+            AppIcons.particulateMatter,
             '${stats['maxPm10']} µg/m³',
             '${stats['avgPm10']} µg/m³',
             AppTheme.neonGreen,
@@ -346,8 +363,9 @@ class _MonitorTabState extends State<MonitorTab> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
-              child: Text(
-                "Sensor Data Log",
+              child: IconLabel(
+                icon: AppIcons.sensorLog,
+                label: 'Sensor Data Log',
                 style: TextStyle(
                   color: theme.textTheme.bodyLarge?.color,
                   fontWeight: FontWeight.bold,
@@ -356,10 +374,7 @@ class _MonitorTabState extends State<MonitorTab> {
               ),
             ),
             IconButton(
-              icon: const Icon(
-                CupertinoIcons.arrow_down_doc,
-                color: AppTheme.neonGreen,
-              ),
+              icon: const Icon(AppIcons.download, color: AppTheme.neonGreen),
               onPressed: () => _exportCSV(context, theme, state.history),
               tooltip: "Export CSV",
             ),
@@ -376,7 +391,7 @@ class _MonitorTabState extends State<MonitorTab> {
                         unawaited(_sensorLogController.setLiveUpdates(enabled)),
             ),
             IconButton(
-              icon: const Icon(CupertinoIcons.refresh),
+              icon: const Icon(AppIcons.refresh),
               tooltip: 'Refresh sensor log',
               onPressed: _sensorLogController.isLoading
                   ? null
@@ -391,7 +406,7 @@ class _MonitorTabState extends State<MonitorTab> {
               onPressed: _sensorLogController.isLoading
                   ? null
                   : () => unawaited(_sensorLogController.showNewRecords()),
-              icon: const Icon(CupertinoIcons.arrow_up),
+              icon: const Icon(AppIcons.scrollToTop),
               label: const Text('New records available'),
             ),
           ),
@@ -556,12 +571,18 @@ class _MonitorTabState extends State<MonitorTab> {
     );
   }
 
-  Widget _analyticsSection(String title, List<Widget> cards, ThemeData theme) {
+  Widget _analyticsSection(
+    String title,
+    IconData icon,
+    List<Widget> cards,
+    ThemeData theme,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
+        IconLabel(
+          icon: icon,
+          label: title,
           style: TextStyle(
             color: theme.textTheme.bodyLarge?.color,
             fontSize: 14,
@@ -576,6 +597,7 @@ class _MonitorTabState extends State<MonitorTab> {
 
   Widget _analyticsCard(
     String title,
+    IconData icon,
     String peak,
     String average,
     Color color,
@@ -591,8 +613,10 @@ class _MonitorTabState extends State<MonitorTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
+          IconLabel(
+            icon: icon,
+            color: color,
+            label: title,
             style: const TextStyle(
               color: Colors.grey,
               fontSize: 12,

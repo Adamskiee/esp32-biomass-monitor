@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:biomass_iot_app/app/app_icons.dart';
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -10,7 +12,12 @@ class AttemptComparisonScreen extends StatelessWidget {
   final AttemptComparison comparison;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Attempt comparison')),
+    appBar: AppBar(
+      title: const IconLabel(
+        icon: AppIcons.compare,
+        label: 'Attempt comparison',
+      ),
+    ),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: comparison.metrics
@@ -33,7 +40,18 @@ class _MetricCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${metric.label} (${metric.unit})'),
+            IconLabel(
+              icon: switch (metric) {
+                ComparisonMetric.mq2 => AppIcons.smoke,
+                ComparisonMetric.mq135 => AppIcons.gas,
+                ComparisonMetric.temperature => AppIcons.ambientTemperature,
+                ComparisonMetric.humidity => AppIcons.humidity,
+                ComparisonMetric.pm1 ||
+                ComparisonMetric.pm25 ||
+                ComparisonMetric.pm10 => AppIcons.particulateMatter,
+              },
+              label: '${metric.label} (${metric.unit})',
+            ),
             const SizedBox(height: 8),
             Text(
               'Without: ${_value(comparison.unfiltered.average, metric)} · With: ${_value(comparison.filtered.average, metric)}',
