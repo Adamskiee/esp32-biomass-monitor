@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:biomass_iot_app/core/storage/app_database.dart';
-import 'package:biomass_iot_app/core/storage/database_schema.dart';
 import 'package:biomass_iot_app/database_helper.dart';
 import 'package:biomass_iot_app/features/experiments/attempt.dart';
 import 'package:biomass_iot_app/features/experiments/attempt_store.dart';
@@ -33,8 +32,8 @@ void main() {
     final oldDatabase = await databaseFactoryFfi.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: DatabaseSchema.version,
-        onCreate: DatabaseSchema.create,
+        version: 3,
+        onCreate: _createVersionThreeDatabase,
       ),
     );
     final startedAt = DateTime.utc(2026, 10, 7, 12);
@@ -342,4 +341,62 @@ void main() {
     );
     await database.close();
   });
+}
+
+Future<void> _createVersionThreeDatabase(Database db, int version) async {
+  await db.execute('''
+    CREATE TABLE sensor_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temperature_c REAL,
+      humidity_percent REAL,
+      chamber_temp_c REAL,
+      mq135_v REAL,
+      mq2_v REAL,
+      pm1_ug_m3 REAL,
+      pm25_ug_m3 REAL,
+      pm10_ug_m3 REAL,
+      timestamp TEXT
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE alerts (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      description TEXT,
+      severity TEXT,
+      time TEXT
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scenario TEXT NOT NULL,
+      sequence_number INTEGER NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      status TEXT NOT NULL,
+      UNIQUE(scenario, sequence_number)
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE attempt_readings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      attempt_id INTEGER NOT NULL REFERENCES attempts(id) ON DELETE CASCADE,
+      recorded_at TEXT NOT NULL,
+      elapsed_ms INTEGER NOT NULL,
+      temperature_c REAL,
+      humidity_percent REAL,
+      mq135_v REAL,
+      mq2_v REAL,
+      pm1_ug_m3 REAL,
+      pm25_ug_m3 REAL,
+      pm10_ug_m3 REAL
+    )
+  ''');
+  await db.execute(
+    'CREATE INDEX attempt_readings_attempt_elapsed ON attempt_readings(attempt_id, elapsed_ms)',
+  );
+  await db.execute(
+    "CREATE UNIQUE INDEX one_active_attempt ON attempts(status) WHERE status = 'active'",
+  );
 }
