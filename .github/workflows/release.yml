@@ -57,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Validate release tag
-        run: mobileapp/tool/release_tag.sh "$GITHUB_REF_TYPE" "$GITHUB_REF_NAME" > "$RUNNER_TEMP/version"
+        run: mobileapp/tool/release_tag.sh "$GITHUB_REF_TYPE" "$GITHUB_REF_NAME" mobileapp/pubspec.yaml > "$RUNNER_TEMP/version"
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -93,7 +93,7 @@ jobs:
           flutter pub get
           flutter analyze
           flutter test
-          flutter build apk --release --build-name "$(cat "$RUNNER_TEMP/version")" --build-number "$GITHUB_RUN_NUMBER"
+          flutter build apk --release --build-number "$GITHUB_RUN_NUMBER"
       - name: Verify and stage APK
         working-directory: mobileapp
         run: |
@@ -118,7 +118,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Validate release tag
-        run: mobileapp/tool/release_tag.sh "$GITHUB_REF_TYPE" "$GITHUB_REF_NAME" > /dev/null
+        run: mobileapp/tool/release_tag.sh "$GITHUB_REF_TYPE" "$GITHUB_REF_NAME" mobileapp/pubspec.yaml > /dev/null
       - uses: actions/download-artifact@v8
         with:
           path: downloaded-artifacts
