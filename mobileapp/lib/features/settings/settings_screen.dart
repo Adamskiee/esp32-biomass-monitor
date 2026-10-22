@@ -1,3 +1,5 @@
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
@@ -21,9 +23,10 @@ class SettingsScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(
-              CupertinoIcons.info_circle_fill,
-              color: AppTheme.neonBlue,
+            Icon(
+              AppIcons.information,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
             ),
             const SizedBox(width: 12),
             Text(
@@ -105,7 +108,11 @@ class SettingsScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(CupertinoIcons.wifi, color: AppTheme.neonBlue),
+            Icon(
+              AppIcons.wifi,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -172,8 +179,10 @@ class SettingsScreen extends StatelessWidget {
               bottom: 100,
             ),
             children: [
-              Text(
-                "Preferences (Auto-Saved)",
+              IconLabel(
+                color: theme.colorScheme.onSurfaceVariant,
+                icon: AppIcons.preferences,
+                label: 'Preferences (Auto-Saved)',
                 style: TextStyle(
                   color: theme.textTheme.bodyLarge?.color,
                   fontWeight: FontWeight.bold,
@@ -188,6 +197,7 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     _switchRow(
                       "Dark Mode Theme",
+                      AppIcons.darkMode,
                       settings.isDarkMode,
                       theme,
                       (val) => settings.toggleTheme(),
@@ -195,6 +205,7 @@ class SettingsScreen extends StatelessWidget {
                     const Divider(height: 32),
                     _switchRow(
                       "Push Notifications",
+                      AppIcons.alerts,
                       settings.pushNotifications,
                       theme,
                       (val) => settings.togglePush(val),
@@ -204,8 +215,10 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              Text(
-                "Telemetry Connection",
+              IconLabel(
+                color: theme.colorScheme.onSurfaceVariant,
+                icon: AppIcons.wifi,
+                label: 'Telemetry Connection',
                 style: TextStyle(
                   color: theme.textTheme.bodyLarge?.color,
                   fontWeight: FontWeight.bold,
@@ -216,11 +229,16 @@ class SettingsScreen extends StatelessWidget {
               GlowingCard(
                 glowColor: AppTheme.cardBorder,
                 padding: const EdgeInsets.all(24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  runSpacing: 12,
                   children: [
-                    Text(
-                      "Polling Interval",
+                    IconLabel(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      icon: AppIcons.pollingInterval,
+                      label: 'Polling Interval',
                       style: TextStyle(
                         color: theme.textTheme.bodyLarge?.color,
                         fontSize: 15,
@@ -266,13 +284,16 @@ class SettingsScreen extends StatelessWidget {
                     Material(
                       type: MaterialType.transparency,
                       child: ListTile(
+                        minLeadingWidth: 20,
+                        horizontalTitleGap: 8,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 8,
                         ),
-                        leading: const Icon(
-                          CupertinoIcons.info_circle_fill,
-                          color: AppTheme.neonBlue,
+                        leading: Icon(
+                          AppIcons.information,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          size: 20,
                         ),
                         title: Text(
                           "About / Documentation",
@@ -281,10 +302,10 @@ class SettingsScreen extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        trailing: const Icon(
-                          CupertinoIcons.chevron_right,
-                          color: Colors.grey,
-                          size: 18,
+                        trailing: Icon(
+                          AppIcons.next,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          size: 20,
                         ),
                         onTap: () => _showAboutDialog(context, theme),
                       ),
@@ -293,13 +314,16 @@ class SettingsScreen extends StatelessWidget {
                     Material(
                       type: MaterialType.transparency,
                       child: ListTile(
+                        minLeadingWidth: 20,
+                        horizontalTitleGap: 8,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 8,
                         ),
-                        leading: const Icon(
-                          CupertinoIcons.wifi,
-                          color: AppTheme.neonBlue,
+                        leading: Icon(
+                          AppIcons.wifi,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          size: 20,
                         ),
                         title: Text(
                           "Network & Hardware Diagnostics",
@@ -308,10 +332,10 @@ class SettingsScreen extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        trailing: const Icon(
-                          CupertinoIcons.chevron_right,
-                          color: Colors.grey,
-                          size: 18,
+                        trailing: Icon(
+                          AppIcons.next,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          size: 20,
                         ),
                         onTap: () => _showDiagnosticsDialog(context, theme),
                       ),
@@ -329,6 +353,7 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _switchRow(
     String label,
+    IconData icon,
     bool val,
     ThemeData theme,
     Function(bool) onChanged,
@@ -337,8 +362,10 @@ class SettingsScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: Text(
-            label,
+          child: IconLabel(
+            color: theme.colorScheme.onSurfaceVariant,
+            icon: icon,
+            label: label,
             style: TextStyle(
               color: theme.textTheme.bodyLarge?.color,
               fontSize: 15,

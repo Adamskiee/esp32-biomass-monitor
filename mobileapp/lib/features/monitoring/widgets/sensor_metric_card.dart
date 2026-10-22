@@ -1,5 +1,5 @@
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class SensorMetricCard extends StatelessWidget {
@@ -75,9 +75,7 @@ class SensorMetricCard extends StatelessWidget {
                                 ),
                           ),
                         Icon(
-                          isFault
-                              ? CupertinoIcons.exclamationmark_triangle_fill
-                              : icon,
+                          isFault ? AppIcons.warning : icon,
                           color: displayColor,
                           size: isCompact ? 20 : 24,
                         ),

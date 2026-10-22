@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
 
 class SafetyThresholdSlider extends StatefulWidget {
@@ -255,7 +256,7 @@ class _SliderControls extends StatelessWidget {
             child: TextButton.icon(
               key: ValueKey('${field}_slider_default'),
               onPressed: enabled ? onDefault : null,
-              icon: const Icon(Icons.restore, size: 18),
+              icon: const Icon(AppIcons.reset, size: 20),
               label: const Text('Default'),
             ),
           ),

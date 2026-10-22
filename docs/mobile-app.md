@@ -97,6 +97,33 @@ on smaller screens and with larger text. Android opens its share chooser with
 The file includes the latest 60 session readings, rather than the full paginated
 log. If there are no readings or sharing fails, the app displays a message.
 
+## How do icons stay consistent across pages?
+
+UI icons come from `AppIcons` in `mobileapp/lib/app/app_icons.dart` so the same
+action or sensor uses the same Cupertino symbol on every page. Reuse an existing
+semantic name when adding UI, or add a name there for a new concept.
+
+Icons accompany section headings, chart groups, analytics cards, sensor threshold
+rows, settings controls, and alert filters. Sensor symbols match their dashboard
+cards so readers can recognize the same measurement across pages. `IconLabel` in
+`mobileapp/lib/core/widgets/icon_label.dart` pairs an icon with wrapping text;
+keep visible labels so icons are not the only way to identify a control.
+
+Icons use outlines by default. Home, Alerts, and Settings use filled variants
+when selected in both desktop and mobile navigation. Critical, warning, and
+informational alert indicators also use filled symbols to emphasize status.
+Monitor and Control keep the same symbol when selected and use color to indicate
+selection. Navigation and standalone content icons use 24 logical pixels;
+heading, label, and button icons use 20. Severity filter icons use 16, and sensor
+cards use 20 in compact layouts or 24 otherwise. Branding and large status
+illustrations retain sizes suited to their context.
+
+Uncolored icons inherit Flutter's light or dark theme foreground so they stay
+readable against the page background. Keep that default when adjusting global
+icon sizing. Settings uses the theme's `onSurfaceVariant` foreground for all
+icons, including dialog headings and chevrons, with 20-pixel sizing and matching
+label spacing.
+
 ## How do I configure sensor limits on Control?
 
 Under **Emergency Control & Local Alerts**, the Temperature, Gas, Particulate

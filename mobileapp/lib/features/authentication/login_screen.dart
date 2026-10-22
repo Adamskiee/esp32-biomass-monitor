@@ -1,8 +1,8 @@
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/glass_container.dart';
 import 'package:biomass_iot_app/features/settings/settings_controller.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 decoration: _inputDec(
                                   "ESP32 IP address",
-                                  CupertinoIcons.wifi,
+                                  AppIcons.wifi,
                                   theme,
                                 ),
                               ),
@@ -225,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 decoration: _inputDec(
                                   "Operator ID",
-                                  CupertinoIcons.person_solid,
+                                  AppIcons.user,
                                   theme,
                                 ),
                               ),
@@ -238,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 decoration: _inputDec(
                                   "Passcode",
-                                  CupertinoIcons.lock_fill,
+                                  AppIcons.password,
                                   theme,
                                 ),
                                 onSubmitted: (_) => _handleLogin(),
@@ -289,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 const SizedBox(height: 24),
                                 TextButton.icon(
                                   icon: const Icon(
-                                    CupertinoIcons.lock_shield_fill,
+                                    AppIcons.authentication,
                                     color: AppTheme.neonBlue,
                                   ),
                                   label: const Text(

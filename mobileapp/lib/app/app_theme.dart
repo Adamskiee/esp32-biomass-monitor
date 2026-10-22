@@ -10,10 +10,17 @@ class AppTheme {
   static const Color neonOrange = Color(0xFFFF9F0A);
   static const Color neonRed = Color(0xFFFF453A);
   static const Color neonPurple = Color(0xFFBF5AF2);
+  static const _actionIconStyle = ButtonStyle(
+    iconSize: WidgetStatePropertyAll(20),
+  );
 
   static ThemeData getDarkTheme() => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    iconButtonTheme: const IconButtonThemeData(style: _actionIconStyle),
+    elevatedButtonTheme: const ElevatedButtonThemeData(style: _actionIconStyle),
+    outlinedButtonTheme: const OutlinedButtonThemeData(style: _actionIconStyle),
+    textButtonTheme: const TextButtonThemeData(style: _actionIconStyle),
     scaffoldBackgroundColor: backgroundDark,
     cardColor: cardDark,
     dividerColor: cardBorder,
@@ -27,6 +34,10 @@ class AppTheme {
   static ThemeData getLightTheme() => ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
+    iconButtonTheme: const IconButtonThemeData(style: _actionIconStyle),
+    elevatedButtonTheme: const ElevatedButtonThemeData(style: _actionIconStyle),
+    outlinedButtonTheme: const OutlinedButtonThemeData(style: _actionIconStyle),
+    textButtonTheme: const TextButtonThemeData(style: _actionIconStyle),
     scaffoldBackgroundColor: const Color(0xFFF8FAFC),
     cardColor: const Color(0xFFFFFFFF),
     dividerColor: const Color(0xFFE2E8F0),

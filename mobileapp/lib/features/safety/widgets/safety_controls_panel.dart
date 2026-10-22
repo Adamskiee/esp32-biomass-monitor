@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -303,7 +305,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
         if (_offline)
           const Card(
             child: ListTile(
-              leading: Icon(Icons.wifi_off),
+              leading: Icon(AppIcons.wifiDisconnected),
               title: Text('ESP32 disconnected'),
               subtitle: Text(
                 'Last readings are stale. Controls are unavailable.',
@@ -318,10 +320,15 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
               children: [
                 Row(
                   children: [
-                    const Expanded(child: Text('Active alerts')),
+                    const Expanded(
+                      child: IconLabel(
+                        icon: AppIcons.alerts,
+                        label: 'Active alerts',
+                      ),
+                    ),
                     IconButton(
                       tooltip: _muted ? 'Unmute app alerts' : 'Mute app alerts',
-                      icon: Icon(_muted ? Icons.volume_off : Icons.volume_up),
+                      icon: Icon(_muted ? AppIcons.muted : AppIcons.volume),
                       onPressed: () => setState(() => _muted = !_muted),
                     ),
                   ],
@@ -339,6 +346,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
           child: Column(
             children: [
               ListTile(
+                leading: const Icon(AppIcons.pump),
                 title: const Text('Pump Status'),
                 trailing: Text(pumpLabel),
                 subtitle: const Text(
@@ -346,6 +354,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
                 ),
               ),
               SwitchListTile(
+                secondary: const Icon(AppIcons.sprinkler),
                 title: const Text('Manual Sprinkler'),
                 subtitle: Text(
                   protection
@@ -364,8 +373,9 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
         ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 12),
-          child: Text(
-            'Safety Thresholds',
+          child: IconLabel(
+            icon: AppIcons.control,
+            label: 'Safety Thresholds',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
@@ -373,6 +383,13 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
           SafetyThresholdGroup(
             key: _thresholdGroupKeys[group.key],
             title: group.key,
+            icon: switch (group.key) {
+              'Temperature' => AppIcons.ambientTemperature,
+              'Gas' => AppIcons.gas,
+              'Particulate Matter' => AppIcons.particulateMatter,
+              'Humidity' => AppIcons.humidity,
+              _ => AppIcons.control,
+            },
             fields: group.value,
             editor: _editor,
             controllers: _controllers,
@@ -392,9 +409,10 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
                 setState(() => _editor.edit(field, value)),
           ),
         const SizedBox(height: 12),
-        ElevatedButton(
+        ElevatedButton.icon(
+          icon: const Icon(AppIcons.apply),
           onPressed: locked || !_editor.isDirty ? null : _save,
-          child: Text(_saving ? 'Saving thresholds...' : 'Apply Thresholds'),
+          label: Text(_saving ? 'Saving thresholds...' : 'Apply Thresholds'),
         ),
       ],
     );

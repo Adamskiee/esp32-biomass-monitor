@@ -1,3 +1,4 @@
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_tab.dart';
@@ -5,7 +6,6 @@ import 'package:biomass_iot_app/features/monitoring/home_tab.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
 import 'package:biomass_iot_app/features/safety/control_tab.dart';
 import 'package:biomass_iot_app/features/settings/settings_screen.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -83,9 +83,9 @@ class _MainWrapperState extends State<MainWrapper> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    CupertinoIcons.wifi_slash,
+                    AppIcons.wifiDisconnected,
                     color: Colors.white,
-                    size: 18,
+                    size: 20,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -133,7 +133,7 @@ class _MainWrapperState extends State<MainWrapper> {
               ),
               actions: [
                 Icon(
-                  CupertinoIcons.wifi,
+                  AppIcons.wifi,
                   color: isHardwareConnected
                       ? AppTheme.neonGreen
                       : AppTheme.neonRed,
@@ -142,7 +142,7 @@ class _MainWrapperState extends State<MainWrapper> {
                 const SizedBox(width: 16),
                 IconButton(
                   icon: const Icon(
-                    CupertinoIcons.power,
+                    AppIcons.disconnect,
                     color: AppTheme.neonRed,
                     size: 20,
                   ),
@@ -171,7 +171,7 @@ class _MainWrapperState extends State<MainWrapper> {
                     child: Row(
                       children: [
                         const Icon(
-                          CupertinoIcons.flame_fill,
+                          AppIcons.brand,
                           color: AppTheme.neonGreen,
                           size: 32,
                         ),
@@ -196,29 +196,37 @@ class _MainWrapperState extends State<MainWrapper> {
                       children: [
                         _sidebarItem(
                           0,
-                          CupertinoIcons.house_fill,
+                          AppIcons.home,
                           "Home Dashboard",
                           theme,
+                          selectedIcon: AppIcons.homeSelected,
                         ),
                         _sidebarItem(
                           1,
-                          CupertinoIcons.wind,
+                          AppIcons.monitor,
                           "Air Quality Monitor",
                           theme,
                         ),
-                        _sidebarItem(2, Icons.tune, "System Control", theme),
+                        _sidebarItem(
+                          2,
+                          AppIcons.control,
+                          "System Control",
+                          theme,
+                        ),
                         _sidebarItem(
                           3,
-                          CupertinoIcons.bell_fill,
+                          AppIcons.alerts,
                           "Active Alerts",
                           theme,
+                          selectedIcon: AppIcons.alertsSelected,
                           badge: alertCount,
                         ),
                         _sidebarItem(
                           4,
-                          CupertinoIcons.gear_solid,
+                          AppIcons.settings,
                           "Settings & Admin",
                           theme,
+                          selectedIcon: AppIcons.settingsSelected,
                         ),
                       ],
                     ),
@@ -234,7 +242,7 @@ class _MainWrapperState extends State<MainWrapper> {
                         elevation: 0,
                         minimumSize: const Size(double.infinity, 50),
                       ),
-                      icon: const Icon(CupertinoIcons.power),
+                      icon: const Icon(AppIcons.disconnect),
                       label: const Text("Logout"),
                       onPressed: () => _showLogoutConfirmation(context),
                     ),
@@ -290,24 +298,27 @@ class _MainWrapperState extends State<MainWrapper> {
                     onTap: (index) => state.setTab(index),
                     items: const [
                       BottomNavigationBarItem(
-                        icon: Icon(CupertinoIcons.house_fill, size: 26),
+                        icon: Icon(AppIcons.home, size: 24),
+                        activeIcon: Icon(AppIcons.homeSelected, size: 24),
                         label: 'Home',
                       ),
                       BottomNavigationBarItem(
-                        icon: Icon(CupertinoIcons.wind, size: 26),
+                        icon: Icon(AppIcons.monitor, size: 24),
                         label: 'Monitor',
                       ),
                       BottomNavigationBarItem(
-                        icon: Icon(Icons.tune, size: 26),
+                        icon: Icon(AppIcons.control, size: 24),
                         label: 'Control',
                       ),
                       BottomNavigationBarItem(
-                        icon: Icon(CupertinoIcons.bell_fill, size: 26),
+                        icon: Icon(AppIcons.alerts, size: 24),
+                        activeIcon: Icon(AppIcons.alertsSelected, size: 24),
                         label: 'Alerts',
                       ),
                       BottomNavigationBarItem(
-                        icon: Icon(CupertinoIcons.bars, size: 26),
-                        label: 'More',
+                        icon: Icon(AppIcons.settings, size: 24),
+                        activeIcon: Icon(AppIcons.settingsSelected, size: 24),
+                        label: 'Settings',
                       ),
                     ],
                   ),
@@ -323,6 +334,7 @@ class _MainWrapperState extends State<MainWrapper> {
     IconData icon,
     String title,
     ThemeData theme, {
+    IconData? selectedIcon,
     int badge = 0,
   }) {
     final currentTab = context.select<AppStateProvider, int>(
@@ -346,9 +358,9 @@ class _MainWrapperState extends State<MainWrapper> {
           child: Row(
             children: [
               Icon(
-                icon,
+                isSel ? selectedIcon ?? icon : icon,
                 color: isSel ? AppTheme.neonGreen : Colors.grey,
-                size: 20,
+                size: 24,
               ),
               const SizedBox(width: 16),
               Expanded(

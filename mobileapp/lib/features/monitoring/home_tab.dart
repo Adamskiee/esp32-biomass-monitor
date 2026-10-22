@@ -1,3 +1,5 @@
+import 'package:biomass_iot_app/core/widgets/icon_label.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
@@ -121,7 +123,7 @@ class _HomeTabState extends State<HomeTab> {
                 if (!isHardwareConnected)
                   const Card(
                     child: ListTile(
-                      leading: Icon(CupertinoIcons.wifi_slash),
+                      leading: Icon(AppIcons.wifiDisconnected),
                       title: Text('ESP32 disconnected'),
                       subtitle: Text('Live sensor readings are unavailable.'),
                     ),
@@ -135,7 +137,7 @@ class _HomeTabState extends State<HomeTab> {
                         "Ambient Temp",
                         data.temperatureC,
                         " °C",
-                        CupertinoIcons.thermometer,
+                        AppIcons.ambientTemperature,
                         AppTheme.neonOrange,
                         theme,
                         decimals: 1,
@@ -146,7 +148,7 @@ class _HomeTabState extends State<HomeTab> {
                         "Humidity",
                         data.humidityPercent,
                         " %",
-                        CupertinoIcons.drop_fill,
+                        AppIcons.humidity,
                         AppTheme.neonBlue,
                         theme,
                         decimals: 1,
@@ -157,7 +159,7 @@ class _HomeTabState extends State<HomeTab> {
                         "Chamber Temp",
                         data.chamberTempC,
                         " °C",
-                        CupertinoIcons.flame_fill,
+                        AppIcons.chamberTemperature,
                         data.chamberTempC != null && data.chamberTempC! > 100
                             ? AppTheme.neonRed
                             : AppTheme.neonOrange,
@@ -169,7 +171,7 @@ class _HomeTabState extends State<HomeTab> {
                         "MQ135 Gas",
                         data.mq135V,
                         " V",
-                        CupertinoIcons.cloud_fill,
+                        AppIcons.gas,
                         AppTheme.neonBlue,
                         theme,
                         decimals: 2,
@@ -181,7 +183,7 @@ class _HomeTabState extends State<HomeTab> {
                         "MQ2 Smoke",
                         data.mq2V,
                         " V",
-                        CupertinoIcons.smoke_fill,
+                        AppIcons.smoke,
                         AppTheme.neonPurple,
                         theme,
                         decimals: 2,
@@ -193,7 +195,7 @@ class _HomeTabState extends State<HomeTab> {
                         "PM1.0",
                         data.pm1_0UgM3,
                         " µg/m³",
-                        CupertinoIcons.circle_grid_3x3_fill,
+                        AppIcons.particulateMatter,
                         AppTheme.neonBlue,
                         theme,
                         decimals: 1,
@@ -204,7 +206,7 @@ class _HomeTabState extends State<HomeTab> {
                         "PM2.5",
                         data.pm2_5UgM3,
                         " µg/m³",
-                        CupertinoIcons.circle_grid_3x3_fill,
+                        AppIcons.particulateMatter,
                         AppTheme.neonPurple,
                         theme,
                         decimals: 1,
@@ -215,7 +217,7 @@ class _HomeTabState extends State<HomeTab> {
                         "PM10",
                         data.pm10UgM3,
                         " µg/m³",
-                        CupertinoIcons.circle_grid_3x3_fill,
+                        AppIcons.particulateMatter,
                         AppTheme.neonOrange,
                         theme,
                         decimals: 1,
@@ -237,8 +239,9 @@ class _HomeTabState extends State<HomeTab> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         runSpacing: 16,
                         children: [
-                          Text(
-                            "Real-Time Telemetry Trends",
+                          IconLabel(
+                            icon: AppIcons.trends,
+                            label: 'Real-Time Telemetry Trends',
                             style: TextStyle(
                               color: theme.textTheme.bodyLarge?.color,
                               fontWeight: FontWeight.bold,
@@ -322,6 +325,7 @@ class _HomeTabState extends State<HomeTab> {
                                   children: [
                                     _buildTrendChart(
                                       title: 'Temperature',
+                                      icon: AppIcons.ambientTemperature,
                                       unit: '°C',
                                       history: chartData,
                                       theme: theme,
@@ -342,6 +346,7 @@ class _HomeTabState extends State<HomeTab> {
                                     const SizedBox(height: 24),
                                     _buildTrendChart(
                                       title: 'Gas Sensors',
+                                      icon: AppIcons.gas,
                                       unit: 'V',
                                       history: chartData,
                                       theme: theme,
@@ -362,6 +367,7 @@ class _HomeTabState extends State<HomeTab> {
                                     const SizedBox(height: 24),
                                     _buildTrendChart(
                                       title: 'Humidity',
+                                      icon: AppIcons.humidity,
                                       unit: '%',
                                       history: chartData,
                                       theme: theme,
@@ -378,6 +384,7 @@ class _HomeTabState extends State<HomeTab> {
                                     const SizedBox(height: 24),
                                     _buildTrendChart(
                                       title: 'Particulate Matter',
+                                      icon: AppIcons.particulateMatter,
                                       unit: 'µg/m³',
                                       history: chartData,
                                       theme: theme,
@@ -415,8 +422,9 @@ class _HomeTabState extends State<HomeTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "Recent Alerts",
+                    IconLabel(
+                      icon: AppIcons.alerts,
+                      label: 'Recent Alerts',
                       style: TextStyle(
                         color: theme.textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.bold,
@@ -514,6 +522,7 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildTrendChart({
     required String title,
     required String unit,
+    required IconData icon,
     required List<SensorData> history,
     required ThemeData theme,
     required double height,
@@ -527,7 +536,11 @@ class _HomeTabState extends State<HomeTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        IconLabel(
+          icon: icon,
+          label: title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 12,
@@ -718,9 +731,7 @@ class LegacySensorMetricCard extends StatelessWidget {
                             ),
                       ),
                     Icon(
-                      isFault
-                          ? CupertinoIcons.exclamationmark_triangle_fill
-                          : icon,
+                      isFault ? AppIcons.warning : icon,
                       color: displayColor,
                       size: isCompact ? 20 : 24,
                     ),
@@ -728,7 +739,7 @@ class LegacySensorMetricCard extends StatelessWidget {
                 ),
               ),
               Icon(
-                CupertinoIcons.arrow_up_right,
+                AppIcons.openDetails,
                 color: Colors.grey.withValues(alpha: 0.5),
                 size: 16,
               ),

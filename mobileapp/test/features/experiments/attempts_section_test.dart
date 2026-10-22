@@ -1,3 +1,4 @@
+import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/core/storage/database_provider.dart';
 import 'package:biomass_iot_app/features/experiments/attempt.dart';
 import 'package:biomass_iot_app/features/experiments/attempt_comparison_service.dart';
@@ -235,7 +236,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.widgetWithText(ListTile, 'Without filtration #1'),
-          matching: find.byIcon(Icons.delete_outline),
+          matching: find.byIcon(AppIcons.delete),
         ),
       );
       await tester.pumpAndSettle();
@@ -253,7 +254,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.widgetWithText(ListTile, 'Without filtration #1'),
-          matching: find.byIcon(Icons.delete_outline),
+          matching: find.byIcon(AppIcons.delete),
         ),
       );
       await tester.pumpAndSettle();
