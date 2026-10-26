@@ -88,6 +88,43 @@ class _AlertsTabState extends State<AlertsTab> {
     final mediaQuery = MediaQuery.of(context);
     final isCompact = mediaQuery.size.width < 600;
     final alerts = _controller.alerts;
+    final sessionSummary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const IconLabel(
+          icon: AppIcons.alerts,
+          label: 'Session Summary',
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "${_controller.totalAlerts} alerts today",
+          style: TextStyle(
+            color: theme.textTheme.bodyLarge?.color,
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
+    );
+    final clearAllButton = ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppTheme.neonRed.withValues(alpha: 0.1),
+        foregroundColor: AppTheme.neonRed,
+        elevation: 0,
+      ),
+      onPressed: () => unawaited(_controller.clearAllAlerts()),
+      icon: const Icon(AppIcons.delete, size: 20),
+      label: const Text(
+        'Clear All',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -102,54 +139,22 @@ class _AlertsTabState extends State<AlertsTab> {
                 child: GlowingCard(
                   glowColor: AppTheme.neonOrange,
                   padding: EdgeInsets.all(isCompact ? 16 : 24),
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 16,
-                    runSpacing: 12,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const IconLabel(
-                            icon: AppIcons.alerts,
-                            label: 'Session Summary',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "${_controller.totalAlerts} alerts today",
-                            style: TextStyle(
-                              color: theme.textTheme.bodyLarge?.color,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 24,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.neonRed.withValues(
-                            alpha: 0.1,
-                          ),
-                          foregroundColor: AppTheme.neonRed,
-                          elevation: 0,
+                  child: isCompact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            sessionSummary,
+                            const SizedBox(height: 12),
+                            clearAllButton,
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            sessionSummary,
+                            const Spacer(),
+                            clearAllButton,
+                          ],
                         ),
-                        onPressed: () =>
-                            unawaited(_controller.clearAllAlerts()),
-                        icon: const Icon(AppIcons.delete, size: 20),
-                        label: const Text(
-                          "Clear All",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
               Padding(
