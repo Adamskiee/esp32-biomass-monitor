@@ -13,6 +13,7 @@ class SafetyThresholdGroup extends StatelessWidget {
     super.key,
     required this.title,
     this.icon = AppIcons.control,
+    this.color,
     required this.fields,
     required this.editor,
     required this.controllers,
@@ -25,6 +26,7 @@ class SafetyThresholdGroup extends StatelessWidget {
   });
   final String title;
   final IconData icon;
+  final Color? color;
   final List<String> fields;
   final SafetyThresholdEditor editor;
   final Map<String, TextEditingController> controllers;
@@ -53,6 +55,7 @@ class SafetyThresholdGroup extends StatelessWidget {
                 icon: icon,
                 label: title,
                 style: Theme.of(context).textTheme.titleMedium,
+                color: color,
               ),
               if (alertsOnly)
                 Text('Alerts only', style: _secondaryStyle(context)),
@@ -67,6 +70,7 @@ class SafetyThresholdGroup extends StatelessWidget {
                 expanded: expandedField == _humidityMin,
                 onToggle: () => onToggle(_humidityMin),
                 onChanged: onChanged,
+                color: color,
               ),
             for (final field in fields)
               if (!humidityPair || !_definitions[field]!.isHumidity) ...[
@@ -82,6 +86,7 @@ class SafetyThresholdGroup extends StatelessWidget {
                   onToggle: () => onToggle(field),
                   showAction: !alertsOnly,
                   onChanged: onChanged,
+                  color: color,
                 ),
               ],
           ],
@@ -103,6 +108,7 @@ class _ThresholdRow extends StatelessWidget {
     required this.onToggle,
     required this.showAction,
     required this.onChanged,
+    this.color,
   });
   final _FieldDefinition definition;
   final SafetyThresholdEditor editor;
@@ -114,6 +120,7 @@ class _ThresholdRow extends StatelessWidget {
   final VoidCallback onToggle;
   final bool showAction;
   final void Function(String field, String value) onChanged;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -133,6 +140,10 @@ class _ThresholdRow extends StatelessWidget {
           key: ValueKey('${definition.field}_header'),
           title: definition.label,
           icon: definition.icon,
+          color:
+              _status(definition, editor, reading, activeTriggers) == 'Normal'
+              ? color
+              : Theme.of(context).colorScheme.error,
           status: _status(definition, editor, reading, activeTriggers),
           details: [
             if (expanded)
@@ -239,6 +250,7 @@ class _HumidityThresholdRow extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.onChanged,
+    this.color,
   });
 
   final SafetyThresholdEditor editor;
@@ -249,6 +261,7 @@ class _HumidityThresholdRow extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final void Function(String field, String value) onChanged;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -285,6 +298,9 @@ class _HumidityThresholdRow extends StatelessWidget {
           key: const ValueKey('humidity_range_header'),
           title: 'Humidity',
           icon: AppIcons.humidity,
+          color: status == 'Normal'
+              ? color
+              : Theme.of(context).colorScheme.error,
           status: status,
           details: [
             if (expanded) 'Current: ${_format(reading.humidityPercent, '%')}',
@@ -366,6 +382,7 @@ class _SensorHeader extends StatelessWidget {
     required this.details,
     required this.expanded,
     required this.onToggle,
+    this.color,
     this.action,
   });
 
@@ -375,6 +392,7 @@ class _SensorHeader extends StatelessWidget {
   final List<String> details;
   final bool expanded;
   final VoidCallback onToggle;
+  final Color? color;
   final Widget? action;
 
   @override
@@ -388,7 +406,7 @@ class _SensorHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 20),
+            Icon(icon, size: 20, color: color),
             const SizedBox(width: 8),
             Expanded(
               child: Column(

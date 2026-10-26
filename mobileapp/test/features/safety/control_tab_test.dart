@@ -274,6 +274,46 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('safety dashboard uses shared colors for its control icons', (
+    tester,
+  ) async {
+    await mount(tester, openField: null);
+
+    void expectIconColor(Finder finder, Color color) {
+      expect(finder, findsOneWidget);
+      expect(tester.widget<Icon>(finder).color, color);
+    }
+
+    expectIconColor(
+      find.descendant(
+        of: find.byType(SwitchListTile),
+        matching: find.byIcon(AppIcons.sprinkler),
+      ),
+      AppTheme.informationLight,
+    );
+    expectIconColor(find.byIcon(AppIcons.control).first, AppTheme.successLight);
+    expectIconColor(
+      find.byIcon(AppIcons.ambientTemperature).first,
+      AppTheme.warningLight,
+    );
+    expectIconColor(
+      find.byIcon(AppIcons.gas).first,
+      AppTheme.sensorPurpleLight,
+    );
+    expectIconColor(
+      find.byIcon(AppIcons.particulateMatter).first,
+      AppTheme.informationLight,
+    );
+    expectIconColor(
+      find.descendant(
+        of: find.byKey(const ValueKey('humidity_range_header')),
+        matching: find.byIcon(AppIcons.humidity),
+      ),
+      AppTheme.informationLight,
+    );
+    await finish(tester);
+  });
+
   testWidgets('renders sensor summaries before revealing their controls', (
     tester,
   ) async {

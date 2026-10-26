@@ -307,6 +307,12 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
     final informationColor = useLightColors
         ? AppTheme.informationLight
         : AppTheme.neonBlue;
+    final warningColor = useLightColors
+        ? AppTheme.warningLight
+        : AppTheme.neonOrange;
+    final sensorPurpleColor = useLightColors
+        ? AppTheme.sensorPurpleLight
+        : AppTheme.neonPurple;
     final dangerColor = useLightColors
         ? AppTheme.dangerLight
         : AppTheme.neonRed;
@@ -320,11 +326,11 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_offline)
-          const Card(
+          Card(
             child: ListTile(
-              leading: Icon(AppIcons.wifiDisconnected),
-              title: Text('ESP32 disconnected'),
-              subtitle: Text(
+              leading: Icon(AppIcons.wifiDisconnected, color: dangerColor),
+              title: const Text('ESP32 disconnected'),
+              subtitle: const Text(
                 'Last readings are stale. Controls are unavailable.',
               ),
             ),
@@ -346,7 +352,10 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
                     ),
                     IconButton(
                       tooltip: _muted ? 'Unmute app alerts' : 'Mute app alerts',
-                      icon: Icon(_muted ? AppIcons.muted : AppIcons.volume),
+                      icon: Icon(
+                        _muted ? AppIcons.muted : AppIcons.volume,
+                        color: _muted ? dangerColor : informationColor,
+                      ),
                       onPressed: () => setState(() => _muted = !_muted),
                     ),
                   ],
@@ -378,7 +387,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
                 ),
               ),
               SwitchListTile(
-                secondary: const Icon(AppIcons.sprinkler),
+                secondary: Icon(AppIcons.sprinkler, color: informationColor),
                 title: const Text('Manual Sprinkler'),
                 subtitle: Text(
                   protection
@@ -395,11 +404,12 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
             ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: IconLabel(
             icon: AppIcons.control,
             label: 'Safety Thresholds',
+            color: successColor,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
@@ -413,6 +423,12 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
               'Particulate Matter' => AppIcons.particulateMatter,
               'Humidity' => AppIcons.humidity,
               _ => AppIcons.control,
+            },
+            color: switch (group.key) {
+              'Temperature' => warningColor,
+              'Gas' => sensorPurpleColor,
+              'Particulate Matter' || 'Humidity' => informationColor,
+              _ => successColor,
             },
             fields: group.value,
             editor: _editor,
