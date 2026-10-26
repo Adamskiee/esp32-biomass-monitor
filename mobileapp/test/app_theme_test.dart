@@ -11,6 +11,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(mockAppFonts);
 
+  test('uses the shared danger color for theme error states', () {
+    expect(AppTheme.getDarkTheme().colorScheme.error, AppTheme.neonRed);
+    expect(AppTheme.getLightTheme().colorScheme.error, AppTheme.dangerLight);
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets('default icons stay readable in ${brightness.name} mode', (
       tester,

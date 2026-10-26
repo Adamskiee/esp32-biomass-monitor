@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/icon_label.dart';
 import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
@@ -299,6 +300,22 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
         : pump == false
         ? 'IDLE'
         : 'UNAVAILABLE';
+    final useLightColors = Theme.of(context).brightness == Brightness.light;
+    final successColor = useLightColors
+        ? AppTheme.successLight
+        : AppTheme.neonGreen;
+    final informationColor = useLightColors
+        ? AppTheme.informationLight
+        : AppTheme.neonBlue;
+    final dangerColor = useLightColors
+        ? AppTheme.dangerLight
+        : AppTheme.neonRed;
+    final alertColor = triggers.isEmpty ? successColor : dangerColor;
+    final pumpColor = switch (pump) {
+      true => successColor,
+      false => informationColor,
+      _ => dangerColor,
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -320,10 +337,11 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: IconLabel(
                         icon: AppIcons.alerts,
                         label: 'Active alerts',
+                        color: alertColor,
                       ),
                     ),
                     IconButton(
@@ -346,9 +364,15 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(AppIcons.pump),
+                leading: Icon(AppIcons.pump, color: pumpColor),
                 title: const Text('Pump Status'),
-                trailing: Text(pumpLabel),
+                trailing: Text(
+                  pumpLabel,
+                  style: TextStyle(
+                    color: pumpColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 subtitle: const Text(
                   'Reported relay output; water flow is not measured.',
                 ),

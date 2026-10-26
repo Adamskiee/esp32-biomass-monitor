@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:biomass_iot_app/api_service.dart';
+import 'package:biomass_iot_app/app/app_icons.dart';
+import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/features/safety/widgets/safety_controls_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -251,6 +253,26 @@ void main() {
       await finish(tester);
     },
   );
+
+  testWidgets('active alert indicator uses the shared severity colors', (
+    tester,
+  ) async {
+    await mount(tester, openField: null);
+    expect(
+      tester.widget<Icon>(find.byIcon(AppIcons.alerts)).color,
+      AppTheme.successLight,
+    );
+
+    state['active_triggers'] = ['high_pm2_5'];
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(
+      tester.widget<Icon>(find.byIcon(AppIcons.alerts)).color,
+      AppTheme.dangerLight,
+    );
+    await finish(tester);
+  });
 
   testWidgets('renders sensor summaries before revealing their controls', (
     tester,

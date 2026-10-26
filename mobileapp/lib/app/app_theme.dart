@@ -10,6 +10,9 @@ class AppTheme {
   static const Color neonOrange = Color(0xFFFF9F0A);
   static const Color neonRed = Color(0xFFFF453A);
   static const Color neonPurple = Color(0xFFBF5AF2);
+  static const Color successLight = Color(0xFF198754);
+  static const Color informationLight = Color(0xFF0066CC);
+  static const Color dangerLight = Color(0xFFC62828);
   static const _actionIconStyle = ButtonStyle(
     iconSize: WidgetStatePropertyAll(20),
   );
@@ -28,6 +31,7 @@ class AppTheme {
     colorScheme: const ColorScheme.dark(
       primary: neonGreen,
       surface: backgroundDark,
+      error: neonRed,
     ),
   );
 
@@ -45,6 +49,7 @@ class AppTheme {
     colorScheme: const ColorScheme.light(
       primary: neonGreen,
       surface: Color(0xFFF8FAFC),
+      error: dangerLight,
     ),
   );
 }
