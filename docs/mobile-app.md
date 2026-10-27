@@ -90,12 +90,17 @@ arrives while an older page is open, the app keeps that page stable and shows a
 New records available action that returns to the refreshed first page. Session
 analytics and CSV exports continue to use the current in-memory session.
 
-To export those session readings on Android, tap the export icon beside
-**Sensor Data Log**, then **GENERATE & SHARE CSV**. The export sheet scrolls
-on smaller screens and with larger text. Android opens its share chooser with
-`Biomass_Telemetry_Export.csv` attached, so the receiving app gets a CSV file.
-The file includes the latest 60 session readings, rather than the full paginated
-log. If there are no readings or sharing fails, the app displays a message.
+To save session readings on Android or iOS, tap the download icon beside
+**Sensor Data Log**. The system Save As picker opens directly so you can choose
+a destination and filename. The suggested name is
+`Biomass_Telemetry_Export.csv`. Available destinations depend on the phone and
+its installed file providers. Cancelling returns to the monitor without saving.
+The app confirms when saving completes and displays a message if saving fails
+or there are no readings. The download button is disabled while a save is in
+progress to prevent duplicate requests.
+
+The CSV includes the latest 60 session readings, rather than the full paginated
+log. Saving on iOS requires iOS 14 or later.
 
 ## How do icons stay consistent across pages?
 

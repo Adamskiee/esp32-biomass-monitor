@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:biomass_iot_app/core/widgets/icon_label.dart';
 import 'package:biomass_iot_app/app/app_icons.dart';
@@ -12,17 +11,17 @@ import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_history_store.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_log_controller.dart';
-import 'package:biomass_iot_app/features/monitoring/telemetry_csv.dart';
+import 'package:biomass_iot_app/features/monitoring/telemetry_csv_saver.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../experiments/attempts_section.dart';
 
 class MonitorTab extends StatefulWidget {
-  const MonitorTab({super.key, this.sensorLogController});
+  const MonitorTab({super.key, this.sensorLogController, this.csvSaver});
 
   final SensorLogController? sensorLogController;
+  final Future<Uri?> Function(List<SensorData>)? csvSaver;
 
   @override
   State<MonitorTab> createState() => _MonitorTabState();
@@ -30,6 +29,7 @@ class MonitorTab extends StatefulWidget {
 
 class _MonitorTabState extends State<MonitorTab> {
   int _segIndex = 0;
+  bool _isSavingCsv = false;
   late SensorLogController _sensorLogController;
   late bool _ownsSensorLogController;
   int? _lastTelemetryRevision;
@@ -69,128 +69,30 @@ class _MonitorTabState extends State<MonitorTab> {
     super.dispose();
   }
 
-  void _exportCSV(
-    BuildContext context,
-    ThemeData theme,
-    List<SensorData> history,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: theme.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Export Telemetry Data",
-                style: TextStyle(
-                  color: theme.textTheme.bodyLarge?.color,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Export the latest session readings as a CSV file.",
-                style: TextStyle(color: Colors.grey, fontSize: 13),
-              ),
-              const SizedBox(height: 24),
-              ListTile(
-                title: Text(
-                  "Date Range",
-                  style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                ),
-                subtitle: const Text(
-                  "Current Session",
-                  style: TextStyle(color: AppTheme.neonGreen),
-                ),
-                tileColor: theme.scaffoldBackgroundColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                title: Text(
-                  "Include Sensors",
-                  style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                ),
-                subtitle: const Text(
-                  "Temperature, humidity, chamber, MQ135, MQ2, PMS",
-                  style: TextStyle(color: AppTheme.neonGreen),
-                ),
-                tileColor: theme.scaffoldBackgroundColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    backgroundColor: AppTheme.neonGreen,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(AppIcons.share),
-                  label: const Text(
-                    "GENERATE & SHARE CSV",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await _generateAndShareCSV(history);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _generateAndShareCSV(List<SensorData> history) async {
+  Future<void> _saveCSV(List<SensorData> history) async {
+    if (_isSavingCsv) return;
     if (history.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No sensor readings to export yet.')),
+        const SnackBar(content: Text('No sensor readings to save yet.')),
       );
       return;
     }
+    setState(() => _isSavingCsv = true);
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [
-            XFile.fromData(
-              utf8.encode(buildTelemetryCsv(history)),
-              mimeType: 'text/csv',
-            ),
-          ],
-          fileNameOverrides: ['Biomass_Telemetry_Export.csv'],
-          subject: 'Biomass_Telemetry_Export.csv',
-        ),
+      final savedUri = await (widget.csvSaver ?? saveTelemetryCsv)(
+        List<SensorData>.of(history),
       );
+      if (!mounted || savedUri == null) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('CSV saved successfully.')));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to export CSV. Please try again.'),
-        ),
+        const SnackBar(content: Text('Unable to save CSV. Please try again.')),
       );
+    } finally {
+      if (mounted) setState(() => _isSavingCsv = false);
     }
   }
 
@@ -375,8 +277,8 @@ class _MonitorTabState extends State<MonitorTab> {
             ),
             IconButton(
               icon: const Icon(AppIcons.download, color: AppTheme.neonGreen),
-              onPressed: () => _exportCSV(context, theme, state.history),
-              tooltip: "Export CSV",
+              onPressed: _isSavingCsv ? null : () => _saveCSV(state.history),
+              tooltip: "Save CSV",
             ),
           ],
         ),
