@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/features/monitoring/monitor_tab.dart';
@@ -83,6 +82,7 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(450, 900),
     double textScale = 1,
+    Future<Uri?> Function(List<SensorData>)? csvSaver,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -96,7 +96,10 @@ void main() {
             ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: MonitorTab(sensorLogController: logController),
+          home: MonitorTab(
+            sensorLogController: logController,
+            csvSaver: csvSaver,
+          ),
         ),
       ),
     );
@@ -104,144 +107,198 @@ void main() {
     expect(tester.takeException(), isNull);
   }
 
-  Future<void> openExport(WidgetTester tester) async {
-    await tester.scrollUntilVisible(find.byTooltip('Export CSV'), 300);
+  Future<void> download(WidgetTester tester) async {
+    await tester.scrollUntilVisible(find.byTooltip('Save CSV'), 300);
     await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('Export CSV'));
+    await tester.tap(find.byTooltip('Save CSV'));
     await tester.pumpAndSettle();
   }
 
-  Future<Completer<MethodCall>> prepareShare(
-    WidgetTester tester, {
-    bool fail = false,
-  }) async {
-    final directory = (await tester.runAsync(
-      () => Directory.systemTemp.createTemp('telemetry-export-test-'),
-    ))!;
-    final called = (await tester.runAsync(
-      () async => Completer<MethodCall>(),
-    ))!;
-    const shareChannel = MethodChannel('dev.fluttercommunity.plus/share');
-    const pathChannel = MethodChannel('plugins.flutter.io/path_provider');
-    final messenger = tester.binding.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(pathChannel, (call) async {
-      expect(call.method, 'getTemporaryDirectory');
-      return directory.path;
-    });
-    messenger.setMockMethodCallHandler(shareChannel, (call) async {
-      called.complete(call);
-      if (fail) throw PlatformException(code: 'share_failed');
-      return 'android.share.target';
-    });
-    addTearDown(() async {
-      messenger.setMockMethodCallHandler(shareChannel, null);
-      messenger.setMockMethodCallHandler(pathChannel, null);
-      await directory.delete(recursive: true);
-    });
-    return called;
-  }
-
-  testWidgets('shares a named CSV attachment containing session readings', (
+  testWidgets('opens Save As directly with a snapshot of session readings', (
     tester,
   ) async {
-    final shared = await prepareShare(tester);
-    await mount(tester);
-    state.history.add(
-      SensorData(
-        temperatureC: 31.2,
-        humidityPercent: 54.5,
-        timestamp: DateTime.utc(2026, 10, 19, 12),
-      ),
+    final pending = Completer<Uri?>();
+    List<SensorData>? saved;
+    await mount(
+      tester,
+      csvSaver: (records) {
+        saved = records;
+        return pending.future;
+      },
     );
-    await openExport(tester);
-    final call = (await tester.runAsync(() async {
-      // File IO must start outside the widget test's fake async zone.
-      tester
-          .widget<ElevatedButton>(
-            find.widgetWithText(ElevatedButton, 'GENERATE & SHARE CSV'),
-          )
-          .onPressed!();
-      return shared.future.timeout(const Duration(seconds: 5));
-    }))!;
+    final reading = SensorData(
+      temperatureC: 31.2,
+      timestamp: DateTime.utc(2026, 10, 19),
+    );
+    state.history.add(reading);
+    await download(tester);
+    expect(saved, [reading]);
+    state.history.clear();
+    expect(saved, [reading]);
+    expect(find.text('Export Telemetry Data'), findsNothing);
+    expect(find.text('GENERATE & SHARE CSV'), findsNothing);
+    expect(find.text('CSV saved successfully.'), findsNothing);
+    pending.complete(Uri.parse('content://documents/chosen.csv'));
     await tester.pumpAndSettle();
-
-    expect(call.method, 'share');
-    final arguments = call.arguments as Map;
-    expect(arguments['text'], isNull);
-    expect(arguments['mimeTypes'], ['text/csv']);
-    final paths = arguments['paths'] as List;
-    expect(paths, hasLength(1));
-    final file = File(paths.single as String);
-    expect(file.uri.pathSegments.last, 'Biomass_Telemetry_Export.csv');
-    final contents = await tester.runAsync(file.readAsString);
-    expect(
-      contents,
-      'Timestamp,Temperature(C),Humidity(%),ChamberTemperature(C),MQ135(V),MQ2(V),PM1.0(ug/m3),PM2.5(ug/m3),PM10(ug/m3)\n'
-      '2026-10-19T12:00:00.000Z,31.20,54.50,,,,,,\n',
-    );
-    expect(tester.takeException(), isNull);
+    expect(find.text('CSV saved successfully.'), findsOneWidget);
   });
 
-  testWidgets('explains when there are no session readings to export', (
-    tester,
-  ) async {
-    await mount(tester);
-    await openExport(tester);
-    await tester.tap(find.text('GENERATE & SHARE CSV'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('No sensor readings to export yet.'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+  testWidgets('does not open Save As without readings', (tester) async {
+    var calls = 0;
+    await mount(
+      tester,
+      csvSaver: (_) async {
+        calls++;
+        return null;
+      },
+    );
+    await download(tester);
+    expect(calls, 0);
+    expect(find.text('No sensor readings to save yet.'), findsOneWidget);
   });
 
-  testWidgets('shows feedback when Android sharing fails', (tester) async {
-    final shared = await prepareShare(tester, fail: true);
-    await mount(tester);
+  testWidgets('cancels silently and allows another save', (tester) async {
+    var calls = 0;
+    await mount(
+      tester,
+      csvSaver: (_) async {
+        calls++;
+        return null;
+      },
+    );
     state.history.add(SensorData(timestamp: DateTime.utc(2026, 10, 19)));
-    await openExport(tester);
-    await tester.runAsync(() async {
-      tester
-          .widget<ElevatedButton>(
-            find.widgetWithText(ElevatedButton, 'GENERATE & SHARE CSV'),
-          )
-          .onPressed!();
-      await shared.future.timeout(const Duration(seconds: 5));
-    });
-    await tester.pumpAndSettle();
+    await download(tester);
+    expect(find.byType(SnackBar), findsNothing);
+    await download(tester);
+    expect(calls, 2);
+  });
 
-    expect(
-      find.text('Unable to export CSV. Please try again.'),
-      findsOneWidget,
+  testWidgets('reports a failed save and allows retry', (tester) async {
+    var calls = 0;
+    await mount(
+      tester,
+      csvSaver: (_) async {
+        calls++;
+        if (calls == 1) throw PlatformException(code: 'save_failed');
+        return null;
+      },
     );
+    state.history.add(SensorData(timestamp: DateTime.utc(2026, 10, 19)));
+    await download(tester);
+    expect(find.text('Unable to save CSV. Please try again.'), findsOneWidget);
+    expect(find.text('CSV saved successfully.'), findsNothing);
+    await download(tester);
+    expect(calls, 2);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('prevents duplicate saves while the picker is open', (
+    tester,
+  ) async {
+    var calls = 0;
+    final pending = Completer<Uri?>();
+    await mount(
+      tester,
+      csvSaver: (_) {
+        calls++;
+        return pending.future;
+      },
+    );
+    state.history.add(SensorData(timestamp: DateTime.utc(2026, 10, 19)));
+    await tester.scrollUntilVisible(find.byTooltip('Save CSV'), 300);
+    await tester.pumpAndSettle();
+    final action = tester
+        .widget<IconButton>(
+          find.byWidgetPredicate(
+            (widget) => widget is IconButton && widget.tooltip == 'Save CSV',
+          ),
+        )
+        .onPressed!;
+    action();
+    action();
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) => widget is IconButton && widget.tooltip == 'Save CSV',
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) => widget is IconButton && widget.tooltip == 'Save CSV',
+            ),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  for (final fails in [false, true]) {
+    testWidgets(
+      'handles leaving the monitor during a ${fails ? 'failed' : 'successful'} save',
+      (tester) async {
+        final pending = Completer<Uri?>();
+        await mount(tester, csvSaver: (_) => pending.future);
+        state.history.add(SensorData(timestamp: DateTime.utc(2026, 10, 19)));
+        await download(tester);
+        await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+        if (fails) {
+          pending.completeError(PlatformException(code: 'save_failed'));
+        } else {
+          pending.complete(Uri.parse('content://documents/chosen.csv'));
+        }
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final size in [
     const Size(320, 800),
     const Size(360, 640),
     const Size(640, 360),
   ]) {
-    testWidgets('opens the CSV export sheet at $size', (tester) async {
-      await mount(tester, size: size);
-      await openExport(tester);
-
+    testWidgets('keeps Save As accessible at $size', (tester) async {
+      var called = false;
+      await mount(
+        tester,
+        size: size,
+        csvSaver: (_) async {
+          called = true;
+          return null;
+        },
+      );
+      state.history.add(SensorData(timestamp: DateTime.utc(2026, 10, 19)));
+      await download(tester);
+      expect(called, isTrue);
       expect(tester.takeException(), isNull);
-      expect(find.text('Export Telemetry Data'), findsOneWidget);
-      final generate = find.text('GENERATE & SHARE CSV');
-      await tester.ensureVisible(generate);
-      expect(generate.hitTestable(), findsOneWidget);
     });
   }
 
-  testWidgets('keeps CSV export accessible with large text', (tester) async {
-    await mount(tester, size: const Size(360, 640), textScale: 1.6);
-    await openExport(tester);
-
+  testWidgets('keeps Save As accessible with large text', (tester) async {
+    var called = false;
+    await mount(
+      tester,
+      size: const Size(360, 640),
+      textScale: 1.6,
+      csvSaver: (_) async {
+        called = true;
+        return null;
+      },
+    );
+    state.history.add(SensorData(timestamp: DateTime.utc(2026, 10, 19)));
+    await download(tester);
+    expect(called, isTrue);
     expect(tester.takeException(), isNull);
-    final generate = find.text('GENERATE & SHARE CSV');
-    await tester.ensureVisible(generate);
-    expect(generate.hitTestable(), findsOneWidget);
   });
 
   testWidgets(
