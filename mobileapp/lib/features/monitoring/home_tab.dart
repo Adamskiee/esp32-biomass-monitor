@@ -263,6 +263,7 @@ class _HomeTabState extends State<HomeTab> {
                       Wrap(
                         alignment: WrapAlignment.spaceBetween,
                         crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 16,
                         runSpacing: 16,
                         children: [
                           IconLabel(
