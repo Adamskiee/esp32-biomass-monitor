@@ -6,18 +6,22 @@ import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/core/widgets/delayed_loading.dart';
 import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
-import 'package:biomass_iot_app/database_helper.dart';
+import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'chart_history.dart';
+import 'chart_history_store.dart';
+
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  const HomeTab({super.key, this.chartHistoryReader});
+
+  final ChartHistoryReader? chartHistoryReader;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -62,29 +66,39 @@ class _HistoryChartsSkeleton extends StatelessWidget {
 
 class _HomeTabState extends State<HomeTab> {
   int _chartTimeframe = 0;
-  List<SensorData>? _historicalData;
+  ChartHistory? _historicalData;
   bool _isLoadingHistory = false;
+  bool _historyError = false;
+  int _chartRequest = 0;
+  late final ChartHistoryReader _historyReader =
+      widget.chartHistoryReader ?? ChartHistoryStore(AppDatabase());
 
   Future<void> _fetchHistoricalData(int index) async {
+    final request = ++_chartRequest;
     setState(() {
       _chartTimeframe = index;
-      if (index == 0) {
-        _historicalData = null;
-        _isLoadingHistory = false;
-      } else {
-        _isLoadingHistory = true;
-      }
+      _historicalData = null;
+      _historyError = false;
+      _isLoadingHistory = index != 0;
     });
-
-    if (index > 0) {
-      int hours = index == 1 ? 1 : 24;
-      final data = await DatabaseHelper().getAggregatedSensorData(hours);
-      if (mounted) {
-        setState(() {
-          _historicalData = data;
-          _isLoadingHistory = false;
-        });
-      }
+    if (index == 0) return;
+    final through = DateTime.now();
+    final since = index == 3
+        ? null
+        : through.subtract(Duration(hours: index == 1 ? 1 : 24));
+    try {
+      final data = await _historyReader.load(since: since, through: through);
+      if (!mounted || request != _chartRequest) return;
+      setState(() {
+        _historicalData = data;
+        _isLoadingHistory = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _chartRequest) return;
+      setState(() {
+        _historyError = true;
+        _isLoadingHistory = false;
+      });
     }
   }
 
@@ -111,7 +125,12 @@ class _HomeTabState extends State<HomeTab> {
           child: RefreshIndicator(
             color: AppTheme.neonGreen,
             backgroundColor: theme.cardColor,
-            onRefresh: () => state.forceRefresh(),
+            onRefresh: () async {
+              await state.forceRefresh();
+              if (mounted && _chartTimeframe != 0) {
+                await _fetchHistoricalData(_chartTimeframe);
+              }
+            },
             child: ListView(
               padding: EdgeInsets.only(
                 left: isCompact ? 16 : 24,
@@ -248,35 +267,23 @@ class _HomeTabState extends State<HomeTab> {
                               fontSize: 16,
                             ),
                           ),
-                          CupertinoSegmentedControl<int>(
-                            selectedColor: AppTheme.neonBlue,
-                            borderColor: AppTheme.neonBlue,
-                            unselectedColor: theme.cardColor,
-                            groupValue: _chartTimeframe,
-                            children: const {
-                              0: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  "Live",
-                                  style: TextStyle(fontSize: 11),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final entry in const {
+                                0: 'Live',
+                                1: '1H',
+                                2: '24H',
+                                3: 'All time',
+                              }.entries)
+                                ChoiceChip(
+                                  label: Text(entry.value),
+                                  selected: _chartTimeframe == entry.key,
+                                  onSelected: (_) =>
+                                      _fetchHistoricalData(entry.key),
                                 ),
-                              ),
-                              1: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  "1H",
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ),
-                              2: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  "24H",
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ),
-                            },
-                            onValueChanged: _fetchHistoricalData,
+                            ],
                           ),
                         ],
                       ),
@@ -284,7 +291,7 @@ class _HomeTabState extends State<HomeTab> {
                       Text(
                         _chartTimeframe == 0
                             ? "Recent readings. Tap a chart for values."
-                            : "Historical average trends.",
+                            : "Saved readings for the selected period. Charts show averages; statistics use every reading. Pull down to refresh.",
                         style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 12,
@@ -293,10 +300,23 @@ class _HomeTabState extends State<HomeTab> {
                       const SizedBox(height: 24),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final chartData = _chartTimeframe == 0
-                              ? state.history
+                          final chartHistory = _chartTimeframe == 0
+                              ? ChartHistory.fromReadings(state.history)
                               : (_historicalData ??
-                                    (_isLoadingHistory ? state.history : []));
+                                    ChartHistory.fromReadings([]));
+                          final chartData = chartHistory.points;
+                          if (_historyError) {
+                            return Column(
+                              children: [
+                                const Text('Unable to load chart history.'),
+                                TextButton(
+                                  onPressed: () =>
+                                      _fetchHistoricalData(_chartTimeframe),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            );
+                          }
                           return DelayedLoading(
                             isLoading: _isLoadingHistory,
                             hasContent: chartData.isNotEmpty,
@@ -328,18 +348,19 @@ class _HomeTabState extends State<HomeTab> {
                                       icon: AppIcons.ambientTemperature,
                                       unit: '°C',
                                       history: chartData,
+                                      statistics: chartHistory.statistics,
                                       theme: theme,
                                       height: chartHeight,
                                       series: [
                                         _TrendSeries(
                                           label: 'Ambient',
                                           color: AppTheme.neonOrange,
-                                          valueFor: (data) => data.temperatureC,
+                                          metric: SensorMetric.ambient,
                                         ),
                                         _TrendSeries(
                                           label: 'Chamber',
                                           color: AppTheme.neonRed,
-                                          valueFor: (data) => data.chamberTempC,
+                                          metric: SensorMetric.chamber,
                                         ),
                                       ],
                                     ),
@@ -349,18 +370,19 @@ class _HomeTabState extends State<HomeTab> {
                                       icon: AppIcons.gas,
                                       unit: 'V',
                                       history: chartData,
+                                      statistics: chartHistory.statistics,
                                       theme: theme,
                                       height: chartHeight,
                                       series: [
                                         _TrendSeries(
                                           label: 'MQ2',
                                           color: AppTheme.neonPurple,
-                                          valueFor: (data) => data.mq2V,
+                                          metric: SensorMetric.mq2,
                                         ),
                                         _TrendSeries(
                                           label: 'MQ135',
                                           color: AppTheme.neonBlue,
-                                          valueFor: (data) => data.mq135V,
+                                          metric: SensorMetric.mq135,
                                         ),
                                       ],
                                     ),
@@ -370,14 +392,14 @@ class _HomeTabState extends State<HomeTab> {
                                       icon: AppIcons.humidity,
                                       unit: '%',
                                       history: chartData,
+                                      statistics: chartHistory.statistics,
                                       theme: theme,
                                       height: chartHeight,
                                       series: [
                                         _TrendSeries(
                                           label: 'Relative humidity',
                                           color: AppTheme.neonBlue,
-                                          valueFor: (data) =>
-                                              data.humidityPercent,
+                                          metric: SensorMetric.humidity,
                                         ),
                                       ],
                                     ),
@@ -387,23 +409,24 @@ class _HomeTabState extends State<HomeTab> {
                                       icon: AppIcons.particulateMatter,
                                       unit: 'µg/m³',
                                       history: chartData,
+                                      statistics: chartHistory.statistics,
                                       theme: theme,
                                       height: chartHeight,
                                       series: [
                                         _TrendSeries(
                                           label: 'PM1.0',
                                           color: AppTheme.neonGreen,
-                                          valueFor: (data) => data.pm1_0UgM3,
+                                          metric: SensorMetric.pm1,
                                         ),
                                         _TrendSeries(
                                           label: 'PM2.5',
                                           color: AppTheme.neonBlue,
-                                          valueFor: (data) => data.pm2_5UgM3,
+                                          metric: SensorMetric.pm25,
                                         ),
                                         _TrendSeries(
                                           label: 'PM10',
                                           color: AppTheme.neonOrange,
-                                          valueFor: (data) => data.pm10UgM3,
+                                          metric: SensorMetric.pm10,
                                         ),
                                       ],
                                     ),
@@ -527,6 +550,7 @@ class _HomeTabState extends State<HomeTab> {
     required ThemeData theme,
     required double height,
     required List<_TrendSeries> series,
+    required Map<SensorMetric, SensorStatistics> statistics,
   }) {
     final availableSeries = series
         .where(
@@ -566,6 +590,15 @@ class _HomeTabState extends State<HomeTab> {
               .toList(),
         ),
         const SizedBox(height: 12),
+        for (final item in series)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              _statisticsLabel(item, statistics[item.metric], unit),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        const SizedBox(height: 6),
         SizedBox(
           height: height,
           child: availableSeries.isEmpty
@@ -580,6 +613,18 @@ class _HomeTabState extends State<HomeTab> {
         ),
       ],
     );
+  }
+
+  String _statisticsLabel(
+    _TrendSeries series,
+    SensorStatistics? stats,
+    String unit,
+  ) {
+    if (stats?.peak == null || stats?.average == null) {
+      return '${series.label}: No data';
+    }
+    final decimals = unit == 'V' ? 2 : 1;
+    return '${series.label}: Peak ${stats!.peak!.toStringAsFixed(decimals)} $unit · Average ${stats.average!.toStringAsFixed(decimals)} $unit';
   }
 
   LineChartData _buildChartData(
@@ -656,12 +701,14 @@ class _TrendSeries {
   const _TrendSeries({
     required this.label,
     required this.color,
-    required this.valueFor,
+    required this.metric,
   });
 
   final String label;
   final Color color;
-  final double? Function(SensorData data) valueFor;
+  final SensorMetric metric;
+
+  double? valueFor(SensorData data) => metric.valueFor(data);
 }
 
 class LegacySensorMetricCard extends StatelessWidget {
