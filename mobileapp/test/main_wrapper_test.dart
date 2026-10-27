@@ -352,10 +352,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('29.5 °C'), findsOneWidget);
     expect(find.text('26.5 °C'), findsNothing);
-    await tester.scrollUntilVisible(
-      find.text('Real-Time Telemetry Trends'),
-      150,
-    );
+    await tester.scrollUntilVisible(find.text('Telemetry Trends'), 150);
     expect(find.byType(LineChart), findsNWidgets(4));
     final charts = tester
         .widgetList<LineChart>(find.byType(LineChart))
@@ -392,9 +389,10 @@ void main() {
       FlSpot(0, 18),
       FlSpot(1, 19),
     ]);
-    expect(find.text('Temperature'), findsOneWidget);
-    expect(find.text('Gas Sensors'), findsOneWidget);
-    expect(find.text('Particulate Matter'), findsOneWidget);
+    expect(find.textContaining('Updating live'), findsOneWidget);
+    expect(find.text('Temperature (°C)'), findsOneWidget);
+    expect(find.text('Gas Sensors (V)'), findsOneWidget);
+    expect(find.text('Particulate Matter (µg/m³)'), findsOneWidget);
     await dispose(tester);
   });
 
@@ -438,10 +436,7 @@ void main() {
     pm10 = 19.0;
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.scrollUntilVisible(
-      find.text('Real-Time Telemetry Trends'),
-      150,
-    );
+    await tester.scrollUntilVisible(find.text('Telemetry Trends'), 150);
     final particulateChart = tester
         .widgetList<LineChart>(find.byType(LineChart))
         .toList()[3];
@@ -489,10 +484,7 @@ void main() {
       await mount(tester);
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('Real-Time Telemetry Trends'),
-        150,
-      );
+      await tester.scrollUntilVisible(find.text('Telemetry Trends'), 150);
       final chart = tester.widget<LineChart>(find.byType(LineChart).first);
       expect(chart.data.lineBarsData, hasLength(1));
       final bar = chart.data.lineBarsData.single;
@@ -516,10 +508,7 @@ void main() {
     await mount(tester);
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.scrollUntilVisible(
-      find.text('Real-Time Telemetry Trends'),
-      150,
-    );
+    await tester.scrollUntilVisible(find.text('Telemetry Trends'), 150);
     final charts = tester
         .widgetList<LineChart>(find.byType(LineChart))
         .toList();
@@ -547,10 +536,7 @@ void main() {
     await mount(tester);
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.scrollUntilVisible(
-      find.text('Real-Time Telemetry Trends'),
-      150,
-    );
+    await tester.scrollUntilVisible(find.text('Telemetry Trends'), 150);
     expect(find.byType(LineChart), findsNothing);
     for (final title in [
       'Temperature',
@@ -602,10 +588,7 @@ void main() {
     chamber = null;
     await mount(tester);
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Real-Time Telemetry Trends'),
-      150,
-    );
+    await tester.scrollUntilVisible(find.text('Telemetry Trends'), 150);
     final chartFinder = find.byType(LineChart).first;
     await tester.ensureVisible(chartFinder);
     await tester.pump();

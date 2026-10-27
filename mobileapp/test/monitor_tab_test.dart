@@ -344,29 +344,28 @@ void main() {
     await mount(tester);
 
     expect(find.text('Air Quality'), findsNothing);
-    expect(find.text('Ambient Temperature'), findsOneWidget);
-    expect(find.text('PM2.5'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.textContaining('Ambient Temp: 31.2 °C'),
       300,
     );
+    expect(find.textContaining('Chamber Temp: 58.4 °C'), findsOneWidget);
     expect(find.textContaining('Ambient Temp: 31.2 °C'), findsOneWidget);
     expect(find.textContaining('Humidity: 54.5 %'), findsOneWidget);
     expect(find.textContaining('MQ-135: 0.75 V'), findsOneWidget);
+    expect(find.textContaining('MQ-2: 1.75 V'), findsOneWidget);
     expect(find.textContaining('PM1.0: 8 µg/m³'), findsOneWidget);
+    expect(find.textContaining('PM2.5: 12 µg/m³'), findsOneWidget);
+    expect(find.textContaining('PM10: 18 µg/m³'), findsOneWidget);
   });
 
-  testWidgets('groups session analytics by sensor type', (tester) async {
+  testWidgets('opens directly to sensor records', (tester) async {
+    await history.insertSensorData(
+      SensorData(temperatureC: 25, timestamp: DateTime(2026, 10, 7)),
+    );
     await mount(tester);
-
-    expect(find.text('Temperature'), findsOneWidget);
-    expect(find.text('Gas Sensors'), findsOneWidget);
-    expect(find.text('Particulate Matter'), findsOneWidget);
-    expect(find.text('Chamber Temperature'), findsOneWidget);
-    expect(find.text('Ambient Temperature'), findsOneWidget);
-    expect(find.text('Humidity'), findsOneWidget);
-    expect(find.text('Peak'), findsNWidgets(8));
-    expect(find.text('Average'), findsNWidgets(8));
+    expect(find.text('Session Analytics'), findsNothing);
+    expect(find.text('Sensor Data Log').hitTestable(), findsOneWidget);
+    expect(find.text('Telemetry Record').hitTestable(), findsOneWidget);
   });
 
   testWidgets('shows ten records per page with navigation controls', (

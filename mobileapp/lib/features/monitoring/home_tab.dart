@@ -6,18 +6,23 @@ import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/core/widgets/glowing_card.dart';
 import 'package:biomass_iot_app/core/widgets/delayed_loading.dart';
 import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
-import 'package:biomass_iot_app/database_helper.dart';
+import 'package:biomass_iot_app/core/storage/app_database.dart';
 import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
 import 'package:biomass_iot_app/features/monitoring/widgets/sensor_metric_card.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'chart_history.dart';
+import 'chart_history_store.dart';
+import 'telemetry_time_format.dart';
+import 'widgets/sensor_trend_chart.dart';
+
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  const HomeTab({super.key, this.chartHistoryReader});
+
+  final ChartHistoryReader? chartHistoryReader;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -62,29 +67,45 @@ class _HistoryChartsSkeleton extends StatelessWidget {
 
 class _HomeTabState extends State<HomeTab> {
   int _chartTimeframe = 0;
-  List<SensorData>? _historicalData;
+  ChartHistory? _historicalData;
   bool _isLoadingHistory = false;
+  bool _historyError = false;
+  int _chartRequest = 0;
+  DateTime? _snapshotSince;
+  DateTime? _snapshotThrough;
+  late final ChartHistoryReader _historyReader =
+      widget.chartHistoryReader ?? ChartHistoryStore(AppDatabase());
 
   Future<void> _fetchHistoricalData(int index) async {
+    final request = ++_chartRequest;
     setState(() {
       _chartTimeframe = index;
-      if (index == 0) {
-        _historicalData = null;
-        _isLoadingHistory = false;
-      } else {
-        _isLoadingHistory = true;
-      }
+      _historicalData = null;
+      _snapshotSince = null;
+      _snapshotThrough = null;
+      _historyError = false;
+      _isLoadingHistory = index != 0;
     });
-
-    if (index > 0) {
-      int hours = index == 1 ? 1 : 24;
-      final data = await DatabaseHelper().getAggregatedSensorData(hours);
-      if (mounted) {
-        setState(() {
-          _historicalData = data;
-          _isLoadingHistory = false;
-        });
-      }
+    if (index == 0) return;
+    final through = DateTime.now();
+    final since = index == 3
+        ? null
+        : through.subtract(Duration(hours: index == 1 ? 1 : 24));
+    try {
+      final data = await _historyReader.load(since: since, through: through);
+      if (!mounted || request != _chartRequest) return;
+      setState(() {
+        _historicalData = data;
+        _snapshotSince = since;
+        _snapshotThrough = through;
+        _isLoadingHistory = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _chartRequest) return;
+      setState(() {
+        _historyError = true;
+        _isLoadingHistory = false;
+      });
     }
   }
 
@@ -111,7 +132,12 @@ class _HomeTabState extends State<HomeTab> {
           child: RefreshIndicator(
             color: AppTheme.neonGreen,
             backgroundColor: theme.cardColor,
-            onRefresh: () => state.forceRefresh(),
+            onRefresh: () async {
+              await state.forceRefresh();
+              if (mounted && _chartTimeframe != 0) {
+                await _fetchHistoricalData(_chartTimeframe);
+              }
+            },
             child: ListView(
               padding: EdgeInsets.only(
                 left: isCompact ? 16 : 24,
@@ -237,66 +263,83 @@ class _HomeTabState extends State<HomeTab> {
                       Wrap(
                         alignment: WrapAlignment.spaceBetween,
                         crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 16,
                         runSpacing: 16,
                         children: [
                           IconLabel(
                             icon: AppIcons.trends,
-                            label: 'Real-Time Telemetry Trends',
+                            label: 'Telemetry Trends',
                             style: TextStyle(
                               color: theme.textTheme.bodyLarge?.color,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
-                          CupertinoSegmentedControl<int>(
-                            selectedColor: AppTheme.neonBlue,
-                            borderColor: AppTheme.neonBlue,
-                            unselectedColor: theme.cardColor,
-                            groupValue: _chartTimeframe,
-                            children: const {
-                              0: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  "Live",
-                                  style: TextStyle(fontSize: 11),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final entry in const {
+                                0: 'Live',
+                                1: '1H',
+                                2: '24H',
+                                3: 'All time',
+                              }.entries)
+                                ChoiceChip(
+                                  label: Text(entry.value),
+                                  selected: _chartTimeframe == entry.key,
+                                  onSelected: (_) =>
+                                      _fetchHistoricalData(entry.key),
                                 ),
-                              ),
-                              1: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  "1H",
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ),
-                              2: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  "24H",
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ),
-                            },
-                            onValueChanged: _fetchHistoricalData,
+                            ],
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        _chartTimeframe == 0
-                            ? "Recent readings. Tap a chart for values."
-                            : "Historical average trends.",
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 12,
+                      if (_chartTimeframe == 0)
+                        Text(
+                          'Recent ${state.history.length} readings${isHardwareConnected ? ' · Updating live' : ''}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        )
+                      else if (_snapshotThrough != null) ...[
+                        Text(
+                          _snapshotSince == null
+                              ? 'All saved readings · As of ${formatTelemetryTimestamp(context, _snapshotThrough!)}'
+                              : 'Selected period: ${formatTelemetryTimestamp(context, _snapshotSince!)} – ${formatTelemetryTimestamp(context, _snapshotThrough!)}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Pull down to refresh',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final chartData = _chartTimeframe == 0
-                              ? state.history
+                          final chartHistory = _chartTimeframe == 0
+                              ? ChartHistory.fromReadings(state.history)
                               : (_historicalData ??
-                                    (_isLoadingHistory ? state.history : []));
+                                    ChartHistory.fromReadings([]));
+                          final chartData = chartHistory.points;
+                          if (_historyError) {
+                            return Column(
+                              children: [
+                                const Text('Unable to load chart history.'),
+                                TextButton(
+                                  onPressed: () =>
+                                      _fetchHistoricalData(_chartTimeframe),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            );
+                          }
                           return DelayedLoading(
                             isLoading: _isLoadingHistory,
                             hasContent: chartData.isNotEmpty,
@@ -323,87 +366,102 @@ class _HomeTabState extends State<HomeTab> {
                                     : 250.0;
                                 return Column(
                                   children: [
-                                    _buildTrendChart(
+                                    SensorTrendChart(
+                                      key: ValueKey(
+                                        'Temperature-$_chartTimeframe',
+                                      ),
                                       title: 'Temperature',
                                       icon: AppIcons.ambientTemperature,
                                       unit: '°C',
                                       history: chartData,
-                                      theme: theme,
+                                      statistics: chartHistory.statistics,
+                                      isLive: _chartTimeframe == 0,
                                       height: chartHeight,
                                       series: [
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'Ambient',
                                           color: AppTheme.neonOrange,
-                                          valueFor: (data) => data.temperatureC,
+                                          metric: SensorMetric.ambient,
                                         ),
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'Chamber',
                                           color: AppTheme.neonRed,
-                                          valueFor: (data) => data.chamberTempC,
+                                          metric: SensorMetric.chamber,
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 24),
-                                    _buildTrendChart(
+                                    SensorTrendChart(
+                                      key: ValueKey(
+                                        'Gas Sensors-$_chartTimeframe',
+                                      ),
                                       title: 'Gas Sensors',
                                       icon: AppIcons.gas,
                                       unit: 'V',
                                       history: chartData,
-                                      theme: theme,
+                                      statistics: chartHistory.statistics,
+                                      isLive: _chartTimeframe == 0,
                                       height: chartHeight,
                                       series: [
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'MQ2',
                                           color: AppTheme.neonPurple,
-                                          valueFor: (data) => data.mq2V,
+                                          metric: SensorMetric.mq2,
                                         ),
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'MQ135',
                                           color: AppTheme.neonBlue,
-                                          valueFor: (data) => data.mq135V,
+                                          metric: SensorMetric.mq135,
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 24),
-                                    _buildTrendChart(
+                                    SensorTrendChart(
+                                      key: ValueKey(
+                                        'Humidity-$_chartTimeframe',
+                                      ),
                                       title: 'Humidity',
                                       icon: AppIcons.humidity,
                                       unit: '%',
                                       history: chartData,
-                                      theme: theme,
+                                      statistics: chartHistory.statistics,
+                                      isLive: _chartTimeframe == 0,
                                       height: chartHeight,
                                       series: [
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'Relative humidity',
                                           color: AppTheme.neonBlue,
-                                          valueFor: (data) =>
-                                              data.humidityPercent,
+                                          metric: SensorMetric.humidity,
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 24),
-                                    _buildTrendChart(
+                                    SensorTrendChart(
+                                      key: ValueKey(
+                                        'Particulate Matter-$_chartTimeframe',
+                                      ),
                                       title: 'Particulate Matter',
                                       icon: AppIcons.particulateMatter,
                                       unit: 'µg/m³',
                                       history: chartData,
-                                      theme: theme,
+                                      statistics: chartHistory.statistics,
+                                      isLive: _chartTimeframe == 0,
                                       height: chartHeight,
                                       series: [
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'PM1.0',
                                           color: AppTheme.neonGreen,
-                                          valueFor: (data) => data.pm1_0UgM3,
+                                          metric: SensorMetric.pm1,
                                         ),
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'PM2.5',
                                           color: AppTheme.neonBlue,
-                                          valueFor: (data) => data.pm2_5UgM3,
+                                          metric: SensorMetric.pm25,
                                         ),
-                                        _TrendSeries(
+                                        SensorTrendSeries(
                                           label: 'PM10',
                                           color: AppTheme.neonOrange,
-                                          valueFor: (data) => data.pm10UgM3,
+                                          metric: SensorMetric.pm10,
                                         ),
                                       ],
                                     ),
@@ -518,150 +576,6 @@ class _HomeTabState extends State<HomeTab> {
     final minutes = (data.mqWarmupRemainingSeconds / 60).ceil();
     return 'Warming up: $minutes min remaining';
   }
-
-  Widget _buildTrendChart({
-    required String title,
-    required String unit,
-    required IconData icon,
-    required List<SensorData> history,
-    required ThemeData theme,
-    required double height,
-    required List<_TrendSeries> series,
-  }) {
-    final availableSeries = series
-        .where(
-          (item) => history.any((reading) => item.valueFor(reading) != null),
-        )
-        .toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        IconLabel(
-          icon: icon,
-          label: title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 6,
-          children: availableSeries
-              .map(
-                (item) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: item.color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(item.label, style: const TextStyle(fontSize: 12)),
-                  ],
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: height,
-          child: availableSeries.isEmpty
-              ? Center(child: Text('No readings available for $title'))
-              : LineChart(
-                  _buildChartData(history, theme, unit, availableSeries),
-                  // Reset cached tooltips and bar animations when sensors change.
-                  key: ValueKey(
-                    availableSeries.map((item) => item.label).join('|'),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
-  LineChartData _buildChartData(
-    List<SensorData> history,
-    ThemeData theme,
-    String unit,
-    List<_TrendSeries> series,
-  ) {
-    return LineChartData(
-      lineTouchData: LineTouchData(
-        touchTooltipData: LineTouchTooltipData(
-          getTooltipColor: (spot) => theme.cardColor.withValues(alpha: 0.9),
-          getTooltipItems: (touchedSpots) {
-            return touchedSpots.map((spot) {
-              final item = series[spot.barIndex];
-              return LineTooltipItem(
-                '${item.label}: ${spot.y.toStringAsFixed(unit == 'V' ? 2 : 1)} $unit',
-                TextStyle(color: item.color, fontWeight: FontWeight.bold),
-              );
-            }).toList();
-          },
-        ),
-      ),
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (val) => FlLine(
-          color: theme.dividerColor.withValues(alpha: 0.5),
-          strokeWidth: 1,
-          dashArray: [5, 5],
-        ),
-      ),
-      titlesData: FlTitlesData(
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 40,
-            getTitlesWidget: (val, _) => Text(
-              val.toInt().toString(),
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
-            ),
-          ),
-        ),
-        rightTitles: const AxisTitles(
-          sideTitles: SideTitles(showTitles: false),
-        ),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        bottomTitles: const AxisTitles(
-          sideTitles: SideTitles(showTitles: false),
-        ),
-      ),
-      borderData: FlBorderData(show: false),
-      lineBarsData: series
-          .map(
-            (item) => LineChartBarData(
-              spots: List.generate(
-                history.length,
-                (index) => item.valueFor(history[index]) == null
-                    ? FlSpot.nullSpot
-                    : FlSpot(index.toDouble(), item.valueFor(history[index])!),
-              ),
-              isCurved: true,
-              color: item.color,
-              barWidth: 3,
-              dotData: const FlDotData(show: false),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _TrendSeries {
-  const _TrendSeries({
-    required this.label,
-    required this.color,
-    required this.valueFor,
-  });
-
-  final String label;
-  final Color color;
-  final double? Function(SensorData data) valueFor;
 }
 
 class LegacySensorMetricCard extends StatelessWidget {

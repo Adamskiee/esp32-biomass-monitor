@@ -5,7 +5,6 @@ import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:biomass_iot_app/app/app_state_provider.dart';
 import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/storage/app_database.dart';
-import 'package:biomass_iot_app/core/widgets/fluid_tile_grid.dart';
 import 'package:biomass_iot_app/core/widgets/delayed_loading.dart';
 import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/features/monitoring/sensor_data.dart';
@@ -167,7 +166,6 @@ class _MonitorTabState extends State<MonitorTab> {
   }
 
   Widget _buildSensorsView(AppStateProvider state, ThemeData theme) {
-    final stats = state.getSessionAnalytics();
     final isCompact = MediaQuery.of(context).size.width < 600;
 
     return ListView(
@@ -178,89 +176,6 @@ class _MonitorTabState extends State<MonitorTab> {
         bottom: 100,
       ),
       children: [
-        IconLabel(
-          icon: AppIcons.analytics,
-          label: 'Session Analytics',
-          style: TextStyle(
-            color: theme.textTheme.bodyLarge?.color,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _analyticsSection('Temperature', AppIcons.ambientTemperature, [
-          _analyticsCard(
-            'Chamber Temperature',
-            AppIcons.chamberTemperature,
-            '${stats['maxT']} °C',
-            '${stats['avgT']} °C',
-            AppTheme.neonOrange,
-            theme,
-          ),
-          _analyticsCard(
-            'Ambient Temperature',
-            AppIcons.ambientTemperature,
-            '${stats['maxAmbientTemp']} °C',
-            '${stats['avgAmbientTemp']} °C',
-            AppTheme.neonOrange,
-            theme,
-          ),
-          _analyticsCard(
-            'Humidity',
-            AppIcons.humidity,
-            '${stats['maxHumidity']} %',
-            '${stats['avgHumidity']} %',
-            AppTheme.neonBlue,
-            theme,
-          ),
-        ], theme),
-        const SizedBox(height: 24),
-        _analyticsSection('Gas Sensors', AppIcons.gas, [
-          _analyticsCard(
-            'MQ-2',
-            AppIcons.smoke,
-            '${stats['maxMq2']} V',
-            '${stats['avgMq2']} V',
-            AppTheme.neonRed,
-            theme,
-          ),
-          _analyticsCard(
-            'MQ-135',
-            AppIcons.gas,
-            '${stats['maxMq135']} V',
-            '${stats['avgMq135']} V',
-            AppTheme.neonPurple,
-            theme,
-          ),
-        ], theme),
-        const SizedBox(height: 24),
-        _analyticsSection('Particulate Matter', AppIcons.particulateMatter, [
-          _analyticsCard(
-            'PM1.0',
-            AppIcons.particulateMatter,
-            '${stats['maxPm1_0']} µg/m³',
-            '${stats['avgPm1_0']} µg/m³',
-            AppTheme.neonGreen,
-            theme,
-          ),
-          _analyticsCard(
-            'PM2.5',
-            AppIcons.particulateMatter,
-            '${stats['maxPm2_5']} µg/m³',
-            '${stats['avgPm2_5']} µg/m³',
-            AppTheme.neonGreen,
-            theme,
-          ),
-          _analyticsCard(
-            'PM10',
-            AppIcons.particulateMatter,
-            '${stats['maxPm10']} µg/m³',
-            '${stats['avgPm10']} µg/m³',
-            AppTheme.neonGreen,
-            theme,
-          ),
-        ], theme),
-        const SizedBox(height: 32),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -470,91 +385,6 @@ class _MonitorTabState extends State<MonitorTab> {
     return Text(
       '$label: $reading $unit',
       style: const TextStyle(color: Colors.grey, fontSize: 12),
-    );
-  }
-
-  Widget _analyticsSection(
-    String title,
-    IconData icon,
-    List<Widget> cards,
-    ThemeData theme,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        IconLabel(
-          icon: icon,
-          label: title,
-          style: TextStyle(
-            color: theme.textTheme.bodyLarge?.color,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        FluidTileGrid(minTileWidth: 240, children: cards),
-      ],
-    );
-  }
-
-  Widget _analyticsCard(
-    String title,
-    IconData icon,
-    String peak,
-    String average,
-    Color color,
-    ThemeData theme,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconLabel(
-            icon: icon,
-            color: color,
-            label: title,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _analyticsValue('Peak', peak, color),
-              Container(width: 1, height: 38, color: theme.dividerColor),
-              _analyticsValue('Average', average, color),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _analyticsValue(String label, String value, Color color) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
