@@ -56,8 +56,19 @@ void main() {
           timestamp: DateTime.utc(2026, 10, 19, 12),
         ),
       ];
+      String datedName(DateTime date) {
+        final month = date.month.toString().padLeft(2, '0');
+        final day = date.day.toString().padLeft(2, '0');
+        final hour = date.hour.toString().padLeft(2, '0');
+        final minute = date.minute.toString().padLeft(2, '0');
+        final second = date.second.toString().padLeft(2, '0');
+        return 'Biomass_Telemetry_Export_${date.year}-$month-${day}_$hour-$minute-$second.csv';
+      }
+
+      final before = DateTime.now();
       expect(await saveTelemetryCsv(history), picker.result);
-      expect(picker.savedName, 'Biomass_Telemetry_Export.csv');
+      final after = DateTime.now();
+      expect(picker.savedName, anyOf(datedName(before), datedName(after)));
       expect(picker.savedMimeType, 'text/csv');
       expect(utf8.decode(picker.savedBytes!), buildTelemetryCsv(history));
     },

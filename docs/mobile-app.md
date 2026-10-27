@@ -92,9 +92,9 @@ analytics and CSV exports continue to use the current in-memory session.
 
 To save session readings on Android or iOS, tap the download icon beside
 **Sensor Data Log**. The system Save As picker opens directly so you can choose
-a destination and filename. The suggested name is
-`Biomass_Telemetry_Export.csv`. Available destinations depend on the phone and
-its installed file providers. Cancelling returns to the monitor without saving.
+a destination and filename. The suggested filename includes the phone's local
+date and time, for example `Biomass_Telemetry_Export_2026-10-27_13-30-45.csv`.
+Available destinations depend on the phone and its installed file providers. Cancelling returns to the monitor without saving.
 The app confirms when saving completes and displays a message if saving fails
 or there are no readings. The download button is disabled while a save is in
 progress to prevent duplicate requests.
