@@ -1,0 +1,79 @@
+name: Recover Android signing key
+
+on:
+  workflow_dispatch:
+    inputs:
+      recovery_public_key:
+        description: ASCII-armored GPG public key generated on the recovery computer
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Encrypt signing backup
+        shell: bash
+        env:
+          RECOVERY_PUBLIC_KEY: ${{ inputs.recovery_public_key }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          recovery_dir=$(mktemp -d "$RUNNER_TEMP/signing-recovery.XXXXXX")
+          trap 'rm -rf "$recovery_dir"' EXIT
+          export GNUPGHOME="$recovery_dir/gnupg"
+          mkdir -m 700 "$GNUPGHOME" "$recovery_dir/bundle"
+          for secret in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEY_ALIAS; do
+            test -n "${!secret}" || { echo "Missing required signing secret: $secret" >&2; exit 1; }
+          done
+          printf '%s\n' "$RECOVERY_PUBLIC_KEY" > "$recovery_dir/public.asc"
+          python3 - "$recovery_dir/bundle" <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          bundle = Path(sys.argv[1])
+          try:
+              encoded = ''.join(os.environ['ANDROID_KEYSTORE_BASE64'].split())
+              keystore = base64.b64decode(encoded, validate=True)
+              if not keystore:
+                  raise ValueError('Empty keystore')
+          except ValueError:
+              sys.exit('The keystore secret is empty or invalid base64')
+          (bundle / 'release.jks').write_bytes(keystore)
+          credentials = {
+              'storePassword': os.environ['ANDROID_KEYSTORE_PASSWORD'],
+              'keyPassword': os.environ['ANDROID_KEY_PASSWORD'],
+              'keyAlias': os.environ['ANDROID_KEY_ALIAS'],
+          }
+          (bundle / 'signing-credentials.json').write_text(json.dumps(credentials))
+          PY
+          if ! keytool -list -keystore "$recovery_dir/bundle/release.jks" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
+            echo 'Keystore validation failed: check the keystore, store password, and alias secrets' >&2
+            exit 1
+          fi
+          tar -czf "$recovery_dir/signing-backup.tar.gz" -C "$recovery_dir/bundle" release.jks signing-credentials.json
+          gpg --batch --no-options --recipient-file "$recovery_dir/public.asc" \
+            --output "$RUNNER_TEMP/android-signing-backup.tar.gz.gpg" \
+            --encrypt "$recovery_dir/signing-backup.tar.gz"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-signing-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-signing-backup.tar.gz.gpg
+          if-no-files-found: error
+          retention-days: 1

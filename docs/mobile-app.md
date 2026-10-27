@@ -341,6 +341,10 @@ Add the encoded output and the passwords to these GitHub repository secrets:
 and `ANDROID_KEY_ALIAS`. Keep the keystore and its passwords out of the
 repository. The release workflow reconstructs them only on its runner.
 
+If the local keystore is lost while these secrets still exist, follow
+[the signing key recovery guide](android-signing-recovery.md) to download an
+encrypted backup of the keystore and its credentials.
+
 Set the built-in version in `mobileapp/pubspec.yaml` before tagging. The
 three-part version must exactly match the release tag; the `+BUILD` suffix can
 remain a local build counter because GitHub Actions supplies the release build
