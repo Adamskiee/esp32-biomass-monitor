@@ -34,8 +34,10 @@ void main() {
     testWidgets('filter colors and selection stay consistent in $brightness', (
       tester,
     ) async {
-      await tester.binding.setSurfaceSize(const Size(360, 800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final controller = _Controller();
       final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
