@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/icon_label.dart';
 import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
@@ -299,15 +300,34 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
         : pump == false
         ? 'IDLE'
         : 'UNAVAILABLE';
+    final useLightColors = Theme.of(context).brightness == Brightness.light;
+    final successColor = useLightColors
+        ? AppTheme.successLight
+        : AppTheme.neonGreen;
+    final informationColor = useLightColors
+        ? AppTheme.informationLight
+        : AppTheme.neonBlue;
+    final warningColor = useLightColors
+        ? AppTheme.warningLight
+        : AppTheme.neonOrange;
+    final dangerColor = useLightColors
+        ? AppTheme.dangerLight
+        : AppTheme.neonRed;
+    final alertColor = triggers.isEmpty ? successColor : dangerColor;
+    final pumpColor = switch (pump) {
+      true => successColor,
+      false => informationColor,
+      _ => dangerColor,
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_offline)
-          const Card(
+          Card(
             child: ListTile(
-              leading: Icon(AppIcons.wifiDisconnected),
-              title: Text('ESP32 disconnected'),
-              subtitle: Text(
+              leading: Icon(AppIcons.wifiDisconnected, color: dangerColor),
+              title: const Text('ESP32 disconnected'),
+              subtitle: const Text(
                 'Last readings are stale. Controls are unavailable.',
               ),
             ),
@@ -320,15 +340,19 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: IconLabel(
                         icon: AppIcons.alerts,
                         label: 'Active alerts',
+                        color: alertColor,
                       ),
                     ),
                     IconButton(
                       tooltip: _muted ? 'Unmute app alerts' : 'Mute app alerts',
-                      icon: Icon(_muted ? AppIcons.muted : AppIcons.volume),
+                      icon: Icon(
+                        _muted ? AppIcons.muted : AppIcons.volume,
+                        color: _muted ? dangerColor : informationColor,
+                      ),
                       onPressed: () => setState(() => _muted = !_muted),
                     ),
                   ],
@@ -346,15 +370,21 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(AppIcons.pump),
+                leading: Icon(AppIcons.pump, color: pumpColor),
                 title: const Text('Pump Status'),
-                trailing: Text(pumpLabel),
+                trailing: Text(
+                  pumpLabel,
+                  style: TextStyle(
+                    color: pumpColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 subtitle: const Text(
                   'Reported relay output; water flow is not measured.',
                 ),
               ),
               SwitchListTile(
-                secondary: const Icon(AppIcons.sprinkler),
+                secondary: Icon(AppIcons.sprinkler, color: informationColor),
                 title: const Text('Manual Sprinkler'),
                 subtitle: Text(
                   protection
@@ -371,11 +401,12 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
             ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: IconLabel(
             icon: AppIcons.control,
             label: 'Safety Thresholds',
+            color: successColor,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
@@ -389,6 +420,12 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
               'Particulate Matter' => AppIcons.particulateMatter,
               'Humidity' => AppIcons.humidity,
               _ => AppIcons.control,
+            },
+            color: switch (group.key) {
+              'Temperature' => warningColor,
+              'Gas' => dangerColor,
+              'Particulate Matter' || 'Humidity' => informationColor,
+              _ => successColor,
             },
             fields: group.value,
             editor: _editor,
