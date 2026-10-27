@@ -118,6 +118,12 @@ heading, label, and button icons use 20. Severity filter icons use 16, and senso
 cards use 20 in compact layouts or 24 otherwise. Branding and large status
 illustrations retain sizes suited to their context.
 
+Alert filters pair matching icon and label colors: neutral gray for All, blue for
+Info, orange for Warning, and red for Critical. The selected filter adds a subtle
+matching background tint, stronger border, and bolder label so selection remains
+visible without relying on color alone. Light mode uses darker severity shades
+to keep the labels readable.
+
 Uncolored icons inherit Flutter's light or dark theme foreground so they stay
 readable against the page background. Keep that default when adjusting global
 icon sizing. Settings uses the theme's `onSurfaceVariant` foreground for all

@@ -10,25 +10,68 @@ import 'package:biomass_iot_app/core/widgets/loading_skeleton.dart';
 import 'package:biomass_iot_app/features/alerts/alert_presentation.dart';
 import 'package:biomass_iot_app/features/alerts/alerts_controller.dart';
 import 'package:biomass_iot_app/features/alerts/alert_timestamp.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class _SeverityFilterLabel extends StatelessWidget {
-  const _SeverityFilterLabel(this.icon, this.label);
+class _SeverityFilterButton extends StatelessWidget {
+  const _SeverityFilterButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onPressed,
+  });
 
   final IconData icon;
   final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 16),
-      const SizedBox(height: 4),
-      Text(label, style: const TextStyle(fontSize: 12)),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MergeSemantics(
+      child: Semantics(
+        selected: selected,
+        child: TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: color,
+            backgroundColor: selected
+                ? Color.alphaBlend(
+                    color.withValues(alpha: 0.12),
+                    theme.cardColor,
+                  )
+                : theme.cardColor,
+            minimumSize: const Size(48, 60),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            side: BorderSide(
+              color: selected ? color : theme.dividerColor,
+              width: selected ? 1.5 : 1,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 double alertListBottomInset({
@@ -162,47 +205,60 @@ class _AlertsTabState extends State<AlertsTab> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: CupertinoSegmentedControl<String>(
-                        selectedColor: AppTheme.neonOrange,
-                        borderColor: AppTheme.neonOrange,
-                        unselectedColor: theme.cardColor,
-                        groupValue: _filter,
-                        children: const {
-                          'All': Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: _SeverityFilterLabel(AppIcons.alerts, 'All'),
-                          ),
-                          'Info': Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: _SeverityFilterLabel(
-                              AppIcons.information,
+                      child: Row(
+                        spacing: 6,
+                        children: [
+                          for (final (label, icon, darkColor, lightColor) in [
+                            (
+                              'All',
+                              AppIcons.alerts,
+                              const Color(0xFFB0B8C5),
+                              const Color(0xFF4B5563),
+                            ),
+                            (
                               'Info',
+                              AppIcons.information,
+                              const Color(0xFF409CFF),
+                              const Color(0xFF0060CC),
                             ),
-                          ),
-                          'Warning': Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: _SeverityFilterLabel(
-                              AppIcons.warning,
+                            (
                               'Warning',
+                              AppIcons.warning,
+                              AppTheme.neonOrange,
+                              const Color(0xFF925300),
                             ),
-                          ),
-                          'Critical': Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: _SeverityFilterLabel(
-                              AppIcons.critical,
+                            (
                               'Critical',
+                              AppIcons.critical,
+                              AppTheme.neonRed,
+                              const Color(0xFFBE2420),
                             ),
-                          ),
-                        },
-                        onValueChanged: (val) {
-                          if (_controller.isLoading) return;
-                          setState(() => _filter = val);
-                          unawaited(
-                            _controller.setSeverity(
-                              val == 'All' ? null : val.toLowerCase(),
+                          ])
+                            Expanded(
+                              child: _SeverityFilterButton(
+                                icon: icon,
+                                label: label,
+                                color: theme.brightness == Brightness.dark
+                                    ? darkColor
+                                    : lightColor,
+                                selected: _filter == label,
+                                onPressed: () {
+                                  if (_controller.isLoading ||
+                                      _filter == label) {
+                                    return;
+                                  }
+                                  setState(() => _filter = label);
+                                  unawaited(
+                                    _controller.setSeverity(
+                                      label == 'All'
+                                          ? null
+                                          : label.toLowerCase(),
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                          );
-                        },
+                        ],
                       ),
                     ),
                     IconButton(
