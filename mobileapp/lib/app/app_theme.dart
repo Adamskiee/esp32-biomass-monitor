@@ -14,7 +14,6 @@ class AppTheme {
   static const Color informationLight = Color(0xFF0066CC);
   static const Color warningLight = Color(0xFFB45309);
   static const Color dangerLight = Color(0xFFC62828);
-  static const Color sensorPurpleLight = Color(0xFF7E22CE);
   static const _actionIconStyle = ButtonStyle(
     iconSize: WidgetStatePropertyAll(20),
   );

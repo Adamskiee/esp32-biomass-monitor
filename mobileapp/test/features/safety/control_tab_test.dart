@@ -296,10 +296,7 @@ void main() {
       find.byIcon(AppIcons.ambientTemperature).first,
       AppTheme.warningLight,
     );
-    expectIconColor(
-      find.byIcon(AppIcons.gas).first,
-      AppTheme.sensorPurpleLight,
-    );
+    expectIconColor(find.byIcon(AppIcons.gas).first, AppTheme.dangerLight);
     expectIconColor(
       find.byIcon(AppIcons.particulateMatter).first,
       AppTheme.informationLight,

@@ -310,9 +310,6 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
     final warningColor = useLightColors
         ? AppTheme.warningLight
         : AppTheme.neonOrange;
-    final sensorPurpleColor = useLightColors
-        ? AppTheme.sensorPurpleLight
-        : AppTheme.neonPurple;
     final dangerColor = useLightColors
         ? AppTheme.dangerLight
         : AppTheme.neonRed;
@@ -426,7 +423,7 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
             },
             color: switch (group.key) {
               'Temperature' => warningColor,
-              'Gas' => sensorPurpleColor,
+              'Gas' => dangerColor,
               'Particulate Matter' || 'Humidity' => informationColor,
               _ => successColor,
             },
