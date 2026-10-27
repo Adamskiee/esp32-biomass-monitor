@@ -64,17 +64,29 @@ void main() {
     await tester.scrollUntilVisible(find.text('All time'), 300);
   }
 
-  testWidgets('Live summaries sit with charts and preserve missing values', (
+  testWidgets('Live analytics are available on demand for each chart', (
     tester,
   ) async {
     await mount(tester, _Reader((_, _) async => snapshot(900)));
-    expect(
-      find.text('Ambient: Peak 30.0 °C · Average 20.0 °C'),
-      findsOneWidget,
-    );
-    expect(find.text('Chamber: No data'), findsOneWidget);
-    expect(find.text('MQ2: Peak 1.50 V · Average 1.00 V'), findsOneWidget);
+    expect(find.text('30.0'), findsNothing);
+    expect(find.text('Recent 2 readings'), findsOneWidget);
+    final details = find.text('Peak & average').first;
+    await tester.ensureVisible(details);
+    await tester.pumpAndSettle();
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+    expect(find.text('30.0'), findsOneWidget);
+    expect(find.text('20.0'), findsOneWidget);
+    expect(find.text('No data'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('disconnected recent readings do not claim live updates', (
+    tester,
+  ) async {
+    await mount(tester, _Reader((_, _) async => snapshot(900)));
+    expect(find.textContaining('Updating live'), findsNothing);
+    expect(find.text('Recent 2 readings'), findsOneWidget);
   });
 
   testWidgets(
@@ -91,14 +103,8 @@ void main() {
       await tester.tap(find.text('All time'));
       await tester.pumpAndSettle();
       expect(sinceReceived, isNull);
-      expect(
-        find.text('Ambient: Peak 900.0 °C · Average 25.0 °C'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Ambient: Peak 30.0 °C · Average 20.0 °C'),
-        findsNothing,
-      );
+      expect(find.text('900.0'), findsOneWidget);
+      expect(find.text('30.0'), findsNothing);
     },
   );
 
@@ -119,11 +125,8 @@ void main() {
     await tester.pumpAndSettle();
     first.complete(snapshot(100));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Ambient: Peak 900.0 °C · Average 25.0 °C'),
-      findsOneWidget,
-    );
-    expect(find.text('Ambient: Peak 100.0 °C · Average 25.0 °C'), findsNothing);
+    expect(find.text('900.0'), findsOneWidget);
+    expect(find.text('100.0'), findsNothing);
   });
 
   testWidgets('failed history can be retried without displaying Live values', (
@@ -140,14 +143,11 @@ void main() {
     await tester.tap(find.text('All time'));
     await tester.pumpAndSettle();
     expect(find.text('Unable to load chart history.'), findsOneWidget);
-    expect(find.text('Ambient: Peak 30.0 °C · Average 20.0 °C'), findsNothing);
+    expect(find.text('30.0'), findsNothing);
     fails = false;
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Ambient: Peak 900.0 °C · Average 25.0 °C'),
-      findsOneWidget,
-    );
+    expect(find.text('900.0'), findsOneWidget);
   });
 
   testWidgets('1H and 24H summaries use their selected saved periods', (
@@ -162,15 +162,59 @@ void main() {
     );
     await tester.tap(find.text('1H'));
     await tester.pumpAndSettle();
-    expect(find.text('Ambient: Peak 1.0 °C · Average 25.0 °C'), findsOneWidget);
+    expect(find.text('1.0'), findsOneWidget);
     await tester.ensureVisible(find.text('24H'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('24H'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Ambient: Peak 24.0 °C · Average 25.0 °C'),
-      findsOneWidget,
+    expect(find.text('24.0'), findsOneWidget);
+  });
+
+  testWidgets('a pending period never displays the previous snapshot range', (
+    tester,
+  ) async {
+    final pending = Completer<ChartHistory>();
+    await mount(
+      tester,
+      _Reader(
+        (since, through) =>
+            since == null ? Future.value(snapshot(900)) : pending.future,
+      ),
     );
+    await tester.tap(find.text('All time'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('All saved readings · As of'), findsOneWidget);
+    await tester.ensureVisible(find.text('1H'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1H'));
+    await tester.pump();
+    expect(find.textContaining('All saved readings · As of'), findsNothing);
+    expect(find.textContaining('Selected period:'), findsNothing);
+    pending.complete(snapshot(100));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Selected period:'), findsOneWidget);
+    expect(find.text('100.0'), findsOneWidget);
+  });
+
+  testWidgets('returning to Live collapses previously expanded analytics', (
+    tester,
+  ) async {
+    await mount(tester, _Reader((_, _) async => snapshot(900)));
+    final details = find.text('Peak & average').first;
+    await tester.ensureVisible(details);
+    await tester.pumpAndSettle();
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+    expect(find.text('30.0'), findsOneWidget);
+    await tester.ensureVisible(find.text('All time'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All time'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Live'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Live'));
+    await tester.pumpAndSettle();
+    expect(find.text('30.0'), findsNothing);
   });
 
   testWidgets('empty saved history shows a no-data state', (tester) async {
@@ -178,7 +222,7 @@ void main() {
     await tester.tap(find.text('All time'));
     await tester.pumpAndSettle();
     expect(find.text('No historical data available'), findsOneWidget);
-    expect(find.text('Ambient: Peak 30.0 °C · Average 20.0 °C'), findsNothing);
+    expect(find.text('30.0'), findsNothing);
   });
 
   testWidgets(
@@ -192,10 +236,7 @@ void main() {
       );
       await tester.tap(find.text('All time'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Ambient: Peak 900.0 °C · Average 25.0 °C'),
-        findsOneWidget,
-      );
+      expect(find.text('900.0'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

@@ -76,12 +76,21 @@ protection automatically runs the pump.
 The Home dashboard groups live and historical trends by unit so readings remain
 readable: ambient and chamber temperatures, humidity, MQ2 and MQ135 voltages,
 and PM1.0, PM2.5, and PM10 concentrations. The shared timeframe control offers
-Live, 1H, 24H, and All time. Each chart section shows a peak and average for
-each sensor, calculated over the same period as the chart.
+Live, 1H, 24H, and All time. Graphs appear first in each sensor group. Historical
+views show a compact table below each graph with color-coded sensor names, peaks,
+and averages for the selected period. On narrow screens or with larger text,
+summaries stack by sensor so names and values stay readable. Live keeps those
+summaries collapsed; expand **Peak & average** below a chart when you need its
+summary.
 
 Live uses the latest 60 readings held in memory. The 1H and 24H options use all
 saved readings within the selected period; All time uses the entire saved
-history through the time it was loaded. Pull down to refresh a historical view.
+history through the time it was loaded. The heading shows the selected date and
+time range, or the snapshot time for All time. Pull down to refresh a historical
+view. Labels below each graph identify its first and last plotted readings, with
+dates when they cross calendar days. A single reading shows its date and time.
+Points remain ordered by reading rather than spaced by elapsed time.
+
 Historical charts show up to 60 averaged points to keep large histories readable.
 Their statistics use the original readings, so averaging chart points cannot
 hide a peak or give a small group of readings too much weight. For example,
@@ -92,8 +101,8 @@ without valid readings shows No data in its summary. A missing chart reading
 appears as a gap, so the app does not misrepresent unavailable sensor data as
 zero. A sensor with no valid readings in the selected timeframe is omitted from
 its chart and legend. If every sensor in a chart is unavailable, the chart shows
-a no-data message. This also handles
-hardware startup and sensor faults, when the ESP32 can report null readings.
+a no-data message. This also handles hardware startup and sensor faults, when the
+ESP32 can report null readings.
 
 The sensor data log reads the full local history in pages of 10 records, newest
 first. Live updates are off by default so records do not move between pages
