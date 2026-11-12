@@ -72,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             Text(
-              "Brucal, Cabaluna, Jimenez, Manalo, Vivas",
+              "Brucal, Cabaluna, Jimenez, Manalo",
               style: TextStyle(
                 color: theme.textTheme.bodyLarge?.color,
                 fontSize: 13,
