@@ -193,8 +193,9 @@ class SimulatorState:
         for field, low, high in (("temperature_c", -40, 80), ("humidity_percent", 0, 100)):
             if readings[field] is not None and not low <= readings[field] <= high:
                 readings[field] = None
-        if readings["mq2_v"] is not None and readings["mq2_v"] > 4.8:
-            readings["mq2_v"] = None
+        for field in ("mq2_v", "mq135_v"):
+            if readings[field] is not None and readings[field] > 4.8:
+                readings[field] = None
         if self._mq_warmup_remaining_seconds(now) > 0:
             readings["mq2_v"] = readings["mq135_v"] = None
         # A PMS frame is one sample, so a missing channel invalidates all three.

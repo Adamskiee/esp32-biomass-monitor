@@ -41,12 +41,9 @@ bool validHumidity(float value) {
 }
 
 bool validUpperReading(size_t index, float value) {
-  if (index == 1) {
+  if (index == 1 || index == 2) {
     return !mq_sensors_are_warming_up && isfinite(value) &&
            value <= MQ2_RAIL_SHORT_V;
-  }
-  if (index == 2) {
-    return !mq_sensors_are_warming_up && isfinite(value);
   }
   return index == 3 ? validAmbientTemperature(value) : isfinite(value);
 }
@@ -390,7 +387,7 @@ void evaluateSafetyLoop() {
     requestSprinkler(manual_sprinkler);
   }
 
-  if (faults[0] || (faults[1] && !mq_sensors_are_warming_up)) {
+  if (faults[0] || ((faults[1] || faults[2]) && !mq_sensors_are_warming_up)) {
     setLedStatus(false, true, false);
   } else if (upper_limit_danger[0]) {
     setLedStatus(true, false, false);

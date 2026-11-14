@@ -235,7 +235,7 @@ class SimulatorStateTests(unittest.TestCase):
     def test_invalid_readings_report_faults_without_configured_limits(self):
         cases = (("chamber_temp_c", "temp_sensor_fault", (None, float("nan"))),
                  ("mq2_v", "mq2_sensor_fault", (None, float("inf"), 4.81)),
-                 ("mq135_v", "mq135_sensor_fault", (None, float("nan"))),
+                 ("mq135_v", "mq135_sensor_fault", (None, float("nan"), 4.81)),
                  ("temperature_c", "ambient_temp_sensor_fault", (None, -40.1, 80.1)),
                  ("humidity_percent", "humidity_sensor_fault", (None, -0.1, 100.1)),
                  ("pm1_0_ug_m3", "pms_sensor_fault", (None, float("nan"))))

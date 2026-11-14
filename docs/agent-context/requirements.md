@@ -57,8 +57,8 @@ ownership.
 ### 4.3 Hardware Fault State
 The system enters a hardware fault state if **ANY** of the following conditions are met, ensuring fail-safe filtration:
 1.  **Sensor Fault (Thermocouple):** Chamber Temperature reads `NaN`.
-2.  **Sensor Fault (MQ2):** MQ2 voltage reads `NaN`.
-3.  **Sensor Rail Short (MQ2):** MQ2 voltage reads above `4.8V`.
+2.  **Sensor Fault (MQ2 / MQ135):** MQ2 or MQ135 voltage reads `NaN`.
+3.  **Sensor Disconnect / Rail Short (MQ2 / MQ135):** MQ2 or MQ135 voltage reads above `4.8V` (pulled high by the `3.3V` pull-up bias when unplugged).
 
 **Actions taken when in this state:**
 *   Status LED is set to **YELLOW**.

@@ -681,9 +681,40 @@ void testMq2RailShortIsReportedAsFault() {
   evaluateSafetyLoop();
   EXPECT_FALSE(name, active_triggers_json.find("mq2_sensor_fault") !=
                          std::string::npos);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
   current_mq2_v = 4.81f;
   evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+}
+
+void testMq135FaultTurnsOnYellowLed() {
+  const char *name = "MQ135 fault turns on yellow LED";
+  resetSafetyState();
+  current_mq135_v = 4.8f;
+  evaluateSafetyLoop();
+  EXPECT_FALSE(name, active_triggers_json.find("mq135_sensor_fault") !=
+                         std::string::npos);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+
+  current_mq135_v = 4.81f;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "mq135_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_OFF);
+
+  current_mq135_v = NAN;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "mq135_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+
+  current_mq135_v = 0.24f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
 }
 
 void testMq2NanIsReportedAsFault() {
@@ -1279,6 +1310,7 @@ int main() {
       testMq2DangerStartsAtConfiguredThreshold);
   run("environmental fault recovery", testEnvironmentalFaultRecovery);
   run("MQ2 rail short is reported as fault", testMq2RailShortIsReportedAsFault);
+  run("MQ135 fault turns on yellow LED", testMq135FaultTurnsOnYellowLed);
   run("MQ2 NaN is reported as fault", testMq2NanIsReportedAsFault);
   run("temperature fault allows manual sprinkler",
       testTemperatureFaultAllowsManualSprinkler);
