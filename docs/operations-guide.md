@@ -96,10 +96,12 @@ chamber reading fails; an environmental alert leaves manual control available.
   It also means the sprinkler has opened automatically. An MQ2 gas alert does
   not change the green LED or open the sprinkler. Check `active_triggers` and
   the measured values in the app.
-- A yellow LED indicates an invalid thermocouple or MQ2 reading. MQ2 readings
-  are invalid only when they are `NaN` or above 4.8 V. A 0 V MQ2 reading is
-  valid. Check sensor wiring and power. A thermocouple failure during a
-  temperature alarm latches the sprinkler on until restart.
+- A yellow LED indicates an invalid or unplugged sensor reading (MAX6675
+  thermocouple, MQ-2, MQ-135 after warm-up, DHT22 temperature/humidity, or
+  PMS5003 particulate sensor). MQ readings are invalid when `NaN` or above
+  4.8 V; a 0 V MQ reading is valid. Check sensor wiring and power. A
+  thermocouple failure during a temperature alarm latches the sprinkler on until
+  restart.
 - The buzzer indicates a valid chamber reading above the configured limit.
 - A rejected manual sprinkler command can mean automatic temperature safety
   is active. The app refreshes the reported output state after rejection.

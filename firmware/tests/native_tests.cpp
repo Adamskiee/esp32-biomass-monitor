@@ -719,6 +719,99 @@ void testMq135FaultTurnsOnYellowLed() {
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
 }
 
+void testDht22FaultTurnsOnYellowLed() {
+  const char *name = "DHT22 fault turns on yellow LED";
+  resetSafetyState();
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+
+  // Unplugged DHT22 returns NAN for both temperature and humidity
+  processSensorReadings(NAN, 25.0f, 0.5f, 0.5f, false, NAN);
+  EXPECT_CONTAINS(name, active_triggers_json, "ambient_temp_sensor_fault");
+  EXPECT_CONTAINS(name, active_triggers_json, "humidity_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_OFF);
+
+  // Ambient temperature fault alone keeps yellow LED on
+  processSensorReadings(NAN, 25.0f, 0.5f, 0.5f, false, 50.0f);
+  EXPECT_CONTAINS(name, active_triggers_json, "ambient_temp_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+
+  // Humidity fault alone keeps yellow LED on
+  processSensorReadings(25.0f, 25.0f, 0.5f, 0.5f, false, NAN);
+  EXPECT_CONTAINS(name, active_triggers_json, "humidity_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+
+  // Reconnected DHT22 restores green LED
+  processSensorReadings(25.0f, 25.0f, 0.5f, 0.5f, false, 50.0f);
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+}
+
+void testPmsFaultTurnsOnYellowLed() {
+  const char *name = "PMS fault turns on yellow LED";
+  resetSafetyState();
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+
+  // Missing PMS reading (unplugged at boot or cache reset)
+  resetPmsReadingCache();
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "pms_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_RED] == RELAY_OFF);
+
+  // Fresh PMS reading restores green LED
+  recordPmsReading(PmsReading{5, 10, 15}, test_millis);
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+
+  // Unplugged PMS ages out after 10 seconds -> yellow LED turns back on
+  test_millis += 10001;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "pms_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+}
+
+void testMax6675FaultTurnsOnYellowLed() {
+  const char *name = "MAX6675 fault turns on yellow LED";
+  resetSafetyState();
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+
+  // Unplugged probe or pulled-up SO line (NAN)
+  current_chamber_c = NAN;
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "temp_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+
+  // 0.0C is treated as a valid reading (green LED stays on)
+  current_chamber_c = 0.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+
+  // Reconnected MAX6675 restores green LED
+  current_chamber_c = 25.0f;
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+}
+
 void testAnalogSensorsRampVsDisconnect() {
   const char *name = "analog sensors distinguish gas ramp from disconnect";
   resetSafetyState();
@@ -1403,6 +1496,9 @@ int main() {
   run("environmental fault recovery", testEnvironmentalFaultRecovery);
   run("MQ2 rail short is reported as fault", testMq2RailShortIsReportedAsFault);
   run("MQ135 fault turns on yellow LED", testMq135FaultTurnsOnYellowLed);
+  run("DHT22 fault turns on yellow LED", testDht22FaultTurnsOnYellowLed);
+  run("PMS fault turns on yellow LED", testPmsFaultTurnsOnYellowLed);
+  run("MAX6675 fault turns on yellow LED", testMax6675FaultTurnsOnYellowLed);
   run("analog sensors distinguish gas ramp from disconnect",
       testAnalogSensorsRampVsDisconnect);
   run("MQ2 NaN is reported as fault", testMq2NanIsReportedAsFault);

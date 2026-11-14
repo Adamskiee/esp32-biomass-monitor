@@ -387,7 +387,11 @@ void evaluateSafetyLoop() {
     requestSprinkler(manual_sprinkler);
   }
 
-  if (faults[0] || ((faults[1] || faults[2]) && !mq_sensors_are_warming_up)) {
+  const bool any_sensor_fault =
+      faults[0] ||
+      ((faults[1] || faults[2]) && !mq_sensors_are_warming_up) ||
+      faults[3] || humidity_fault || !pms_fresh;
+  if (any_sensor_fault) {
     setLedStatus(false, true, false);
   } else if (upper_limit_danger[0]) {
     setLedStatus(true, false, false);

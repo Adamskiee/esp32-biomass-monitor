@@ -10,6 +10,9 @@ static Adafruit_PM25AQI *pms_sensor = nullptr;
 
 void initDigitalSensors() {
   dht.begin();
+  // Enable ESP32 internal pull-up on MAX6675 MISO (GPIO 19) so an unplugged
+  // SO wire reads 0xFFFF (fault bit set -> NAN) instead of floating at 0x0000 (0.0C).
+  pinMode(PIN_MAX6675_SO, INPUT_PULLUP);
   Serial2.begin(9600, SERIAL_8N1, PIN_PM25_RX, PIN_PM25_TX);
 }
 
@@ -35,11 +38,13 @@ bool readPmsReading(PmsReading &out) {
     }
   }
 
+  // Drain all buffered UART frames so Serial2 never accumulates stale samples
+  // across 2-second poll intervals and unplugging is detected promptly.
   PM25_AQI_Data data{};
-  if (!pms_sensor->read(&data)) {
-    return false;
+  bool got_valid_frame = false;
+  while (pms_sensor->read(&data)) {
+    out = {data.pm10_env, data.pm25_env, data.pm100_env};
+    got_valid_frame = true;
   }
-
-  out = {data.pm10_env, data.pm25_env, data.pm100_env};
-  return true;
+  return got_valid_frame;
 }

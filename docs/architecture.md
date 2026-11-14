@@ -29,11 +29,12 @@ shows reported state and cannot override automatic sprinkler safety.
 MQ135 is included in telemetry but does not currently trigger automatic
 actuation.
 
-The PMS5003 is also telemetry only. Each two-second poll attempts one validated
-UART frame and records environmental PM1.0, PM2.5, and PM10 together. Invalid
-or absent frames leave the previous sample unchanged, so the API reports it
-until it ages out after ten seconds. PMS data never contributes to safety
-triggers or actuator decisions.
+The PMS5003 is also telemetry only for sprinkler control. Each two-second poll
+drains buffered UART frames and records the latest environmental PM1.0, PM2.5,
+and PM10 sample together. Invalid or absent frames leave the previous sample
+unchanged, so the API reports it until it ages out after ten seconds, at which
+point `pms_sensor_fault` and the yellow fault LED activate. PMS data never
+triggers automatic sprinkler actuation.
 
 ## How is sprinkler output controlled?
 

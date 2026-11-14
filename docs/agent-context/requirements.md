@@ -56,9 +56,11 @@ ownership.
 
 ### 4.3 Hardware Fault State
 The system enters a hardware fault state if **ANY** of the following conditions are met, ensuring fail-safe filtration:
-1.  **Sensor Fault (Thermocouple):** Chamber Temperature reads `NaN`.
-2.  **Sensor Fault (MQ2 / MQ135):** MQ2 or MQ135 voltage reads `NaN`.
+1.  **Sensor Fault (Thermocouple / MAX6675):** Chamber Temperature reads `NaN` (open thermocouple or unplugged `SO` line pulled high by `INPUT_PULLUP`).
+2.  **Sensor Fault (MQ2 / MQ135):** MQ2 or MQ135 voltage reads `NaN` (after warm-up).
 3.  **Sensor Disconnect / Rail Short (MQ2 / MQ135):** MQ2 or MQ135 voltage reads above `4.8V` (pulled high by the `3.3V` pull-up bias when unplugged).
+4.  **Sensor Fault (DHT22):** Ambient temperature reads `NaN` or outside `-40.0°C..80.0°C`, or humidity reads `NaN` or outside `0.0%..100.0%`.
+5.  **Sensor Fault (PMS5003):** No valid PMS frame has been received within the 10-second freshness window.
 
 **Actions taken when in this state:**
 *   Status LED is set to **YELLOW**.
