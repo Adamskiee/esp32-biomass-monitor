@@ -4,7 +4,7 @@ import 'package:biomass_iot_app/app/app_theme.dart';
 import 'package:biomass_iot_app/core/widgets/icon_label.dart';
 import 'package:biomass_iot_app/app/app_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 
 import '../../../api_service.dart';
 import '../../../core/widgets/delayed_loading.dart';
@@ -45,11 +45,13 @@ class SafetyControlsPanel extends StatefulWidget {
     required this.apiService,
     this.observationRecorder,
     this.onAlert,
+    this.ringtonePlayer,
   });
 
   final ApiService apiService;
   final SafetyObservationRecorder? observationRecorder;
   final VoidCallback? onAlert;
+  final FlutterRingtonePlayer? ringtonePlayer;
 
   @override
   State<SafetyControlsPanel> createState() => _SafetyControlsPanelState();
@@ -160,7 +162,11 @@ class _SafetyControlsPanelState extends State<SafetyControlsPanel>
         if (widget.onAlert != null) {
           widget.onAlert!();
         } else {
-          unawaited(SystemSound.play(SystemSoundType.alert));
+          unawaited(
+            (widget.ringtonePlayer ?? FlutterRingtonePlayer())
+                .playNotification()
+                .catchError((_) {}),
+          );
         }
       }
       setState(() {
