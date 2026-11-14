@@ -1,4 +1,5 @@
 #include "Actuators.h"
+#include "AnalogSensors.h"
 #include "SafetyThresholds.h"
 #include "SystemState.h"
 #include "ThresholdPersistence.h"
@@ -17,6 +18,7 @@ int failure_count = 0;
 int test_count = 0;
 uint8_t pin_levels[40] = {};
 uint8_t pin_modes[40] = {};
+uint32_t pin_millivolts[40] = {};
 
 void fail(const char *test_name, const char *expression, int line) {
   std::cerr << "FAIL " << test_name << " at line " << line << ": " << expression
@@ -186,7 +188,7 @@ void testPersistenceRetainsChangesDuringSave() {
     persistence.markChanged();
     current.values[1] = 3;
     persistence.markChanged();
-    EXPECT_TRUE(name, snapshot.values[0] == 80 && snapshot.values[1] == 2.5f);
+    EXPECT_TRUE(name, snapshot.values[0] == 80 && snapshot.values[1] == 2.0f);
     persistence.finishSave(succeeded);
     EXPECT_FALSE(name, persistence.beginSave(59999, current, snapshot));
     EXPECT_TRUE(name, persistence.beginSave(60000, current, snapshot));
@@ -244,8 +246,8 @@ void testThresholdDefaults() {
   const char *name = "threshold defaults";
   const auto defaults = defaultSafetyThresholds();
   EXPECT_TRUE(name, defaults.values[0] == 80.0f);
-  EXPECT_TRUE(name, defaults.values[1] == 2.5f);
-  const SafetyThresholds expected{{80, 2.5f, 2, 35, 15, 15, 45, 30, 60}};
+  EXPECT_TRUE(name, defaults.values[1] == 2.0f);
+  const SafetyThresholds expected{{80, 2.0f, 2, 35, 15, 15, 45, 30, 60}};
   expectSameThresholds(name, defaults, expected);
   EXPECT_TRUE(name, validateStoredThresholds(defaults));
   const char *expected_names[] = {
@@ -573,7 +575,7 @@ void testMq2DangerDoesNotActivatePump() {
   evaluateSafetyLoop();
   EXPECT_FALSE(name, current_pump_state);
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
-  current_mq2_v = 2.3f;
+  current_mq2_v = 1.8f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
@@ -633,7 +635,7 @@ void testMq2ZeroVoltsIsNormal() {
 void testMq2SafeRangeDoesNotTriggerGasDanger() {
   const char *name = "MQ2 safe range does not trigger gas danger";
   resetSafetyState();
-  current_mq2_v = 2.4f;
+  current_mq2_v = 1.9f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
@@ -715,6 +717,90 @@ void testMq135FaultTurnsOnYellowLed() {
   EXPECT_TRUE(name, active_triggers_json == "[]");
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
   EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+}
+
+void testAnalogSensorsRampVsDisconnect() {
+  const char *name = "analog sensors distinguish gas ramp from disconnect";
+  resetSafetyState();
+  initAnalogSensors();
+
+  // 1. Clean air: 1464 mV on pin -> (1.464 - 1.32) / 0.6 = 0.24V
+  pin_millivolts[PIN_MQ2] = 1464;
+  pin_millivolts[PIN_MQ135] = 1464;
+  EXPECT_TRUE(name, std::fabs(readMQ2Voltage() - 0.24f) < 0.01f);
+  EXPECT_TRUE(name, std::fabs(readMQ135Voltage() - 0.24f) < 0.01f);
+
+  // 2. Unplugged wire in clean air (step jump from 0.24V to >= 3.05V pin) -> 5.0V fault
+  pin_millivolts[PIN_MQ2] = 3200;
+  pin_millivolts[PIN_MQ135] = 3200;
+  current_mq2_v = readMQ2Voltage();
+  current_mq135_v = readMQ135Voltage();
+  EXPECT_TRUE(name, current_mq2_v > 4.8f);
+  EXPECT_TRUE(name, current_mq135_v > 4.8f);
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
+  EXPECT_CONTAINS(name, active_triggers_json, "mq135_sensor_fault");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+
+  // 3. Reconnect to clean air -> recovers to 0.24V
+  pin_millivolts[PIN_MQ2] = 1464;
+  pin_millivolts[PIN_MQ135] = 1464;
+  current_mq2_v = readMQ2Voltage();
+  current_mq135_v = readMQ135Voltage();
+  evaluateSafetyLoop();
+  EXPECT_TRUE(name, active_triggers_json == "[]");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+
+  // 4. Unplugged during High Gas (2.20V -> step jump to >= 3.05V pin) -> immediately faults!
+  pin_millivolts[PIN_MQ2] = 2640;   // (2.64 - 1.32) / 0.6 = 2.20V (High Gas >= 2.0V)
+  pin_millivolts[PIN_MQ135] = 2640; // 2.20V
+  current_mq2_v = readMQ2Voltage();
+  current_mq135_v = readMQ135Voltage();
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq135_gas");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+
+  // Now unplug while at 2.20V High Gas -> immediately detected as fault (Orange LED ON)
+  pin_millivolts[PIN_MQ2] = 3200;
+  pin_millivolts[PIN_MQ135] = 3200;
+  current_mq2_v = readMQ2Voltage();
+  current_mq135_v = readMQ135Voltage();
+  EXPECT_TRUE(name, current_mq2_v > 4.8f);
+  EXPECT_TRUE(name, current_mq135_v > 4.8f);
+  evaluateSafetyLoop();
+  EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
+  EXPECT_CONTAINS(name, active_triggers_json, "mq135_sensor_fault");
+  EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_ON);
+  EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_OFF);
+
+  // 5. Continuous heavy smoke (> 2.88V after ramping through 2.55V-2.88V)
+  // stays clamped at 2.85V (High Gas, NO false fault) across continuous polls.
+  pin_millivolts[PIN_MQ2] = 2880;   // (2.88 - 1.32) / 0.6 = 2.60V
+  pin_millivolts[PIN_MQ135] = 2880; // 2.60V
+  current_mq2_v = readMQ2Voltage();
+  current_mq135_v = readMQ135Voltage();
+  EXPECT_TRUE(name, std::fabs(current_mq2_v - 2.60f) < 0.01f);
+  EXPECT_TRUE(name, std::fabs(current_mq135_v - 2.60f) < 0.01f);
+
+  pin_millivolts[PIN_MQ2] = 3200;
+  pin_millivolts[PIN_MQ135] = 3200;
+  for (int poll = 0; poll < 5; ++poll) {
+    current_mq2_v = readMQ2Voltage();
+    current_mq135_v = readMQ135Voltage();
+    EXPECT_TRUE(name, std::fabs(current_mq2_v - 2.85f) < 0.01f);
+    EXPECT_TRUE(name, std::fabs(current_mq135_v - 2.85f) < 0.01f);
+    evaluateSafetyLoop();
+    EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
+    EXPECT_CONTAINS(name, active_triggers_json, "high_mq135_gas");
+    EXPECT_FALSE(name, active_triggers_json.find("mq2_sensor_fault") !=
+                           std::string::npos);
+    EXPECT_FALSE(name, active_triggers_json.find("mq135_sensor_fault") !=
+                           std::string::npos);
+    EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_GREEN] == RELAY_ON);
+    EXPECT_TRUE(name, pin_levels[PIN_RELAY_LED_YELLOW] == RELAY_OFF);
+  }
 }
 
 void testMq2NanIsReportedAsFault() {
@@ -843,7 +929,7 @@ void testInvalidThresholdUpdateIsTransactional() {
   const auto result = applyThresholdUpdate(true, 1000.0f, true, 1.5f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Invalid);
   EXPECT_TRUE(name, safety_thresholds.values[0] == 80.0f);
-  EXPECT_TRUE(name, safety_thresholds.values[1] == 2.5f);
+  EXPECT_TRUE(name, safety_thresholds.values[1] == 2.0f);
   EXPECT_FALSE(name, threshold_persistence.beginSave(
                          test_millis, safety_thresholds, snapshot));
 }
@@ -855,7 +941,7 @@ void testValidThresholdUpdateChangesRequestedFields() {
   const auto result = applyThresholdUpdate(true, 120.0f, false, 0.0f);
   EXPECT_TRUE(name, result == ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name, safety_thresholds.values[0] == 120.0f);
-  EXPECT_TRUE(name, safety_thresholds.values[1] == 2.5f);
+  EXPECT_TRUE(name, safety_thresholds.values[1] == 2.0f);
   EXPECT_TRUE(name, threshold_persistence.beginSave(
                         test_millis, safety_thresholds, snapshot));
 }
@@ -1154,7 +1240,7 @@ void testWarmupSuppressesBothMqConditions() {
   EXPECT_CONTAINS(name, active_triggers_json, "high_ambient_temp");
   EXPECT_TRUE(name, active_triggers_json.find("mq") == String::npos);
   EXPECT_TRUE(name, current_pump_state);
-  processSensorReadings(25, 25, 2.4f, 2.4f, false, 50);
+  processSensorReadings(25, 25, 2.4f, 1.8f, false, 50);
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
@@ -1250,6 +1336,12 @@ void digitalWrite(uint8_t pin, uint8_t level) {
   }
 }
 
+void analogReadResolution(uint8_t) {}
+
+void analogSetPinAttenuation(uint8_t, adc_attenuation_t) {}
+
+uint32_t analogReadMilliVolts(uint8_t pin) { return pin_millivolts[pin]; }
+
 int main() {
   run("threshold record wire format", testThresholdRecordWireFormat);
   run("threshold record fills unset fields", testThresholdRecordFillsUnsetFields);
@@ -1311,6 +1403,8 @@ int main() {
   run("environmental fault recovery", testEnvironmentalFaultRecovery);
   run("MQ2 rail short is reported as fault", testMq2RailShortIsReportedAsFault);
   run("MQ135 fault turns on yellow LED", testMq135FaultTurnsOnYellowLed);
+  run("analog sensors distinguish gas ramp from disconnect",
+      testAnalogSensorsRampVsDisconnect);
   run("MQ2 NaN is reported as fault", testMq2NanIsReportedAsFault);
   run("temperature fault allows manual sprinkler",
       testTemperatureFaultAllowsManualSprinkler);

@@ -3,7 +3,7 @@ import unittest
 from simulator.model import SafetyOverrideError, SimulatorState
 
 DEFAULT_THRESHOLDS = {
-    "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+    "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.0,
     "threshold_mq135_v": 2.0, "threshold_temperature_c": 35.0,
     "threshold_pm1_0_ug_m3": 15.0, "threshold_pm2_5_ug_m3": 15.0,
     "threshold_pm10_ug_m3": 45.0, "threshold_humidity_min_percent": 30.0,
@@ -70,7 +70,7 @@ class SimulatorStateTests(unittest.TestCase):
             "threshold_humidity_min_percent", "threshold_humidity_max_percent",
         })
         self.assertEqual(first["threshold_chamber_temp_c"], 80.0)
-        self.assertEqual(first["threshold_mq2_v"], 2.5)
+        self.assertEqual(first["threshold_mq2_v"], 2.0)
         self.assertEqual(first["active_triggers"], [])
         self.assertNotEqual(first["temperature_c"], second["temperature_c"])
         self.assertIsInstance(first["humidity_percent"], float)
@@ -126,7 +126,7 @@ class SimulatorStateTests(unittest.TestCase):
                     "threshold_chamber_temp_c": bad, "threshold_mq2_v": 3.0,
                 })
             state = self.state.snapshot()
-            self.assertEqual((state["threshold_chamber_temp_c"], state["threshold_mq2_v"]), (80.0, 2.5))
+            self.assertEqual((state["threshold_chamber_temp_c"], state["threshold_mq2_v"]), (80.0, 2.0))
         with self.assertRaises(ValueError):
             self.state.update_thresholds({})
         self.state.update_thresholds({"threshold_chamber_temp_c": 20, "threshold_mq2_v": 5})
@@ -151,9 +151,9 @@ class SimulatorStateTests(unittest.TestCase):
         self.state.update_thresholds({"threshold_chamber_temp_c": 110})
         self.assertNotIn("high_chamber_temp", self.state.snapshot()["active_triggers"])
         self.state.select_scenario("gas")
-        self.state.set_readings({"mq2_v": 2.4})
+        self.state.set_readings({"mq2_v": 1.95})
         self.assertIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
-        self.state.set_readings({"mq2_v": 2.375})
+        self.state.set_readings({"mq2_v": 1.9})
         self.assertNotIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
 
     def test_normal_reading_crossing_threshold_activates_safety(self):
@@ -186,7 +186,7 @@ class SimulatorStateTests(unittest.TestCase):
         limits = self.state.thresholds_snapshot()
         self.assertEqual(limits, DEFAULT_THRESHOLDS)
         limits["threshold_mq2_v"] = 4
-        self.assertEqual(self.state.thresholds_snapshot()["threshold_mq2_v"], 2.5)
+        self.assertEqual(self.state.thresholds_snapshot()["threshold_mq2_v"], 2.0)
         self.assertEqual(self.state.snapshot()["temperature_c"], 25.1)
 
     def test_every_upper_limit_activates_and_recovers_at_boundaries(self):
@@ -439,7 +439,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.state.reset()
         state = self.state.snapshot()
         self.assertEqual(self.state.scenario, "normal")
-        self.assertEqual((state["threshold_chamber_temp_c"], state["threshold_mq2_v"]), (80.0, 2.5))
+        self.assertEqual((state["threshold_chamber_temp_c"], state["threshold_mq2_v"]), (80.0, 2.0))
         self.assertEqual(state["active_triggers"], [])
         self.assertFalse(state["pump_on"])
 

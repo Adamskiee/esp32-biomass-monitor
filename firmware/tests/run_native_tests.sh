@@ -15,6 +15,7 @@ g++ \
   -I "$repo_dir/firmware/main" \
   -I "$repo_dir/firmware/shared/BiomassConfig/src" \
   "$repo_dir/firmware/main/Actuators.cpp" \
+  "$repo_dir/firmware/main/AnalogSensors.cpp" \
   "$repo_dir/firmware/main/SystemState.cpp" \
   "$repo_dir/firmware/main/SafetyThresholds.cpp" \
   "$repo_dir/firmware/main/ThresholdPersistence.cpp" \

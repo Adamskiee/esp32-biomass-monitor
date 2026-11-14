@@ -10,7 +10,7 @@ from simulator.model import SimulatorState
 from simulator.server import make_handler
 
 DEFAULT_THRESHOLDS = {
-    "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+    "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.0,
     "threshold_mq135_v": 2.0, "threshold_temperature_c": 35.0,
     "threshold_pm1_0_ug_m3": 15.0, "threshold_pm2_5_ug_m3": 15.0,
     "threshold_pm10_ug_m3": 45.0, "threshold_humidity_min_percent": 30.0,
@@ -161,7 +161,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(self.request("/api/settings")[2], {
             **DEFAULT_THRESHOLDS,
-            "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+            "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.0,
         })
 
     def test_malformed_json_and_oversized_body_leave_control_unchanged(self):
@@ -176,7 +176,7 @@ class ServerTests(unittest.TestCase):
             with self.subTest(body=body):
                 status, _, _ = self.request("/api/settings", "POST", body)
                 self.assertEqual(status, 400)
-                self.assertEqual(self.request("/api/settings")[2]["threshold_mq2_v"], 2.5)
+                self.assertEqual(self.request("/api/settings")[2]["threshold_mq2_v"], 2.0)
 
     def test_non_boolean_control_is_rejected(self):
         for body in ({"sprinkler": 1}, {}, [], {"sprinkler": None}):

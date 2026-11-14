@@ -77,11 +77,13 @@ void main() {
       final reading = SensorData.fromJson({
         'temperature_c': 100,
         'humidity_percent': -1,
+        'mq135_v': 4.9,
         'mq2_v': 4.9,
         'pm10_ug_m3': -1,
       });
       expect(reading.temperatureC, isNull);
       expect(reading.humidityPercent, isNull);
+      expect(reading.mq135V, isNull);
       expect(reading.mq2V, isNull);
       expect(reading.pm10UgM3, isNull);
     },

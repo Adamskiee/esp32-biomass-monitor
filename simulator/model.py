@@ -24,7 +24,7 @@ class SimulatorState:
     }
     _PMS_FIELDS = ("pm1_0_ug_m3", "pm2_5_ug_m3", "pm10_ug_m3")
     _DEFAULT_THRESHOLDS = {
-        "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.5,
+        "threshold_chamber_temp_c": 80.0, "threshold_mq2_v": 2.0,
         "threshold_mq135_v": 2.0, "threshold_temperature_c": 35.0,
         "threshold_pm1_0_ug_m3": 15.0, "threshold_pm2_5_ug_m3": 15.0,
         "threshold_pm10_ug_m3": 45.0, "threshold_humidity_min_percent": 30.0,

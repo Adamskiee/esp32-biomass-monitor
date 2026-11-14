@@ -61,7 +61,7 @@ bool validFieldValue(ThresholdField field, float value) {
 }
 
 SafetyThresholds defaultSafetyThresholds() {
-  return SafetyThresholds{{80.0f, 2.5f, 2.0f, 35.0f, 15.0f, 15.0f, 45.0f,
+  return SafetyThresholds{{80.0f, 2.0f, 2.0f, 35.0f, 15.0f, 15.0f, 45.0f,
                            30.0f, 60.0f}};
 }
 

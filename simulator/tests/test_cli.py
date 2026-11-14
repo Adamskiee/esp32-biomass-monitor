@@ -40,7 +40,7 @@ class CommandTests(unittest.TestCase):
         process_command(self.state, "reset")
         snapshot = self.state.snapshot()
         self.assertEqual(self.state.scenario, "normal")
-        self.assertEqual(snapshot["threshold_mq2_v"], 2.5)
+        self.assertEqual(snapshot["threshold_mq2_v"], 2.0)
         self.assertTrue(snapshot["mq_warming_up"])
         self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 300)
 

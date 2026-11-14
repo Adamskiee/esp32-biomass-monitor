@@ -40,7 +40,7 @@ class SensorData {
       maximum: 100,
     ),
     chamberTempC: _number(json['chamber_temp_c']),
-    mq135V: _number(json['mq135_v']),
+    mq135V: _number(json['mq135_v'], maximum: 4.8),
     mq2V: _number(json['mq2_v'], maximum: 4.8),
     mqWarmupRemainingSeconds:
         (json['mq_warmup_remaining_seconds'] as num?)?.toInt() ?? 0,

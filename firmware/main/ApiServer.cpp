@@ -91,7 +91,7 @@ void initApiServer() {
       doc["chamber_temp_c"] = nullptr;
     else
       doc["chamber_temp_c"] = current_chamber_c;
-    if (!std::isfinite(current_mq135_v))
+    if (!std::isfinite(current_mq135_v) || current_mq135_v > 4.8f)
       doc["mq135_v"] = nullptr;
     else
       doc["mq135_v"] = current_mq135_v;
