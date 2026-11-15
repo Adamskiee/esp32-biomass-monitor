@@ -71,8 +71,8 @@ void testThresholdRecordWireFormat() {
 
 void testThresholdRecordFillsUnsetFields() {
   const char *name = "threshold record fills unset fields";
-  SafetyThresholds configured{{95, 3, NAN, NAN, NAN, NAN, NAN, NAN, NAN}};
-  SafetyThresholds expected{{95, 3, 2, 35, 15, 15, 45, 30, 60}};
+  SafetyThresholds configured{{95, 2.5f, NAN, NAN, NAN, NAN, NAN, NAN, NAN}};
+  SafetyThresholds expected{{95, 2.5f, 2, 35, 15, 15, 45, 30, 60}};
   for (size_t field = 2; field <= 7; ++field) {
     const auto bytes = encodeThresholdRecord(configured);
     SafetyThresholds restored{};
@@ -229,13 +229,13 @@ void testThresholdUpdatesKeepOnlyRealChangesPending() {
                   ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name,
               threshold_persistence.beginSave(0, safety_thresholds, snapshot));
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2.4f)) ==
                         ThresholdUpdateResult::Accepted);
   threshold_persistence.finishSave(true);
   EXPECT_TRUE(name, threshold_persistence.beginSave(60000, safety_thresholds,
                                                     snapshot));
-  EXPECT_TRUE(name, snapshot.values[0] == 90 && snapshot.values[2] == 3);
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
+  EXPECT_TRUE(name, snapshot.values[0] == 90 && snapshot.values[2] == 2.4f);
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2.4f)) ==
                         ThresholdUpdateResult::Accepted);
   threshold_persistence.finishSave(true);
   EXPECT_FALSE(name, threshold_persistence.beginSave(120000, safety_thresholds,
@@ -277,8 +277,8 @@ void testThresholdRanges() {
   };
   const RangeCase cases[] = {
       {ThresholdField::Chamber, 20.0f, 150.0f, 19.9f, 150.1f},
-      {ThresholdField::Mq2, 0.1f, 5.0f, 0.09f, 5.01f},
-      {ThresholdField::Mq135, 0.1f, 5.0f, 0.09f, 5.01f},
+      {ThresholdField::Mq2, 0.1f, 2.5f, 0.09f, 2.51f},
+      {ThresholdField::Mq135, 0.1f, 2.5f, 0.09f, 2.51f},
       {ThresholdField::Ambient, -40.0f, 80.0f, -40.1f, 80.1f},
       {ThresholdField::Pm1, 0.001f, 65535.0f, 0.0f, 65536.0f},
       {ThresholdField::Pm25, 0.001f, 65535.0f, 0.0f, 65536.0f},
@@ -400,7 +400,7 @@ void testHumidityPairValidation() {
 void testPatchRejectionIsAtomic() {
   const char *name = "patch rejection is atomic";
   const auto defaults = defaultSafetyThresholds();
-  SafetyThresholds accepted{{90.0f, 3.0f, 1.0f, 40.0f, 10.0f, 20.0f,
+  SafetyThresholds accepted{{90.0f, 2.5f, 1.0f, 40.0f, 10.0f, 20.0f,
                              30.0f, 20.0f, 80.0f}};
   const auto original = accepted;
   ThresholdPatch complete_patch{original, 0x01ff};
@@ -429,7 +429,7 @@ void testPatchRejectionIsAtomic() {
   patch = patchFor(ThresholdField::Chamber, 100.0f);
   EXPECT_TRUE(name, validateThresholdPatch(aliased, patch, aliased));
   EXPECT_TRUE(name, aliased.values[0] == 100.0f);
-  EXPECT_TRUE(name, aliased.values[1] == 3.0f && aliased.values[7] == 20.0f);
+  EXPECT_TRUE(name, aliased.values[1] == 2.5f && aliased.values[7] == 20.0f);
   patch.values.values[0] = 151.0f;
   const auto before_rejection = aliased;
   EXPECT_FALSE(name, validateThresholdPatch(aliased, patch, aliased));
@@ -588,6 +588,22 @@ void testMqWarmupCountsDownForFiveMinutes() {
   EXPECT_TRUE(name, mqWarmupRemainingSeconds(301000) == 0);
 }
 
+void testSkippingMqWarmupEndsCountdownImmediately() {
+  const char *name = "skipping MQ warmup ends the countdown immediately";
+  startMqWarmup(1000);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(61000) == 240);
+  EXPECT_TRUE(name, endMqWarmup(61000) == MqWarmupSkipResult::Accepted);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(61000) == 0);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(120000) == 0);
+  // Skipping after warmup already finished is harmless.
+  EXPECT_TRUE(name, endMqWarmup(400000) == MqWarmupSkipResult::Accepted);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(400000) == 0);
+  // A skip right after boot must not underflow into a new countdown.
+  startMqWarmup(0);
+  EXPECT_TRUE(name, endMqWarmup(5000) == MqWarmupSkipResult::Accepted);
+  EXPECT_TRUE(name, mqWarmupRemainingSeconds(5000) == 0);
+}
+
 void testMq2DangerIsIgnoredWhileSensorsWarmUp() {
   const char *name = "MQ2 danger is ignored while sensors warm up";
   resetSafetyState();
@@ -643,17 +659,17 @@ void testMq2SafeRangeDoesNotTriggerGasDanger() {
 void testMq2DangerStartsAtConfiguredThreshold() {
   const char *name = "MQ2 danger starts at configured threshold";
   resetSafetyState();
-  safety_thresholds.values[1] = 3.0f;
-  current_mq2_v = 2.5f;
+  safety_thresholds.values[1] = 2.4f;
+  current_mq2_v = 2.0f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
-  current_mq2_v = 3.0f;
+  current_mq2_v = 2.4f;
   evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
-  current_mq2_v = 2.9f;
+  current_mq2_v = 2.3f;
   evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
-  current_mq2_v = 2.85f;
+  current_mq2_v = 2.25f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
@@ -1114,8 +1130,8 @@ void testConfiguredUpperLimits() {
   };
   const Case cases[] = {
       {ThresholdField::Chamber, "high_chamber_temp", 80, 79, 77, 76},
-      {ThresholdField::Mq2, "high_mq2_gas", 3, 2.99f, 2.9f, 2.85f},
-      {ThresholdField::Mq135, "high_mq135_gas", 3, 2.99f, 2.9f, 2.85f},
+      {ThresholdField::Mq2, "high_mq2_gas", 2.5f, 2.49f, 2.40f, 2.35f},
+      {ThresholdField::Mq135, "high_mq135_gas", 2.5f, 2.49f, 2.40f, 2.35f},
       {ThresholdField::Ambient, "high_ambient_temp", 40, 39, 39, 38},
       {ThresholdField::Ambient, "high_ambient_temp", -10, -10.1f, -10.25f, -10.5f},
       {ThresholdField::Ambient, "high_ambient_temp", 0, -0.1f, -0.25f, -0.5f},
@@ -1229,7 +1245,7 @@ void testEnvironmentalInvalidReadings() {
 void testEnvironmentalLatchesClearOnFault() {
   const char *name = "environmental latches clear on fault";
   resetSafetyState();
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2.4f)) ==
                         ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Ambient, 40)) ==
                         ThresholdUpdateResult::Accepted);
@@ -1237,7 +1253,7 @@ void testEnvironmentalLatchesClearOnFault() {
                         ThresholdUpdateResult::Accepted);
   configureHumidity(name, 30, 70);
   recordPmsReading(PmsReading{100, 0, 0}, test_millis);
-  processSensorReadings(40, 25, 3, 0.5f, false, 29);
+  processSensorReadings(40, 25, 2.4f, 0.5f, false, 29);
   for (const char *trigger : {"high_mq135_gas", "high_ambient_temp",
                               "high_pm1_0", "low_humidity"}) {
     EXPECT_CONTAINS(name, active_triggers_json, trigger);
@@ -1249,17 +1265,17 @@ void testEnvironmentalLatchesClearOnFault() {
     EXPECT_TRUE(name, active_triggers_json.find(trigger) == String::npos);
   }
   recordPmsReading(PmsReading{96, 0, 0}, test_millis);
-  processSensorReadings(39, 25, 2.9f, 0.5f, false, 31);
+  processSensorReadings(39, 25, 2.2f, 0.5f, false, 31);
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
 void testChangedLimitsReevaluateValidReadings() {
   const char *name = "changed limits reevaluate valid readings";
   resetSafetyState();
-  processSensorReadings(40, 80, 3, 3, false, 29);
+  processSensorReadings(40, 80, 2.4f, 2.4f, false, 29);
   recordPmsReading(PmsReading{100, 100, 100}, test_millis);
   ThresholdPatch limits{defaultSafetyThresholds(), 0x1ff};
-  limits.values.values = {80, 3, 3, 40, 100, 100, 100, 30, 70};
+  limits.values.values = {80, 2.4f, 2.4f, 40, 100, 100, 100, 30, 70};
   EXPECT_TRUE(name, applyThresholdUpdate(limits) == ThresholdUpdateResult::Accepted);
   for (const char *trigger : {"high_chamber_temp", "high_mq2_gas",
                               "high_mq135_gas", "high_ambient_temp", "high_pm1_0",
@@ -1267,7 +1283,7 @@ void testChangedLimitsReevaluateValidReadings() {
     EXPECT_CONTAINS(name, active_triggers_json, trigger);
   }
   SafetyThresholds accepted{};
-  limits.values.values = {81, 3.01f, 3.01f, 41, 101, 101, 101, 28, 70};
+  limits.values.values = {81, 2.45f, 2.45f, 41, 101, 101, 101, 28, 70};
   EXPECT_TRUE(name, applyThresholdUpdate(limits, &accepted) ==
                         ThresholdUpdateResult::Accepted);
   EXPECT_TRUE(name, accepted.values == limits.values.values);
@@ -1291,10 +1307,10 @@ void testSimultaneousEnvironmentalAlertsKeepManualPumpUsable() {
   const char *name = "simultaneous environmental alerts keep manual pump usable";
   resetSafetyState();
   ThresholdPatch limits{defaultSafetyThresholds(), 0x1ff};
-  limits.values.values = {80, 3, 3, 40, 100, 100, 100, 30, 70};
+  limits.values.values = {80, 2.4f, 2.4f, 40, 100, 100, 100, 30, 70};
   EXPECT_TRUE(name, applyThresholdUpdate(limits) == ThresholdUpdateResult::Accepted);
   recordPmsReading(PmsReading{100, 100, 100}, test_millis);
-  processSensorReadings(40, 25, 3, 3, false, 29);
+  processSensorReadings(40, 25, 2.4f, 2.4f, false, 29);
   for (const char *trigger : {"high_mq2_gas", "high_mq135_gas",
                               "high_ambient_temp", "high_pm1_0", "high_pm2_5",
                               "high_pm10", "low_humidity"}) {
@@ -1316,12 +1332,12 @@ void testSimultaneousEnvironmentalAlertsKeepManualPumpUsable() {
 void testWarmupSuppressesBothMqConditions() {
   const char *name = "warmup suppresses both MQ conditions";
   resetSafetyState();
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 3)) ==
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq135, 2.4f)) ==
                         ThresholdUpdateResult::Accepted);
-  processSensorReadings(25, 25, 3, 3, false, 50);
+  processSensorReadings(25, 25, 2.5f, 2.5f, false, 50);
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq135_gas");
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
-  for (float value : {3.0f, NAN, INFINITY}) {
+  for (float value : {2.5f, NAN, INFINITY}) {
     processSensorReadings(25, 25, value, value, true, 50);
     EXPECT_TRUE(name, active_triggers_json == "[]");
     EXPECT_TRUE(name, std::isnan(current_mq135_v) && std::isnan(current_mq2_v));
@@ -1333,7 +1349,7 @@ void testWarmupSuppressesBothMqConditions() {
   EXPECT_CONTAINS(name, active_triggers_json, "high_ambient_temp");
   EXPECT_TRUE(name, active_triggers_json.find("mq") == String::npos);
   EXPECT_TRUE(name, current_pump_state);
-  processSensorReadings(25, 25, 2.4f, 1.8f, false, 50);
+  processSensorReadings(25, 25, 1.8f, 1.8f, false, 50);
   EXPECT_TRUE(name, active_triggers_json == "[]");
 }
 
@@ -1365,21 +1381,19 @@ void testPmsFaultEvaluationAndRollover() {
 void testMq2FaultPreservesLatchAndRailPriority() {
   const char *name = "MQ2 fault preserves latch and rail priority";
   resetSafetyState();
-  current_mq2_v = 3;
+  current_mq2_v = 2.2f;
   evaluateSafetyLoop();
   current_mq2_v = NAN;
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq2, 4)) ==
+  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq2, 2.5f)) ==
                         ThresholdUpdateResult::Accepted);
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
   EXPECT_CONTAINS(name, active_triggers_json, "mq2_sensor_fault");
-  current_mq2_v = 3.9f;
+  current_mq2_v = 2.4f;
   evaluateSafetyLoop();
   EXPECT_CONTAINS(name, active_triggers_json, "high_mq2_gas");
-  current_mq2_v = 3.8f;
+  current_mq2_v = 2.3f;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[]");
-  EXPECT_TRUE(name, applyThresholdUpdate(patchFor(ThresholdField::Mq2, 5)) ==
-                        ThresholdUpdateResult::Accepted);
   current_mq2_v = 5;
   evaluateSafetyLoop();
   EXPECT_TRUE(name, active_triggers_json == "[\"mq2_sensor_fault\"]");
@@ -1483,6 +1497,8 @@ int main() {
   run("temperature hysteresis", testTemperatureHysteresis);
   run("MQ2 danger does not activate pump", testMq2DangerDoesNotActivatePump);
   run("MQ warmup counts down for five minutes", testMqWarmupCountsDownForFiveMinutes);
+  run("skipping MQ warmup ends the countdown immediately",
+      testSkippingMqWarmupEndsCountdownImmediately);
   run("MQ2 danger is ignored while sensors warm up",
       testMq2DangerIsIgnoredWhileSensorsWarmUp);
   run("MQ2 danger keeps LED green", testMq2DangerKeepsLedGreen);
