@@ -636,8 +636,7 @@ class _FieldDefinition {
   double get maximum => switch (field) {
     'threshold_chamber_temp_c' => 150,
     'threshold_temperature_c' => 80,
-    'threshold_mq2_v' => 4.8,
-    'threshold_mq135_v' => 5,
+    'threshold_mq2_v' || 'threshold_mq135_v' => 2.5,
     _ => 65535,
   };
 

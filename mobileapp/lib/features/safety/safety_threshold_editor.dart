@@ -60,8 +60,7 @@ class SafetyThresholdEditor {
 
   bool _isWithinRange(String field, double value) => switch (field) {
     'threshold_chamber_temp_c' => value >= 20 && value <= 150,
-    'threshold_mq2_v' => value >= 0.1 && value <= 4.8,
-    'threshold_mq135_v' => value >= 0.1 && value <= 5.0,
+    'threshold_mq2_v' || 'threshold_mq135_v' => value >= 0.1 && value <= 2.5,
     'threshold_temperature_c' => value >= -40 && value <= 80,
     'threshold_pm1_0_ug_m3' ||
     'threshold_pm2_5_ug_m3' ||
@@ -73,8 +72,8 @@ class SafetyThresholdEditor {
 
   String _rangeError(String field) => switch (field) {
     'threshold_chamber_temp_c' => 'Use a value from 20 to 150 °C.',
-    'threshold_mq2_v' => 'Use a value from 0.1 to 4.8 V.',
-    'threshold_mq135_v' => 'Use a value from 0.1 to 5.0 V.',
+    'threshold_mq2_v' ||
+    'threshold_mq135_v' => 'Use a value from 0.1 to 2.5 V.',
     'threshold_temperature_c' => 'Use a value from -40 to 80 °C.',
     'threshold_pm1_0_ug_m3' ||
     'threshold_pm2_5_ug_m3' ||

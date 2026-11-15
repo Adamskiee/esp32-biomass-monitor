@@ -200,9 +200,9 @@ void main() {
       tester.getTopLeft(input).dy,
       greaterThan(tester.getBottomLeft(slider).dy),
     );
-    await tester.enterText(input, '2.8');
+    await tester.enterText(input, '2.3');
     await tester.pump();
-    expect(editor.changedValues(), {mq2: 2.8});
+    expect(editor.changedValues(), {mq2: 2.3});
     expect(tester.takeException(), isNull);
   });
 
@@ -482,7 +482,7 @@ void main() {
       chamber: (85.26, '85.5'),
       ambient: (-10.26, '-10.5'),
       mq2: (1.26, '1.3'),
-      mq135: (2.84, '2.8'),
+      mq135: (2.24, '2.2'),
       pm1: (80.4, '80'),
       pm25: (90.6, '91'),
       pm10: (110.1, '110'),
@@ -579,13 +579,13 @@ void main() {
     await tester.pumpWidget(subject(title: 'Gas', fields: [mq2]));
     await revealSlider(tester, mq2);
     final slider = tester.widget<Slider>(sliderFor(mq2));
-    expect(slider.max, 4.8);
-    expect(slider.value, 4.8);
+    expect(slider.max, 2.5);
+    expect(slider.value, 2.5);
     expect(inputText(tester, mq2), '5');
     expect(editor.isDirty, isFalse);
-    slider.onChanged!(4.8);
+    slider.onChanged!(2.5);
     await tester.pump();
-    expect(editor.changedValues(), {mq2: 4.8});
+    expect(editor.changedValues(), {mq2: 2.5});
   });
 
   testWidgets(

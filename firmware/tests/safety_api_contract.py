@@ -14,8 +14,8 @@ import urllib.request
 
 LIMITS = {
     "threshold_chamber_temp_c": (20, 150),
-    "threshold_mq2_v": (0.1, 5),
-    "threshold_mq135_v": (0.1, 5),
+    "threshold_mq2_v": (0.1, 2.5),
+    "threshold_mq135_v": (0.1, 2.5),
     "threshold_temperature_c": (-40, 80),
     "threshold_pm1_0_ug_m3": (0, 65535),
     "threshold_pm2_5_ug_m3": (0, 65535),
@@ -215,7 +215,7 @@ class WriteContract(ApiContract):
                     self.assert_rejected(path, raw=(
                         '{"' + field + '":1e400}'
                     ).encode())
-            for patch in ({}, {"unknown": 42}, [], {"threshold_mq2_v": 3,
+            for patch in ({}, {"unknown": 42}, [], {"threshold_mq2_v": 2.0,
                           "unknown": 42}, {"threshold_humidity_min_percent": 70,
                           "threshold_humidity_max_percent": 30},
                           {"threshold_humidity_min_percent": 40,

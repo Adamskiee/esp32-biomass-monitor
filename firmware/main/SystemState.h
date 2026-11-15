@@ -45,6 +45,11 @@ enum class ManualSprinklerResult {
   Busy,
 };
 
+enum class MqWarmupSkipResult {
+  Accepted,
+  Busy,
+};
+
 ThresholdUpdateResult applyThresholdUpdate(bool has_chamber_limit,
                                            float chamber_limit,
                                            bool has_mq2_limit, float mq2_limit);
@@ -55,6 +60,9 @@ void processSensorReadings(float temperature_c, float chamber_c, float mq135_v,
                            float mq2_v, bool mq_sensors_warming_up = false,
                            float humidity_percent = NAN);
 void startMqWarmup(uint32_t now_ms);
+// Ends the current MQ warmup so the next sensor read reports live MQ values
+// and evaluates gas alerts. Safe to call after warmup has already finished.
+MqWarmupSkipResult endMqWarmup(uint32_t now_ms);
 uint32_t mqWarmupRemainingSeconds(uint32_t now_ms);
 bool mqSensorsAreWarmingUp();
 void recordPmsReading(const PmsReading &reading, uint32_t sampled_at_ms);

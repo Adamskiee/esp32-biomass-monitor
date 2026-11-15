@@ -35,7 +35,7 @@ class CommandTests(unittest.TestCase):
 
     def test_reset_restores_defaults_and_status_reports_scenario(self):
         self.state.select_scenario("heat")
-        self.state.update_thresholds({"threshold_mq2_v": 4})
+        self.state.update_thresholds({"threshold_mq2_v": 2.4})
         self.assertIn("heat", process_command(self.state, "status"))
         process_command(self.state, "reset")
         snapshot = self.state.snapshot()

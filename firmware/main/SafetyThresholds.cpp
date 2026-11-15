@@ -42,7 +42,7 @@ bool validFieldValue(ThresholdField field, float value) {
     return value >= 20.0f && value <= 150.0f;
   case ThresholdField::Mq2:
   case ThresholdField::Mq135:
-    return value >= 0.1f && value <= 5.0f;
+    return value >= 0.1f && value <= 2.5f;
   case ThresholdField::Ambient:
     return value >= -40.0f && value <= 80.0f;
   case ThresholdField::Pm1:

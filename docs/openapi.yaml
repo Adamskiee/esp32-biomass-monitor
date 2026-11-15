@@ -132,13 +132,13 @@ components:
           type: number
           format: float
           minimum: 0.1
-          maximum: 5.0
-          description: Configured MQ-2 alert limit. Rail-short faults above 4.8 V take precedence, so limits above 4.8 V cannot produce a valid threshold crossing.
+          maximum: 2.5
+          description: Configured MQ-2 alert limit.
         threshold_mq135_v:
           type: number
           format: float
           minimum: 0.1
-          maximum: 5.0
+          maximum: 2.5
         threshold_temperature_c:
           type: number
           format: float
@@ -208,15 +208,15 @@ components:
         threshold_mq2_v:
           type: number
           format: float
-          default: 2.5
+          default: 2.0
           minimum: 0.1
-          maximum: 5
+          maximum: 2.5
         threshold_mq135_v:
           type: number
           format: float
-          default: 2
+          default: 2.0
           minimum: 0.1
-          maximum: 5
+          maximum: 2.5
         threshold_temperature_c:
           type: number
           format: float

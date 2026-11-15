@@ -17,6 +17,25 @@ class SimulatorStateTests(unittest.TestCase):
         self.state = SimulatorState(clock=lambda: self.now)
         self.now = 301.0
 
+    def test_skip_mq_warmup_reports_live_readings_and_gas_alerts(self):
+        now = 0.0
+        state = SimulatorState(clock=lambda: now)
+        state.select_scenario("gas")
+        now = 60.0
+        self.assertEqual(state.snapshot()["mq_warmup_remaining_seconds"], 240)
+
+        state.skip_mq_warmup()
+        snapshot = state.snapshot()
+
+        self.assertFalse(snapshot["mq_warming_up"])
+        self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 0)
+        self.assertEqual(snapshot["mq2_v"], 2.4)
+        self.assertIsNotNone(snapshot["mq135_v"])
+        self.assertIn("high_mq2_gas", snapshot["active_triggers"])
+        # Skipping again after warmup has ended is harmless.
+        state.skip_mq_warmup()
+        self.assertFalse(state.snapshot()["mq_warming_up"])
+
     def test_startup_warmup_hides_mq_readings_and_suppresses_gas_alerts(self):
         now = 0.0
         state = SimulatorState(clock=lambda: now)
@@ -41,7 +60,7 @@ class SimulatorStateTests(unittest.TestCase):
 
         self.assertFalse(snapshot["mq_warming_up"])
         self.assertEqual(snapshot["mq_warmup_remaining_seconds"], 0)
-        self.assertEqual(snapshot["mq2_v"], 2.8)
+        self.assertEqual(snapshot["mq2_v"], 2.4)
         self.assertIn("high_mq2_gas", snapshot["active_triggers"])
 
     def test_snapshot_keeps_safety_and_warmup_status_consistent_at_expiry(self):
@@ -104,7 +123,7 @@ class SimulatorStateTests(unittest.TestCase):
     def test_gas_alert_does_not_start_sprinkler(self):
         self.state.select_scenario("gas")
         state = self.state.snapshot()
-        self.assertEqual(state["mq2_v"], 2.8)
+        self.assertEqual(state["mq2_v"], 2.4)
         self.assertIn("high_mq2_gas", state["active_triggers"])
         self.assertFalse(state["pump_on"])
 
@@ -123,17 +142,17 @@ class SimulatorStateTests(unittest.TestCase):
         for bad in (True, float("nan"), 19.9, 150.1):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.state.update_thresholds({
-                    "threshold_chamber_temp_c": bad, "threshold_mq2_v": 3.0,
+                    "threshold_chamber_temp_c": bad, "threshold_mq2_v": 2.4,
                 })
             state = self.state.snapshot()
             self.assertEqual((state["threshold_chamber_temp_c"], state["threshold_mq2_v"]), (80.0, 2.0))
         with self.assertRaises(ValueError):
             self.state.update_thresholds({})
-        self.state.update_thresholds({"threshold_chamber_temp_c": 20, "threshold_mq2_v": 5})
+        self.state.update_thresholds({"threshold_chamber_temp_c": 20, "threshold_mq2_v": 2.5})
         self.assertEqual(self.state.snapshot()["threshold_chamber_temp_c"], 20.0)
 
     def test_gas_uses_saved_limit(self):
-        self.state.update_thresholds({"threshold_mq2_v": 5.0})
+        self.state.update_thresholds({"threshold_mq2_v": 2.5})
         self.state.select_scenario("gas")
         self.assertNotIn("high_mq2_gas", self.state.snapshot()["active_triggers"])
 
@@ -274,7 +293,7 @@ class SimulatorStateTests(unittest.TestCase):
         self.now += 10
         self.assertIn("high_pm1_0", self.state.snapshot()["active_triggers"])
         self.state.set_readings({"humidity_percent": 55})
-        self.state.update_thresholds({"threshold_mq2_v": 3})
+        self.state.update_thresholds({"threshold_mq2_v": 2.4})
         self.now += 0.001
         sample = self.state.snapshot()
         self.assertEqual(sample["active_triggers"], ["pms_sensor_fault"])
@@ -403,7 +422,7 @@ class SimulatorStateTests(unittest.TestCase):
 
     def test_reset_clears_every_configured_limit_and_override(self):
         self.state.update_thresholds({
-            "threshold_chamber_temp_c": 100, "threshold_mq2_v": 3,
+            "threshold_chamber_temp_c": 100, "threshold_mq2_v": 2.4,
             "threshold_mq135_v": 2, "threshold_temperature_c": 35,
             "threshold_pm1_0_ug_m3": 10, "threshold_pm2_5_ug_m3": 20,
             "threshold_pm10_ug_m3": 30, "threshold_humidity_min_percent": 30,
@@ -425,17 +444,17 @@ class SimulatorStateTests(unittest.TestCase):
         self.assertEqual(self.state.scenario, "heat")
 
     def test_offline_retains_state(self):
-        self.state.update_thresholds({"threshold_mq2_v": 3.0})
+        self.state.update_thresholds({"threshold_mq2_v": 2.4})
         self.state.select_scenario("heat")
         self.state.select_scenario("offline")
         self.assertEqual(self.state.scenario, "offline")
         self.assertEqual(self.state.snapshot()["chamber_temp_c"], 100.0)
-        self.assertEqual(self.state.snapshot()["threshold_mq2_v"], 3.0)
+        self.assertEqual(self.state.snapshot()["threshold_mq2_v"], 2.4)
 
     def test_reset_clears_latch_and_thresholds(self):
         self.state.select_scenario("heat")
         self.state.select_scenario("temp-fault")
-        self.state.update_thresholds({"threshold_chamber_temp_c": 120, "threshold_mq2_v": 3.5})
+        self.state.update_thresholds({"threshold_chamber_temp_c": 120, "threshold_mq2_v": 2.4})
         self.state.reset()
         state = self.state.snapshot()
         self.assertEqual(self.state.scenario, "normal")

@@ -172,8 +172,8 @@ Updates any nonempty subset of the nine supported limits atomically:
 | Field | Accepted range | Initial value |
 | --- | --- | --- |
 | `threshold_chamber_temp_c` | 20 to 150 °C | Existing saved value, otherwise 80 |
-| `threshold_mq2_v` | 0.1 to 5 V | Existing saved value, otherwise 2.5 |
-| `threshold_mq135_v` | 0.1 to 5 V | 2 |
+| `threshold_mq2_v` | 0.1 to 2.5 V | Existing saved value, otherwise 2.0 |
+| `threshold_mq135_v` | 0.1 to 2.5 V | 2.0 |
 | `threshold_temperature_c` | -40 to 80 °C | 35 |
 | `threshold_pm1_0_ug_m3` | Greater than 0, up to 65535 µg/m³ | 15 |
 | `threshold_pm2_5_ug_m3` | Greater than 0, up to 65535 µg/m³ | 15 |

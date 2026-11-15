@@ -12,7 +12,7 @@ class SimulatorState:
     _MQ_WARMUP_SECONDS = 300
     _PMS_FRESHNESS_SECONDS = 10
     _READINGS = {
-        "gas": {"mq2_v": 2.8},
+        "gas": {"mq2_v": 2.4},
         "heat": {"chamber_temp_c": 100.0},
         "temp-fault": {"chamber_temp_c": None},
         "mq2-fault": {"mq2_v": None},
@@ -32,8 +32,8 @@ class SimulatorState:
     }
     _LIMITS = {
         "threshold_chamber_temp_c": (20.0, 150.0),
-        "threshold_mq2_v": (0.1, 5.0),
-        "threshold_mq135_v": (0.1, 5.0),
+        "threshold_mq2_v": (0.1, 2.5),
+        "threshold_mq135_v": (0.1, 2.5),
         "threshold_temperature_c": (-40.0, 80.0),
         "threshold_pm1_0_ug_m3": (0.0, 65535.0),
         "threshold_pm2_5_ug_m3": (0.0, 65535.0),
@@ -90,6 +90,12 @@ class SimulatorState:
             now = self._clock()
             self._mq_warmup_started_at = now
             self._evaluate_safety(self._valid_readings(now), True)
+
+    def skip_mq_warmup(self) -> None:
+        with self._lock:
+            now = self._clock()
+            self._mq_warmup_started_at = min(self._mq_warmup_started_at, now - self._MQ_WARMUP_SECONDS)
+            self._evaluate_safety(self._valid_readings(now), False)
 
     def select_scenario(self, name: str) -> None:
         if name not in (*self._READINGS, "normal", "offline"):

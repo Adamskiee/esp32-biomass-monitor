@@ -206,7 +206,7 @@ class _HomeTabState extends State<HomeTab> {
                         statusText: _mqWarmupStatus(data),
                       ),
                       _metricCard(
-                        "MQ2 Smoke",
+                        "MQ2 Gas",
                         data.mq2V,
                         " V",
                         AppIcons.smoke,

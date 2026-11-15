@@ -223,6 +223,21 @@ ManualSprinklerResult applyManualSprinklerCommand(bool enabled) {
 
 void startMqWarmup(uint32_t now_ms) { mq_warmup_started_at_ms = now_ms; }
 
+MqWarmupSkipResult endMqWarmup(uint32_t now_ms) {
+#ifdef ARDUINO
+  if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) {
+    return MqWarmupSkipResult::Busy;
+  }
+#endif
+  // Unsigned wraparound keeps elapsed == MQ_WARMUP_DURATION_MS even when
+  // now_ms is smaller than the duration (a skip shortly after boot).
+  mq_warmup_started_at_ms = now_ms - MQ_WARMUP_DURATION_MS;
+#ifdef ARDUINO
+  xSemaphoreGive(stateMutex);
+#endif
+  return MqWarmupSkipResult::Accepted;
+}
+
 uint32_t mqWarmupRemainingSeconds(uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - mq_warmup_started_at_ms;
   if (elapsed_ms >= MQ_WARMUP_DURATION_MS) {

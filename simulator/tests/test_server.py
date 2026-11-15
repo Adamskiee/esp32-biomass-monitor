@@ -52,6 +52,21 @@ class ServerTests(unittest.TestCase):
             data = response.read()
             return response.status, response.headers, json.loads(data) if data and response.headers.get_content_type() == "application/json" else data
 
+    def test_warmup_skip_route_ends_warmup_and_requires_auth(self):
+        self.state.start_mq_warmup()
+        status, _, _ = self.request("/api/warmup/skip", "POST", b"", authorization="Basic bad")
+        self.assertEqual(status, 401)
+        self.assertTrue(self.request("/api/state")[2]["mq_warming_up"])
+
+        status, _, body = self.request("/api/warmup/skip", "POST", b"")
+        self.assertEqual((status, body), (200, {"status": "ok"}))
+        _, _, snapshot = self.request("/api/state")
+        self.assertFalse(snapshot["mq_warming_up"])
+        self.assertIsNotNone(snapshot["mq2_v"])
+
+        status, _, body = self.request("/api/warmup/skip", "POST", b"")
+        self.assertEqual((status, body), (200, {"status": "ok"}))
+
     def test_state_and_settings_routes_return_documented_fields(self):
         status, _, state = self.request("/api/state")
         self.assertEqual(status, 200)
@@ -73,14 +88,14 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(self.state.snapshot()["manual_sprinkler"])
         for route, field, value in (
             ("/api/thresholds", "threshold_chamber_temp_c", 120),
-            ("/api/settings", "threshold_mq2_v", 3.0),
+            ("/api/settings", "threshold_mq2_v", 2.4),
         ):
             status, _, body = self.request(route, "POST", {field: value})
             self.assertEqual(status, 200)
             self.assertEqual(body, {"status": "ok", "thresholds": self.request("/api/settings")[2]})
         self.assertEqual(self.request("/api/settings")[2], {
             **DEFAULT_THRESHOLDS,
-            "threshold_chamber_temp_c": 120.0, "threshold_mq2_v": 3.0,
+            "threshold_chamber_temp_c": 120.0, "threshold_mq2_v": 2.4,
         })
 
     def test_missing_and_malformed_basic_auth_return_challenge(self):
@@ -156,7 +171,7 @@ class ServerTests(unittest.TestCase):
 
     def test_boolean_threshold_is_rejected_atomically(self):
         status, _, _ = self.request("/api/thresholds", "POST", {
-            "threshold_chamber_temp_c": True, "threshold_mq2_v": 3,
+            "threshold_chamber_temp_c": True, "threshold_mq2_v": 2.4,
         })
         self.assertEqual(status, 400)
         self.assertEqual(self.request("/api/settings")[2], {
@@ -203,7 +218,7 @@ class ServerTests(unittest.TestCase):
     def test_settings_reads_and_confirmations_do_not_advance_telemetry(self):
         for route in ("/api/thresholds", "/api/settings"):
             self.request("/api/settings")
-            self.request(route, "POST", {"threshold_mq2_v": 3})
+            self.request(route, "POST", {"threshold_mq2_v": 2.4})
         self.assertEqual(self.request("/api/state")[2]["temperature_c"], 25)
 
     def test_both_routes_reject_unknown_non_numeric_and_invalid_ranges_atomically(self):
@@ -214,7 +229,7 @@ class ServerTests(unittest.TestCase):
                           {"threshold_pm2_5_ug_m3": 65536},
                           {"threshold_humidity_min_percent": 60}):
                 with self.subTest(route=route, patch=patch):
-                    self.assertEqual(self.request(route, "POST", {"threshold_mq2_v": 3, **patch})[0], 400)
+                    self.assertEqual(self.request(route, "POST", {"threshold_mq2_v": 2.4, **patch})[0], 400)
                     self.assertEqual(self.request("/api/settings")[2], DEFAULT_THRESHOLDS)
 
     def test_safety_block_returns_conflict(self):

@@ -35,11 +35,16 @@ def make_handler(state: SimulatorState, username: str, password: str) -> type[Ba
         def do_POST(self) -> None:
             if not self._authenticate():
                 return
-            if self.path not in ("/api/control", "/api/thresholds", "/api/settings"):
+            if self.path not in ("/api/control", "/api/thresholds", "/api/settings", "/api/warmup/skip"):
                 self._send_json(404, {"status": "error", "message": "Not found"})
                 return
             if state.scenario == "offline":
                 self._send_json(503, {"status": "error", "message": "Device offline"})
+                return
+            if self.path == "/api/warmup/skip":
+                # Matches the firmware: no body is read and repeat calls succeed.
+                state.skip_mq_warmup()
+                self._send_json(200, {"status": "ok"})
                 return
             payload = self._read_payload()
             if payload is None:

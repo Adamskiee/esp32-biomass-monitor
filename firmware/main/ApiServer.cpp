@@ -241,6 +241,21 @@ void initApiServer() {
               }
             });
 
+  server.on("/api/warmup/skip", HTTP_POST,
+            [send401](AsyncWebServerRequest *request) {
+              if (!request->authenticate(API_USER, API_PASS))
+                return send401(request);
+              if (endMqWarmup(millis()) == MqWarmupSkipResult::Busy) {
+                AsyncWebServerResponse *response = request->beginResponse(
+                    503, "application/json",
+                    "{\"status\":\"error\",\"message\":\"Server busy\"}");
+                return request->send(response);
+              }
+              AsyncWebServerResponse *response = request->beginResponse(
+                  200, "application/json", "{\"status\":\"ok\"}");
+              request->send(response);
+            });
+
   server.onNotFound([](AsyncWebServerRequest *request) {
     AsyncWebServerResponse *response =
         request->beginResponse(404, "text/plain", "Not Found");

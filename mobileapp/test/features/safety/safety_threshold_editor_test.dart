@@ -24,8 +24,8 @@ void main() {
     'rejects a newly entered MQ-2 threshold above the valid sensor range',
     () {
       final editor = SafetyThresholdEditor()
-        ..refresh(SafetyThresholds.fromJson({'threshold_mq2_v': 5.0}))
-        ..edit('threshold_mq2_v', '4.9');
+        ..refresh(SafetyThresholds.fromJson({'threshold_mq2_v': 2.5}))
+        ..edit('threshold_mq2_v', '2.6');
 
       expect(editor.validate()['threshold_mq2_v'], isNotNull);
     },
@@ -100,7 +100,7 @@ void main() {
         SafetyThresholds.fromJson({
           'threshold_chamber_temp_c': 20,
           'threshold_mq2_v': 0.1,
-          'threshold_mq135_v': 5,
+          'threshold_mq135_v': 2.5,
           'threshold_temperature_c': -40,
           'threshold_pm1_0_ug_m3': 65535,
           humidityMin: 0,
@@ -153,8 +153,8 @@ void main() {
 
   for (final entry in <String, List<String>>{
     'threshold_chamber_temp_c': ['19', '151', 'NaN', 'Infinity', ''],
-    'threshold_mq2_v': ['0', '4.9'],
-    'threshold_mq135_v': ['0', '5.1'],
+    'threshold_mq2_v': ['0', '2.6'],
+    'threshold_mq135_v': ['0', '2.6'],
     'threshold_temperature_c': ['-41', '81'],
     'threshold_pm1_0_ug_m3': ['0', '65536'],
     'threshold_pm2_5_ug_m3': ['-1', '65536'],
